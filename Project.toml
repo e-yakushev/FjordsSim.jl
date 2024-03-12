@@ -1,0 +1,7 @@
+name = "FjordsSim"
+uuid = "0c33e1da-db83-441e-bdcc-232a98675987"
+authors = ["limash <yakubov.sha@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+Oceananigans = "9e8cae18-63c1-5223-a75c-80ca9d6e9a09"
