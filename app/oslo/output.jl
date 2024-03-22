@@ -1,47 +1,19 @@
 using Oceananigans
 using GLMakie
 
-Nx = 50
-Ny = 50
-Nz = 10;
+filepath = joinpath(homedir(), "fjords_data", "oslo_fjord_snapshots.jld2")
 
-grid = LatitudeLongitudeGrid(CPU();
-                             size = (Nx, Ny, Nz),
-                             latitude = (58.8, 59.9),
-                             longitude = (10.1, 11.1),
-                             z = (-500, 0),
-                             halo = (4, 4, 4))
+time_series = FieldTimeSeries(filepath, "T")
+x, y, z = nodes(time_series)
+snap = interior(time_series)[:, :, 10, 1]
+h = interior(time_series.grid.immersed_boundary.bottom_height)[:, :, 1]
+land = h .>= 0
+snap[land] .= NaN
 
-filepath = joinpath(homedir(), "src", "FjOs.jl", "oslo_fjord_50_50_10_fine_snapshots.jld2")
+f = Figure(size = (900, 700))
+axis_kwargs = (xlabel="x", ylabel="y")
+ax = Axis(f[1, 1]; axis_kwargs...)
+hm = heatmap!(ax, x, y, snap; nan_color=:white, colormap = :thermal)
+Colorbar(f[1, 2], hm; label = "m")
 
-time_series = (w = FieldTimeSeries(filepath, "w"; grid),
-               T = FieldTimeSeries(filepath, "T"; grid))
-xw, yw, zw = nodes(time_series.w)
-xT, yT, zT = nodes(time_series.T)
-
-snap = interior(time_series.w, :, :, 10, 3)
-
-fig = Figure(size = (500, 400))
-
-axis_kwargs = (xlabel="x",
-               ylabel="y",
-               aspect = AxisAspect(grid.Lx/grid.Lz),
-               limits = ((0, grid.Lx), (-grid.Lz, 0)))
-
-ax_w  = Axis(fig[1, 1]; title = "Vertical velocity", axis_kwargs...)
-ax_T  = Axis(fig[2, 1]; title = "Temperature", axis_kwargs...)
-
-level = 10
-time_snap = 1
-wlims = (-0.05, 0.05)
-Tlims = (18.0, 22.00)
-
-wₙ = interior(time_series.w, :, :, level, time_snap)
-hm_w = heatmap!(ax_w, xw, zw, wₙ; colormap = :balance, colorrange = wlims)
-Colorbar(fig[1, 2], hm_w; label = "m s⁻¹")
-
-Tₙ = interior(time_series.T, :, :, level, time_snap)
-hm_T = heatmap!(ax_T, xT, zT, Tₙ; colormap = :thermal, colorrange = Tlims)
-Colorbar(fig[2, 2], hm_T; label = "ᵒC")
-
-display(fig)
+display(f)

@@ -1,32 +1,11 @@
+using FjordsSim
 using Oceananigans
 using Oceananigans.Units: minute, minutes, days, hour
-using ClimaOcean.Bathymetry: regrid_bathymetry
-
 using Printf
 
-Nx = 100
-Ny = 100
-Nz = 10;
+include("setup.jl")
 
-underlying_grid = LatitudeLongitudeGrid(CPU();
-                             size = (Nx, Ny, Nz),
-                             latitude = (58.8, 59.9),
-                             longitude = (10.1, 11.1),
-                             z = (-500, 0),
-                             halo = (4, 4, 4))
-
-dir = joinpath(homedir(), "fjos_data")
-h = regrid_bathymetry(
-    underlying_grid,
-    height_above_water=0,
-    minimum_depth=0,
-    dir=dir,
-    filename = "ETOPO_2022_v1_15s_N60E000_surface.nc"
-)
-
-bathymetry = h
-
-grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(bathymetry))
+grid = ImmersedBoundaryGrid(fjords_setup)
 
 # const surface_νz = 1e-2
 # const background_νz = 1e-4
@@ -84,7 +63,7 @@ u_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(Qᵘ))
 
 model = HydrostaticFreeSurfaceModel(; coriolis, closure, grid,
                                     momentum_advection = VectorInvariant(),
-                                    tracer_advection = WENO(underlying_grid),
+                                    tracer_advection = WENO(grid.underlying_grid),
                                     tracers = (:T, :S),
                                     boundary_conditions = (u=u_bcs, T=T_bcs)
                                     )
@@ -136,7 +115,7 @@ u, v, w = model.velocities
 T = model.tracers.T
 S = model.tracers.S
 
-output_prefix = "./oslo_fjord_$(Nx)_$(Ny)_$(Nz)_fine"
+output_prefix = joinpath(homedir(), "fjords_data", "oslo_fjord")
 pickup = false
 save_interval = 1hour;
 
@@ -144,7 +123,7 @@ simulation.output_writers[:surface_fields] =
     JLD2OutputWriter(model, (; u, v, w, T, S),
                      schedule = TimeInterval(save_interval),
                      filename = output_prefix * "_snapshots",
-                     with_halos = true,
+                     # with_halos = true,
                      overwrite_existing = true)
 
 # Let's goo!

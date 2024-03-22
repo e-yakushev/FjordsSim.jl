@@ -1,6 +1,6 @@
 module FjordsSim
 
-export FjordsSetup
+export FjordsSetup, ImmersedBoundaryGrid
 
 using ClimaOcean.Bathymetry: regrid_bathymetry
 using Oceananigans
