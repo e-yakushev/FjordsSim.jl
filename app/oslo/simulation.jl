@@ -1,4 +1,3 @@
-using FjordsSim
 using Oceananigans
 using Oceananigans.Units: minute, minutes, days, hour
 using Printf

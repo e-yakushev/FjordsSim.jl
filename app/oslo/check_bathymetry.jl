@@ -1,4 +1,3 @@
-using FjordsSim
 using GLMakie
 using Oceananigans
 

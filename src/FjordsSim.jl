@@ -2,11 +2,15 @@ module FjordsSim
 
 export FjordsSetup, ImmersedBoundaryGrid
 
-using ClimaOcean.Bathymetry: regrid_bathymetry
+import Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid
+
 using Oceananigans
 using Oceananigans.Architectures
 
-import Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid
+include("DataWrangling.jl")
+include("Bathymetry.jl")
+
+using .Bathymetry: regrid_bathymetry
 
 struct FjordsSetup
     arch::AbstractSerialArchitecture
@@ -17,7 +21,7 @@ struct FjordsSetup
     halo::Tuple
     datadir::String
     filename::String
-    height_above_water::Number
+    height_above_water
     minimum_depth::Number
 end
 
@@ -29,7 +33,7 @@ function ImmersedBoundaryGrid(setup::FjordsSetup)
                                  z = setup.z,
                                  halo = setup.halo)
     h = regrid_bathymetry(
-        grid,
+        grid;
         height_above_water=setup.height_above_water,
         minimum_depth=setup.minimum_depth,
         dir=setup.datadir,
