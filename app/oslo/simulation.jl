@@ -2,9 +2,13 @@ using Oceananigans
 using Oceananigans.Units: minute, minutes, days, hour
 using Printf
 
+include("../../src/FjordsSim.jl")
 include("setup.jl")
 
-grid = ImmersedBoundaryGrid(fjords_setup)
+using .FjordsSim
+
+setup = FjordsSetup(;oslo_fjord_setup...)
+grid = ImmersedBoundaryGrid(setup)
 
 # const surface_νz = 1e-2
 # const background_νz = 1e-4
@@ -44,8 +48,8 @@ coriolis = HydrostaticSphericalCoriolis()
 
 dTdz = 0.01 # K m⁻¹, temperature gradient
 
-u₁₀ = 20    # m s⁻¹, average wind velocity 10 meters above the ocean
-cᴰ = 2.5e-3 # dimensionless drag coefficient
+u₁₀ = 5 # m s⁻¹, average wind velocity 10 meters above the ocean
+cᴰ = 1e-3 # dimensionless drag coefficient
 ρₒ = 1026.0 # kg m⁻³, average density at the surface of the world ocean
 ρₐ = 1.225  # kg m⁻³, average density of air at sea-level
 

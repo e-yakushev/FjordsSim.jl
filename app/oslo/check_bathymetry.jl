@@ -1,9 +1,13 @@
 using GLMakie
 using Oceananigans
 
+include("../../src/FjordsSim.jl")
 include("setup.jl")
 
-grid = ImmersedBoundaryGrid(fjords_setup)
+using .FjordsSim
+
+setup = FjordsSetup(;oslo_fjord_setup...)
+grid = ImmersedBoundaryGrid(setup)
 λ, φ, z = nodes(grid.underlying_grid, Center(), Center(), Center())
 
 h = interior(grid.immersed_boundary.bottom_height)
