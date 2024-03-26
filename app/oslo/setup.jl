@@ -1,8 +1,8 @@
 oslo_fjord_setup = (
-    Nx = 300,
-    Ny = 300,
-    latitude = (58.8, 59.9),
-    longitude = (10.1, 11.1),
+    Nx = 100,
+    Ny = 100,
+    latitude = (59.65, 59.92),
+    longitude = (10.47, 10.8),
     filename = "ETOPO_2022_v1_15s_N60E000_surface.nc",
     depth = 500,
     surface_layer_Δz = 1.5,  # it shouldn't be 1

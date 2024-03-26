@@ -46,10 +46,10 @@ coriolis = HydrostaticSphericalCoriolis()
 #                                     closure = closures,
 #                                     tracers = (:T, :S))
 
-dTdz = 0.01 # K m⁻¹, temperature gradient
+dTdz = 1e-3 # K m⁻¹, temperature gradient
 
-u₁₀ = 5 # m s⁻¹, average wind velocity 10 meters above the ocean
-cᴰ = 1e-3 # dimensionless drag coefficient
+u₁₀ = 3 # m s⁻¹, average wind velocity 10 meters above the ocean
+cᴰ = 1e-4 # dimensionless drag coefficient
 ρₒ = 1026.0 # kg m⁻³, average density at the surface of the world ocean
 ρₐ = 1.225  # kg m⁻³, average density of air at sea-level
 
@@ -120,7 +120,7 @@ S = model.tracers.S
 
 output_prefix = joinpath(homedir(), "fjords_data", "oslo_fjord")
 pickup = false
-save_interval = 1hour;
+save_interval = 20minutes;
 
 simulation.output_writers[:surface_fields] =
     JLD2OutputWriter(model, (; u, v, w, T, S),
