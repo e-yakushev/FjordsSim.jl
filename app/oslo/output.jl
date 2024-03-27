@@ -10,7 +10,7 @@ x, y, z = nodes(time_series)
 
 # get a land mask
 h = interior(time_series.grid.immersed_boundary.bottom_height)[:, :, 1]
-land = h .>= -1
+land = h .>= -3
 
 times = time_series.times
 intro = searchsortedfirst(times, 1hour)

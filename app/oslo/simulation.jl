@@ -1,3 +1,4 @@
+## Packages and modules
 using Oceananigans
 using Oceananigans.Units: minute, minutes, days, hour
 using Printf
@@ -7,89 +8,58 @@ include("setup.jl")
 
 using .FjordsSim
 
+## Setup
 setup = FjordsSetup(;oslo_fjord_setup...)
-grid = ImmersedBoundaryGrid(setup)
 
-# const surface_νz = 1e-2
-# const background_νz = 1e-4
-# const background_κz = 1e-5
-#
-# @inline νz(x, y, z, t) = ifelse(z > -49, surface_νz, background_νz)
-#
-# horizontal_viscosity = HorizontalScalarDiffusivity(ν=1e4)
-# vertical_mixing      = RiBasedVerticalDiffusivity()
-# vertical_viscosity   = VerticalScalarDiffusivity(VerticallyImplicitTimeDiscretization(),
-#                                                  ν=νz, κ=background_κz)
-#
-# κ_skew = 9.0      # [m² s⁻¹] skew diffusivity
-# κ_symmetric = 9.0 # [m² s⁻¹] symmetric diffusivity
-#
-# gent_mcwilliams_diffusivity = IsopycnalSkewSymmetricDiffusivity(; κ_skew, κ_symmetric,
-#                                                                 slope_limiter = FluxTapering(1e-2))
-
-# closures = (
-#     vertical_viscosity,
-#     horizontal_viscosity,
-#     vertical_mixing,
-#     gent_mcwilliams_diffusivity,
-# )
-closure = ScalarDiffusivity(ν=1e-4, κ=1e-4)
-
-# free_surface = ImplicitFreeSurface()
-# buoyancy = SeawaterBuoyancy(equation_of_state=LinearEquationOfState(thermal_expansion = 2e-4,
-#                                                                     haline_contraction = 8e-4))
 coriolis = HydrostaticSphericalCoriolis()
+closure = ScalarDiffusivity(ν=1e-4, κ=1e-4)
+grid = ImmersedBoundaryGrid(setup)
+buoyancy = SeawaterBuoyancy(equation_of_state=LinearEquationOfState(thermal_expansion = 2e-4,
+                                                                    haline_contraction = 8e-4))
 
-# model = HydrostaticFreeSurfaceModel(; grid = underlying_grid, free_surface, buoyancy, coriolis,
-#                                     momentum_advection = VectorInvariant(),
-#                                     tracer_advection = WENO(underlying_grid),
-#                                     closure = closures,
-#                                     tracers = (:T, :S))
-
-dTdz = 1e-3 # K m⁻¹, temperature gradient
-
-u₁₀ = 3 # m s⁻¹, average wind velocity 10 meters above the ocean
-cᴰ = 1e-4 # dimensionless drag coefficient
-ρₒ = 1026.0 # kg m⁻³, average density at the surface of the world ocean
-ρₐ = 1.225  # kg m⁻³, average density of air at sea-level
-
-Qᵘ = - ρₐ / ρₒ * cᴰ * u₁₀ * abs(u₁₀); # m² s⁻²
-
+## Boundary conditions
 Qʰ = 200.0  # W m⁻², surface _heat_ flux
+ρₒ = 1026.0 # kg m⁻³, average density at the surface of the world ocean
 cᴾ = 3991.0 # J K⁻¹ kg⁻¹, typical heat capacity for seawater
-
 Qᵀ = Qʰ / (ρₒ * cᴾ) # K m s⁻¹, surface _temperature_ flux
 
+dTdz = 1e-2 # K m⁻¹, temperature gradient
 T_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(Qᵀ),
                                 bottom = GradientBoundaryCondition(dTdz))
-u_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(Qᵘ))
 
-model = HydrostaticFreeSurfaceModel(; coriolis, closure, grid,
+u₁₀ = 10 # m s⁻¹, average wind velocity 10 meters above the ocean
+cᴰ = 2.5e-3 # dimensionless drag coefficient
+ρₐ = 1.225  # kg m⁻³, average density of air at sea-level
+Qᵘ = - ρₐ / ρₒ * cᴰ * u₁₀ * abs(u₁₀); # m² s⁻²
+# u_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(Qᵘ))
+vₛ = 1e-1
+v_bcs = FieldBoundaryConditions(south = OpenBoundaryCondition(vₛ))
+
+## Model
+model = HydrostaticFreeSurfaceModel(; coriolis, closure, grid, buoyancy,
                                     momentum_advection = VectorInvariant(),
                                     tracer_advection = WENO(grid.underlying_grid),
                                     tracers = (:T, :S),
-                                    boundary_conditions = (u=u_bcs, T=T_bcs)
+                                    # boundary_conditions = (u=u_bcs, v=v_bcs, T=T_bcs)
+                                    boundary_conditions = (v=v_bcs, T=T_bcs)
                                     )
 
+## Set model, initial conditions
 # Random noise damped at top and bottom
 Ξ(z) = randn() * z / model.grid.Lz * (1 + z / model.grid.Lz) # noise
-
 # Temperature initial condition: a stable density gradient with random noise superposed.
 Tᵢ(x, y, z) = 20 + dTdz * z + dTdz * model.grid.Lz * 1e-3 * Ξ(z)
-
 # Velocity initial condition: random noise scaled by the friction velocity.
 uᵢ(x, y, z) = sqrt(abs(Qᵘ)) * 1e-3 * Ξ(z);
-
 # `set!` the `model` fields using functions or constants:
 set!(model, u=uᵢ, v=uᵢ, w=uᵢ, T=Tᵢ, S=35)
 
-# set!(model, u=0.01, w=0.01, T=7, S=35)
-
+## Setup a simulation
 Δt = 1minute
 simulation = Simulation(model; Δt, stop_iteration=1440) #stop_time=Nyears * years)
 
+## Setup output, callbacks
 start_time = [time_ns()]
-
 function progress(sim)
     wall_time = (time_ns() - start_time[1]) * 1e-9
 
@@ -120,7 +90,7 @@ S = model.tracers.S
 
 output_prefix = joinpath(homedir(), "fjords_data", "oslo_fjord")
 pickup = false
-save_interval = 20minutes;
+save_interval = 1hour;
 
 simulation.output_writers[:surface_fields] =
     JLD2OutputWriter(model, (; u, v, w, T, S),
@@ -129,7 +99,7 @@ simulation.output_writers[:surface_fields] =
                      # with_halos = true,
                      overwrite_existing = true)
 
-# Let's goo!
+## Run simulation
 @info "Running a simulation with Δt = $(prettytime(simulation.Δt))"
 
 run!(simulation; pickup)
