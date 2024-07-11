@@ -75,8 +75,8 @@ NUT_bottom_cond(i, j, grid, clock, fields ) = (F_ox(fields.O₂[i, j, 1], O2_sub
 NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond,  discrete_form = true,) #ValueBoundaryCondition(10.0)
 
 ## phy
-w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:PHY)).w[1, 1, 1] 
-PHY_bottom_cond(i, j, grid, clock, fields ) = - bu * w_PHY * fields.PHY[i, j, 1] 
+w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:P)).w[1, 1, 1] 
+PHY_bottom_cond(i, j, grid, clock, fields ) = - bu * w_PHY * fields.P[i, j, 1] 
 PHY_bottom = FluxBoundaryCondition(PHY_bottom_cond,  discrete_form = true,)
 
 ## het
@@ -103,13 +103,13 @@ model = NonhydrostaticModel(; grid,
                                                      NUT = FieldBoundaryConditions(bottom = NUT_bottom ),
                                                      DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
                                                      POM = FieldBoundaryConditions(bottom = POM_bottom),
-                                                     PHY = FieldBoundaryConditions(bottom = PHY_bottom),
+                                                     P = FieldBoundaryConditions(bottom = PHY_bottom),
                                                      HET = FieldBoundaryConditions(bottom = HET_bottom),
                                                      ),
                               auxiliary_fields = (; T, S))
 
 ## Set model
-set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350., DOM = 1.)
+set!(model, NUT = 10.0, P = 0.01, HET = 0.05, O₂ = 350., DOM = 1.)
 
 ## Simulation
 stoptime = 1095
@@ -122,15 +122,15 @@ progress_message(sim) = @printf("Iteration: %04d, time: %s, Δt: %s, wall time: 
                                                                   
 simulation.callbacks[:progress] = Callback(progress_message, TimeInterval(10days))
 
-filename = "columney_out"
+output_prefix = joinpath(homedir(), "data_Varna", "columney_output")
+filename = output_prefix * "_snapshots"
 
-model.tracers
-NUT, PHY, HET, POM, DOM, O₂ = model.tracers
+NUT, P, HET, POM, DOM, O₂ = model.tracers
 T = model.auxiliary_fields.T
 PAR = model.auxiliary_fields.PAR
 S = model.auxiliary_fields.S
 
-simulation.output_writers[:profiles] = JLD2OutputWriter(model, (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR),
+simulation.output_writers[:profiles] = JLD2OutputWriter(model, (; NUT, P, HET, POM, DOM, O₂, T, S, PAR),
                                                         filename = "$filename.jld2",
                                                         schedule = TimeInterval(1day),
                                                         overwrite_existing = true)

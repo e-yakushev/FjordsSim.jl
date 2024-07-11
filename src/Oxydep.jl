@@ -190,7 +190,7 @@ function OxygenDepletionModel(; grid,
                                                                                                   
                                    sediment_model::S = nothing,
  
-                                   sinking_speeds = (PHY = 0.15/day, HET = 0.4/day, POM = 10.0/day),
+                                   sinking_speeds = (P = 0.15/day, HET = 0.4/day, POM = 10.0/day),
                                    open_bottom::Bool = true,
 
                                    scale_negatives = false,
@@ -243,7 +243,7 @@ end
 
 const OXYDEP = OxygenDepletionModel
 
-required_biogeochemical_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
+required_biogeochemical_tracers(::OXYDEP) = (:NUT, :P, :HET, :POM, :DOM, :O₂)
 required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, :T)
 
 # Limiting equations and switches
@@ -314,7 +314,7 @@ required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, :T)
             # Denitrification of POM and DOM leads to decrease of NUT (i.e. NOx)
 end
 
-@inline function (bgc::OXYDEP)(::Val{:PHY}, x, y, z, t, NUT, PHY, HET, POM, DOM, OXY, T, PAR)
+@inline function (bgc::OXYDEP)(::Val{:P}, x, y, z, t, NUT, PHY, HET, POM, DOM, OXY, T, PAR)
     Max_uptake = bgc.Max_uptake
     Knut = bgc.Knut
     α = bgc.initial_photosynthetic_slope
@@ -457,15 +457,15 @@ OxygenDepletionModel(adapt(to, oxydep.initial_photosynthetic_slope),
 
 @inline redfield(i, j, k, val_tracer_name, bgc::OXYDEP, tracers) = redfield(val_tracer_name, bgc)
 @inline redfield(::Union{Val{:NUT}}, bgc::OXYDEP) = 0
-@inline redfield(::Union{Val{:PHY}, Val{:HET}, Val{:POM}, Val{:DOM}}, bgc::OXYDEP) = 6.56
+@inline redfield(::Union{Val{:P}, Val{:HET}, Val{:POM}, Val{:DOM}}, bgc::OXYDEP) = 6.56
 
 @inline nitrogen_flux(i, j, k, grid, advection, bgc::OXYDEP, tracers) = sinking_flux(i, j, k, grid, advection, Val(:POM), bgc, tracers) +
-                                                                      sinking_flux(i, j, k, grid, advection, Val(:PHY), bgc, tracers)
+                                                                      sinking_flux(i, j, k, grid, advection, Val(:P), bgc, tracers)
 
-@inline carbon_flux(i, j, k, grid, advection, bgc::OXYDEP, tracers) = nitrogen_flux(i, j, k, grid, advection, bgc, tracers) * redfield(Val(:PHY), bgc)
+@inline carbon_flux(i, j, k, grid, advection, bgc::OXYDEP, tracers) = nitrogen_flux(i, j, k, grid, advection, bgc, tracers) * redfield(Val(:P), bgc)
 
 @inline remineralisation_receiver(::OXYDEP) = :NUT
 
-@inline conserved_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
+@inline conserved_tracers(::OXYDEP) = (:NUT, :P, :HET, :POM, :DOM, :O₂)
 @inline sinking_tracers(bgc::OXYDEP) = keys(bgc.sinking_velocities)
 end # module
