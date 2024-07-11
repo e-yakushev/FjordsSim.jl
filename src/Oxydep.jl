@@ -1,27 +1,26 @@
-"""
-! OXYgen DEPletion model, OXYDEP targests on the silmplest possible way of parameterization of the oxygen  (DO) fate in changeable redox conditions.
-! It has a simplified ecosystem, and simulates production of DO due to photosynthesis and consumation of DO for biota respiraion,
-! OM mineralization, nitrification, and oxidation of reduced specied of S, Mn, Fe, present in suboxic conditions.
-! For the details of  OxyDEP  implemented here see (Berezina et al, 2022)
-Tracers
-=======
-OXYDEP consists of 6 state variables ( in N-units):
-! - Phy - all the phototrophic organisms (phytoplankton and bacteria).
-!   Phy grows due to photosynthesis, loses inorganic matter
-!   due to respiraion, and loses organic matter in dissolved (DOM) and particulate (POM)
-!   forms due to metabolism and mortality. Phy growth is limited by irradiance, temperature and NUT availability.
-! - Het - heterotrophs, can consume Phy and POM,  produce DOM and POM and respirate NUT.
-! - NUT - represents oxydized forms of nutrients (i.e. NO3 and NO2 for N),
-!   that doesn't need additional  oxygen for nitrification.
-! - DOM - is dissolved organic matter. DOM  includes all kinds of labile dissolved organic matter
-!   and reduced forms of inorganic nutrients (i.e. NH4 and Urea for N).
-! - POM - is particular organic matter (less labile than DOM). Temperature affects DOM and POM mineralization.
-! - Oxy - is dissolved oxygen.
+# OXYgen DEPletion model, OXYDEP targests on the silmplest possible way of parameterization of the oxygen  (DO) fate in changeable redox conditions.
+# It has a simplified ecosystem, and simulates production of DO due to photosynthesis and consumation of DO for biota respiraion,
+# OM mineralization, nitrification, and oxidation of reduced specied of S, Mn, Fe, present in suboxic conditions.
+# For the details of  OxyDEP  implemented here see (Berezina et al, 2022)
+# Tracers
+# =======
+# OXYDEP consists of 6 state variables ( in N-units):
+#  Phy - all the phototrophic organisms (phytoplankton and bacteria).
+#  Phy grows due to photosynthesis, loses inorganic matter
+#  due to respiraion, and loses organic matter in dissolved (DOM) and particulate (POM)
+#  forms due to metabolism and mortality. Phy growth is limited by irradiance, temperature and NUT availability.
+#  Het - heterotrophs, can consume Phy and POM,  produce DOM and POM and respirate NUT.
+#  NUT - represents oxydized forms of nutrients (i.e. NO3 and NO2 for N),
+#  that doesn't need additional  oxygen for nitrification.
+#  DOM - is dissolved organic matter. DOM  includes all kinds of labile dissolved organic matter
+#  and reduced forms of inorganic nutrients (i.e. NH4 and Urea for N).
+#  POM - is particular organic matter (less labile than DOM). Temperature affects DOM and POM mineralization.
+#  Oxy - is dissolved oxygen.
+# 
+# Required submodels
+# ==================
+# * Photosynthetically available radiation: PAR (W/m²)
 
-Required submodels
-==================
-* Photosynthetically available radiation: PAR (W/m²)
-"""
 module OXYDEPModel
 
 export OxygenDepletionModel, OXYDEP
@@ -200,8 +199,7 @@ function OxygenDepletionModel(; grid,
                                    modifiers::M = nothing) where {FT, LA, S, P, M}
     sinking_velocities = setup_velocity_fields(sinking_speeds, grid, open_bottom)
 
-    underlying_biogeochemistry = 
-    OxygenDepletionModel(initial_photosynthetic_slope,
+    underlying_biogeochemistry = OxygenDepletionModel(initial_photosynthetic_slope,
                                                  Iopt,
                                                  alphaI,
                                                  betaI,
@@ -245,9 +243,8 @@ end
 
 const OXYDEP = OxygenDepletionModel
 
-required_biogeochemical_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM,  :DOM, :OXY)
+required_biogeochemical_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
 required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, :T)
-#required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, )
 
 # Limiting equations and switches
 @inline yy(value,consta)=consta^2/(value^2+consta^2)   #This is a squared Michaelis-Menten type of limiter
@@ -469,6 +466,6 @@ OxygenDepletionModel(adapt(to, oxydep.initial_photosynthetic_slope),
 
 @inline remineralisation_receiver(::OXYDEP) = :NUT
 
-@inline conserved_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM, :DOM, :OXY)
+@inline conserved_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
 @inline sinking_tracers(bgc::OXYDEP) = keys(bgc.sinking_velocities)
 end # module
