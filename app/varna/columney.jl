@@ -22,9 +22,10 @@ using Oceananigans.Units
 using JLD2
 
 import Oceananigans.Biogeochemistry: update_tendencies!
-import Oceananigans.Biogeochemistry: required_biogeochemical_tracers,
-                                     required_biogeochemical_auxiliary_fields,
-                                     biogeochemical_drift_velocity
+import Oceananigans.Biogeochemistry:
+    required_biogeochemical_tracers,
+    required_biogeochemical_auxiliary_fields,
+    biogeochemical_drift_velocity
 
 include("../../src/Oxydep.jl")
 using .OXYDEPModel
@@ -32,108 +33,135 @@ using .OXYDEPModel
 const year = years = 365days
 
 ## Surface PAR and turbulent vertical diffusivity based on idealised mixed layer depth 
-# Setting up idealised functions for PAR and diffusivity (details here can be ignored but these are typical of the North Atlantic)
-@inline PAR⁰(x, y, t) = 60 * (1 - cos((t + 15days) * 2π / year)) * (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
+@inline PAR⁰(x, y, t) =
+    60 *
+    (1 - cos((t + 15days) * 2π / year)) *
+    (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
 @inline H(t, t₀, t₁) = ifelse(t₀ < t < t₁, 1.0, 0.0)
-@inline fmld1(t) = H(t, 50days, year) * (1 / (1 + exp(-(t - 100days) / 5days))) * (1 / (1 + exp((t - 330days) / 25days)))
-@inline MLD(t) = - (10 + 340 * (1 - fmld1(year - eps(year)) * exp(-mod(t, year) / 25days) - fmld1(mod(t, year))))
-@inline κₜ(x, y, z, t) = 1.e-3 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 1.5e-3    ### 1e-2 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 1e-4
-@inline temp(x, y, z, t) = 2.4 * cos(t * 2π / year + 50days) * (0.5 - 0.5 * tanh(0.25 * (abs(z)- 20)))  + 10
-@inline salt(x, y, z, t) = (2.4 * cos(t * 2π / year + 50days)) * (0.5 - 0.5 * tanh(0.25 * (abs(z)- 20)))  + 33
+@inline fmld1(t) =
+    H(t, 50days, year) *
+    (1 / (1 + exp(-(t - 100days) / 5days))) *
+    (1 / (1 + exp((t - 330days) / 25days)))
+@inline MLD(t) =
+    -(10 + 340 * (1 - fmld1(year - eps(year)) * exp(-mod(t, year) / 25days) - fmld1(mod(t, year))))
+@inline κₜ(x, y, z, t) = 1.e-3 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 1.5e-3
+@inline temp(x, y, z, t) =
+    2.4 * cos(t * 2π / year + 50days) * (0.5 - 0.5 * tanh(0.25 * (abs(z) - 20))) + 10
+@inline salt(x, y, z, t) =
+    (2.4 * cos(t * 2π / year + 50days)) * (0.5 - 0.5 * tanh(0.25 * (abs(z) - 20))) + 33
 
 ## Grid
-depth_extent=100meters
+depth_extent = 100meters
 grid = RectilinearGrid(size = (1, 1, 25), extent = (20meters, 20meters, depth_extent))
 
 ## Model
-biogeochemistry = OXYDEP(; grid, 
-                          surface_photosynthetically_active_radiation = PAR⁰,
-                          particles = nothing)
+biogeochemistry =
+    OXYDEP(; grid, surface_photosynthetically_active_radiation = PAR⁰, particles = nothing)
 clock = Clock(; time = 0.0)
-T = FunctionField{Center, Center, Center}(temp, grid; clock)
-S = FunctionField{Center, Center, Center}(salt, grid; clock)
+T = FunctionField{Center,Center,Center}(temp, grid; clock)
+S = FunctionField{Center,Center,Center}(salt, grid; clock)
 
 ## Boundary conditions
 O2_suboxic = 30.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
-Trel = 10000.      # Relaxation time for exchange with the sediments (s/m)
+Trel = 10000.0      # Relaxation time for exchange with the sediments (s/m)
 b_ox = 15.0        # difference of OXY in the sediment and water, 
-b_NUT = 15.        # NUT in the sediment, (mmol/m3)  
+b_NUT = 15.0        # NUT in the sediment, (mmol/m3)  
 b_DOM_ox = 10.0    # OM in the sediment (oxic conditions), (mmol/m3) 
-b_DOM_anox =20.0   # OM in the sediment (anoxic conditions), (mmol/m3)  
+b_DOM_anox = 20.0   # OM in the sediment (anoxic conditions), (mmol/m3)  
 bu = 0.7           # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
 
-@inline F_ox(conc,threshold)    = (0.5+0.5*tanh(conc-threshold))
-@inline F_subox(conc,threshold) = (0.5-0.5*tanh(conc-threshold))
+@inline F_ox(conc, threshold) = (0.5 + 0.5 * tanh(conc - threshold))
+@inline F_subox(conc, threshold) = (0.5 - 0.5 * tanh(conc - threshold))
 
 ## oxy
 OXY_top = GasExchange(; gas = :O₂)
-OXY_bottom_cond(i, j, grid, clock, fields) = - (F_ox(fields.O₂[i, j, 1], O2_suboxic) * b_ox + F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.O₂[i, j, 1])) / Trel
-OXY_bottom = FluxBoundaryCondition(OXY_bottom_cond,  discrete_form = true,)
+OXY_bottom_cond(i, j, grid, clock, fields) =
+    -(
+        F_ox(fields.O₂[i, j, 1], O2_suboxic) * b_ox +
+        F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.O₂[i, j, 1])
+    ) / Trel
+OXY_bottom = FluxBoundaryCondition(OXY_bottom_cond, discrete_form = true)
 
 ## nut
-NUT_bottom_cond(i, j, grid, clock, fields ) = (F_ox(fields.O₂[i, j, 1], O2_suboxic) * (b_NUT - fields.NUT[i, j, 1]) + F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.NUT[i, j, 1])) / Trel
-NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond,  discrete_form = true,) #ValueBoundaryCondition(10.0)
+NUT_bottom_cond(i, j, grid, clock, fields) =
+    (
+        F_ox(fields.O₂[i, j, 1], O2_suboxic) * (b_NUT - fields.NUT[i, j, 1]) +
+        F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.NUT[i, j, 1])
+    ) / Trel
+NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond, discrete_form = true)
 
 ## phy
-w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:P)).w[1, 1, 1] 
-PHY_bottom_cond(i, j, grid, clock, fields ) = - bu * w_PHY * fields.P[i, j, 1] 
-PHY_bottom = FluxBoundaryCondition(PHY_bottom_cond,  discrete_form = true,)
+w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:PHY)).w[1, 1, 1]
+PHY_bottom_cond(i, j, grid, clock, fields) = -bu * w_PHY * fields.PHY[i, j, 1]
+PHY_bottom = FluxBoundaryCondition(PHY_bottom_cond, discrete_form = true)
 
 ## het
 w_HET = biogeochemical_drift_velocity(biogeochemistry, Val(:HET)).w[1, 1, 1]
-HET_bottom_cond(i, j, grid, clock, fields ) = - bu * w_HET *  fields.HET[i, j, 1] 
-HET_bottom = FluxBoundaryCondition(HET_bottom_cond,  discrete_form = true,)
+HET_bottom_cond(i, j, grid, clock, fields) = -bu * w_HET * fields.HET[i, j, 1]
+HET_bottom = FluxBoundaryCondition(HET_bottom_cond, discrete_form = true)
 
 ## pom
-w_POM = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[1, 1, 1] 
-POM_bottom_cond(i, j, grid, clock, fields ) = - bu * w_POM * fields.POM[i, j, 1] 
-POM_bottom = FluxBoundaryCondition(POM_bottom_cond,  discrete_form = true,)
+w_POM = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[1, 1, 1]
+POM_bottom_cond(i, j, grid, clock, fields) = -bu * w_POM * fields.POM[i, j, 1]
+POM_bottom = FluxBoundaryCondition(POM_bottom_cond, discrete_form = true)
 
 ## dom
 DOM_top = ValueBoundaryCondition(0.0)
-DOM_bottom_cond(i, j, grid, clock, fields ) = (F_ox(fields.O₂[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) + F_subox(fields.O₂[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1])) / Trel
+DOM_bottom_cond(i, j, grid, clock, fields) =
+    (
+        F_ox(fields.O₂[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) +
+        F_subox(fields.O₂[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1])
+    ) / Trel
 DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
 
 ## Model instantiation
-model = NonhydrostaticModel(; grid,
-                              clock,
-                              closure = ScalarDiffusivity(ν = κₜ, κ = κₜ),
-                              biogeochemistry,
-                              boundary_conditions = (O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom ),
-                                                     NUT = FieldBoundaryConditions(bottom = NUT_bottom ),
-                                                     DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
-                                                     POM = FieldBoundaryConditions(bottom = POM_bottom),
-                                                     P = FieldBoundaryConditions(bottom = PHY_bottom),
-                                                     HET = FieldBoundaryConditions(bottom = HET_bottom),
-                                                     ),
-                              auxiliary_fields = (; T, S))
+model = NonhydrostaticModel(;
+    grid,
+    clock,
+    closure = ScalarDiffusivity(ν = κₜ, κ = κₜ),
+    biogeochemistry,
+    boundary_conditions = (
+        O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom),
+        NUT = FieldBoundaryConditions(bottom = NUT_bottom),
+        DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
+        POM = FieldBoundaryConditions(bottom = POM_bottom),
+        PHY = FieldBoundaryConditions(bottom = PHY_bottom),
+        HET = FieldBoundaryConditions(bottom = HET_bottom),
+    ),
+    auxiliary_fields = (; T, S),
+)
 
 ## Set model
-set!(model, NUT = 10.0, P = 0.01, HET = 0.05, O₂ = 350., DOM = 1.)
+set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0)
 
 ## Simulation
 stoptime = 1095
-simulation = Simulation(model, Δt = 6minutes, stop_time = (stoptime)days) 
-progress_message(sim) = @printf("Iteration: %04d, time: %s, Δt: %s, wall time: %s\n",
-                                iteration(sim),
-                                prettytime(sim),
-                                prettytime(sim.Δt),
-                                prettytime(sim.run_wall_time))
-                                                                  
+simulation = Simulation(model, Δt = 6minutes, stop_time = (stoptime)days)
+progress_message(sim) = @printf(
+    "Iteration: %04d, time: %s, Δt: %s, wall time: %s\n",
+    iteration(sim),
+    prettytime(sim),
+    prettytime(sim.Δt),
+    prettytime(sim.run_wall_time)
+)
+
 simulation.callbacks[:progress] = Callback(progress_message, TimeInterval(10days))
 
 output_prefix = joinpath(homedir(), "data_Varna", "columney_output")
 filename = output_prefix * "_snapshots"
 
-NUT, P, HET, POM, DOM, O₂ = model.tracers
+NUT, PHY, HET, POM, DOM, O₂ = model.tracers
 T = model.auxiliary_fields.T
 PAR = model.auxiliary_fields.PAR
 S = model.auxiliary_fields.S
 
-simulation.output_writers[:profiles] = JLD2OutputWriter(model, (; NUT, P, HET, POM, DOM, O₂, T, S, PAR),
-                                                        filename = "$filename.jld2",
-                                                        schedule = TimeInterval(1day),
-                                                        overwrite_existing = true)
+simulation.output_writers[:profiles] = JLD2OutputWriter(
+    model,
+    (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR),
+    filename = "$filename.jld2",
+    schedule = TimeInterval(1day),
+    overwrite_existing = true,
+)
 
 ## Run!
 run!(simulation)

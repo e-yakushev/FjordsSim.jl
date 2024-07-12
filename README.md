@@ -5,4 +5,3 @@
 3. Run Julia REPL and activate the FjordsSim environment `julia --project=.`.
 4. Enter the Pkg REPL by pressing `]` from Julia REPL.
 5. Type `instantiate` to 'resolve' a `Manifest.toml` from a `Project.toml` to install and precompile dependency packages.
-
