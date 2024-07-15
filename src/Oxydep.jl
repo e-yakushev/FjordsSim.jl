@@ -271,7 +271,7 @@ end
 const OXYDEP = OxygenDepletionModel
 
 required_biogeochemical_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
-required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, :T)
+required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, )
 
 # Limiting equations and switches
 @inline yy(value, consta) = consta^2 / (value^2 + consta^2)   #This is a squared Michaelis-Menten type of limiter

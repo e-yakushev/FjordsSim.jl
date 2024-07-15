@@ -147,18 +147,16 @@ progress_message(sim) = @printf(
 
 simulation.callbacks[:progress] = Callback(progress_message, TimeInterval(10days))
 
-output_prefix = joinpath(homedir(), "data_Varna", "columney_output")
-filename = output_prefix * "_snapshots"
-
 NUT, PHY, HET, POM, DOM, O₂ = model.tracers
 T = model.auxiliary_fields.T
 PAR = model.auxiliary_fields.PAR
 S = model.auxiliary_fields.S
 
+output_prefix = joinpath(homedir(), "data_Varna", "columney_snapshots")
 simulation.output_writers[:profiles] = JLD2OutputWriter(
     model,
     (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR),
-    filename = "$filename.jld2",
+    filename = "$output_prefix.jld2",
     schedule = TimeInterval(1day),
     overwrite_existing = true,
 )

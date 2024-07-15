@@ -13,12 +13,6 @@
 # limitations under the License.
 
 ## Packages and modules
-import Oceananigans.Biogeochemistry:
-    biogeochemical_drift_velocity,
-    required_biogeochemical_auxiliary_fields,
-    required_biogeochemical_tracers,
-    update_tendencies!
-
 using CSV
 using CUDA: @allowscalar
 using CairoMakie
@@ -41,6 +35,12 @@ using Oceananigans: architecture
 using Printf
 using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 using Statistics
+
+import Oceananigans.Biogeochemistry:
+    biogeochemical_drift_velocity,
+    required_biogeochemical_auxiliary_fields,
+    required_biogeochemical_tracers,
+    update_tendencies!
 
 ## Oxydep
 include("../../src/Oxydep.jl")
@@ -104,8 +104,7 @@ const year = years = 365days
     (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
 
 ## Oxydep
-biogeochemistry =
-    OXYDEP(; grid, surface_photosynthetically_active_radiation = PAR⁰, particles = nothing)
+biogeochemistry = OXYDEP(; grid, surface_photosynthetically_active_radiation = PAR⁰)
 
 ## Initial Conditions
 z_ini = -reverse([0.5, 1, 2, 3, 4, 6, 8, 9, 10, 12, 16, 20])
@@ -361,7 +360,6 @@ Tforcing = Forcing(T_point_source, field_dependencies = :T, discrete_form = true
 Sforcing = Forcing(S_point_source, field_dependencies = :S, discrete_form = true)
 
 ## Model
-surface_photosynthetically_active_radiation = PAR⁰
 model = HydrostaticFreeSurfaceModel(;
     grid,
     closure,
@@ -371,7 +369,7 @@ model = HydrostaticFreeSurfaceModel(;
     forcing = (T = Tforcing, S = Sforcing),
     momentum_advection = VectorInvariant(),
     tracer_advection = WENO(underlying_grid),
-    tracers = (:O₂, :NUT, :DOM, :POM, :PHY, :HET, :T, :S),
+    tracers = (:T, :S),
 )
 
 ## Set initial conditions
@@ -396,20 +394,21 @@ POM = model.tracers.POM
 PHY = model.tracers.PHY
 HET = model.tracers.HET
 
+output_prefix = joinpath(homedir(), "data_Varna", "simulation_snapshots")
 simulation.output_writers[:surface_fields] = JLD2OutputWriter(
     model,
     (; u, v, w, T, S, O₂, NUT, DOM, POM, PHY, HET),
     schedule = TimeInterval(2minutes),
-    filename = "exp4_out",
+    filename = "$output_prefix.jld2",
     with_halos = true,
     overwrite_existing = true,
 )
 
+# checkpoints_prefix = joinpath(homedir(), "data_Varna", "simulation_chkpnt")
 simulation.output_writers[:checkpointer] =
+    # Checkpointer(model; schedule = IterationInterval(200), prefix = checkpoints_prefix)
     Checkpointer(model; schedule = IterationInterval(200), prefix = "model_checkpoint")
+
 
 ## run simulation
 run!(simulation, pickup = true)
-
-## plot
-heatmap(interior(model.tracers.S, :, :, grid.Nz))
