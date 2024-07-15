@@ -27,9 +27,6 @@ module OXYDEPModel
 
 export OxygenDepletionModel, OXYDEP
 
-import Adapt: adapt_structure, adapt
-import Base: show, summary
-
 using Oceananigans: fields
 using Oceananigans.Units
 using Oceananigans.Fields: Field, TracerFields, CenterField, ZeroField
@@ -41,103 +38,27 @@ using Oceananigans.BoundaryConditions:
 using Oceananigans.Biogeochemistry: AbstractContinuousFormBiogeochemistry
 using Oceananigans.Architectures: architecture
 using Oceananigans.Utils: launch!
+using OceanBioME:
+    setup_velocity_fields, show_sinking_velocities, Biogeochemistry, ScaleNegativeTracers
+using OceanBioME.Light:
+    update_TwoBandPhotosyntheticallyActiveRadiation!,
+    default_surface_PAR,
+    TwoBandPhotosyntheticallyActiveRadiation
+using OceanBioME.Boundaries.Sediments: sinking_flux
+
+import Adapt: adapt_structure, adapt
+import Base: show, summary
 import Oceananigans.Biogeochemistry:
     required_biogeochemical_tracers,
     required_biogeochemical_auxiliary_fields,
     biogeochemical_drift_velocity,
-    biogeochemical_auxiliary_fields,
     update_biogeochemical_state!
-
-using OceanBioME:
-    setup_velocity_fields, show_sinking_velocities, Biogeochemistry, ScaleNegativeTracers
-using OceanBioME.Light: update_TwoBandPhotosyntheticallyActiveRadiation!, default_surface_PAR
-using OceanBioME.BoxModels: BoxModel
-using OceanBioME.Boundaries.Sediments: sinking_flux
 import OceanBioME: redfield, conserved_tracers
 import OceanBioME: maximum_sinking_velocity
 import OceanBioME.Boundaries.Sediments:
     nitrogen_flux, carbon_flux, remineralisation_receiver, sinking_tracers
 
-struct TwoBandPhotosyntheticallyActiveRadiationClone{FT,F,SPAR}
-    water_red_attenuation::FT
-    water_blue_attenuation::FT
-    chlorophyll_red_attenuation::FT
-    chlorophyll_blue_attenuation::FT
-    chlorophyll_red_exponent::FT
-    chlorophyll_blue_exponent::FT
-    pigment_ratio::FT
-
-    phytoplankton_chlorophyll_ratio::FT
-
-    field::F
-
-    surface_PAR::SPAR
-
-    TwoBandPhotosyntheticallyActiveRadiationClone(
-        water_red_attenuation::FT,
-        water_blue_attenuation::FT,
-        chlorophyll_red_attenuation::FT,
-        chlorophyll_blue_attenuation::FT,
-        chlorophyll_red_exponent::FT,
-        chlorophyll_blue_exponent::FT,
-        pigment_ratio::FT,
-        phytoplankton_chlorophyll_ratio::FT,
-        field::F,
-        surface_PAR::SPAR,
-    ) where {FT,F,SPAR} = new{FT,F,SPAR}(
-        water_red_attenuation,
-        water_blue_attenuation,
-        chlorophyll_red_attenuation,
-        chlorophyll_blue_attenuation,
-        chlorophyll_red_exponent,
-        chlorophyll_blue_exponent,
-        pigment_ratio,
-        phytoplankton_chlorophyll_ratio,
-        field,
-        surface_PAR,
-    )
-end
-
-function TwoBandPhotosyntheticallyActiveRadiationClone(;
-    grid,
-    water_red_attenuation::FT = 0.225, # 1/m
-    water_blue_attenuation::FT = 0.0232, # 1/m
-    chlorophyll_red_attenuation::FT = 0.037, # 1/(m * (mgChl/m³) ^ eʳ)
-    chlorophyll_blue_attenuation::FT = 0.074, # 1/(m * (mgChl/m³) ^ eᵇ)
-    chlorophyll_red_exponent::FT = 0.629,
-    chlorophyll_blue_exponent::FT = 0.674,
-    pigment_ratio::FT = 0.7,
-    phytoplankton_chlorophyll_ratio::FT = 1.31,
-    surface_PAR::SPAR = (x, y, t) -> 100 * max(0.0, cos(t * π / 12hours)),
-) where {FT,SPAR} # mgChl/mol N
-
-    field = CenterField(
-        grid;
-        boundary_conditions = regularize_field_boundary_conditions(
-            FieldBoundaryConditions(top = ValueBoundaryCondition(surface_PAR)),
-            grid,
-            :PAR,
-        ),
-    )
-
-    return TwoBandPhotosyntheticallyActiveRadiationClone(
-        water_red_attenuation,
-        water_blue_attenuation,
-        chlorophyll_red_attenuation,
-        chlorophyll_blue_attenuation,
-        chlorophyll_red_exponent,
-        chlorophyll_blue_exponent,
-        pigment_ratio,
-        phytoplankton_chlorophyll_ratio,
-        field,
-        surface_PAR,
-    )
-end
-
-biogeochemical_auxiliary_fields(par::TwoBandPhotosyntheticallyActiveRadiationClone) =
-    (PAR = par.field,)
-
-function update_biogeochemical_state!(model, PAR::TwoBandPhotosyntheticallyActiveRadiationClone)
+function update_biogeochemical_state!(model, PAR::TwoBandPhotosyntheticallyActiveRadiation)
     arch = architecture(model.grid)
     launch!(
         arch,
@@ -288,7 +209,7 @@ function OxygenDepletionModel(;
     NtoN::FT = 5.3,   # (nd)
     NtoB::FT = 0.016, # (nd)
     surface_photosynthetically_active_radiation = default_surface_PAR,
-    light_attenuation_model::LA = TwoBandPhotosyntheticallyActiveRadiationClone(;
+    light_attenuation_model::LA = TwoBandPhotosyntheticallyActiveRadiation(;
         grid,
         surface_PAR = surface_photosynthetically_active_radiation,
     ),
