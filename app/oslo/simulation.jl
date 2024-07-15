@@ -88,7 +88,7 @@ u, v, w = model.velocities
 T = model.tracers.T
 S = model.tracers.S
 
-output_prefix = joinpath(homedir(), "fjords_data", "oslo_fjord")
+output_prefix = joinpath(homedir(), "data_fjords", "oslo_fjord")
 pickup = false
 save_interval = 1hour;
 
