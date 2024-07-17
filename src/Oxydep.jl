@@ -102,7 +102,7 @@ struct OxygenDepletionModel{FT,W} <: AbstractContinuousFormBiogeochemistry
     r_pom_dom::FT # Specific rate of POM decomposition, (1/d)
     # DOM
     r_dom_nut_oxy::FT # Specific rate of DOM oxic decay, (1/d)
-    # OXY
+    # O₂
     O2_suboxic::FT    # O2 threshold for oxic/suboxic switch (mmol/m3)
     r_pom_nut_nut::FT # Specific rate of POM denitrification, (1/d)
     r_dom_nut_nut::FT # Specific rate of DOM denitrification, (1/d)
@@ -270,8 +270,8 @@ end
 
 const OXYDEP = OxygenDepletionModel
 
-required_biogeochemical_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
-required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, )
+required_biogeochemical_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T)
+required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR,)
 
 # Limiting equations and switches
 @inline yy(value, consta) = consta^2 / (value^2 + consta^2)   #This is a squared Michaelis-Menten type of limiter
@@ -302,27 +302,27 @@ required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, )
 @inline GrazPOM(r_pom_het, Kpom, POM, HET) =
     r_pom_het * yy(Kpom, max(0.0, POM - 0.01) / max(0.0001, HET)) * HET
 @inline RespHet(r_het_nut, HET) = r_het_nut * HET
-@inline MortHet(r_het_pom, HET, OXY, O2_suboxic) =
-    (r_het_pom + F_subox(OXY, O2_suboxic) * 0.01 * r_het_pom) * HET
+@inline MortHet(r_het_pom, HET, O₂, O2_suboxic) =
+    (r_het_pom + F_subox(O₂, O2_suboxic) * 0.01 * r_het_pom) * HET
 
 # POM
 @inline POM_decay_ox(r_pom_nut_oxy, POM) = r_pom_nut_oxy * POM
-@inline POM_decay_denitr(r_pom_nut_nut, POM, OXY, O2_suboxic, NUT) =
-    r_pom_nut_nut * POM * F_subox(OXY, O2_suboxic) * F_ox(NUT, 0.01)
+@inline POM_decay_denitr(r_pom_nut_nut, POM, O₂, O2_suboxic, NUT) =
+    r_pom_nut_nut * POM * F_subox(O₂, O2_suboxic) * F_ox(NUT, 0.01)
 #! depends on NUT (NO3+NO2) and DOM (NH4+Urea+"real"DON) ! depends on T ! stops at NUT<0.01 
 @inline Autolys(r_pom_dom, POM) = r_pom_dom * POM
 
 # DOM
 @inline DOM_decay_ox(r_dom_nut_oxy, DOM) = r_dom_nut_oxy * DOM
-@inline DOM_decay_denitr(r_dom_nut_nut, DOM, OXY, O2_suboxic, NUT) =
-    r_dom_nut_nut * DOM * F_subox(OXY, O2_suboxic) * F_ox(NUT, 0.01)
+@inline DOM_decay_denitr(r_dom_nut_nut, DOM, O₂, O2_suboxic, NUT) =
+    r_dom_nut_nut * DOM * F_subox(O₂, O2_suboxic) * F_ox(NUT, 0.01)
 #! depends on NUT (NO3+NO2) and DOM (NH4+Urea+"real"DON) ! depends on T ! stops at NUT<0.01 
 
-# OXY
+# O₂
 
 # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = 
 
-@inline function (bgc::OXYDEP)(::Val{:NUT}, x, y, z, t, NUT, PHY, HET, POM, DOM, OXY, T, PAR)
+@inline function (bgc::OXYDEP)(::Val{:NUT}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
     Max_uptake = bgc.Max_uptake
     Knut = bgc.Knut
     α = bgc.initial_photosynthetic_slope
@@ -345,14 +345,14 @@ required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR, )
         DOM_decay_ox(r_dom_nut_oxy, DOM) +
         POM_decay_ox(r_pom_nut_oxy, POM) - GrowthPhy(Max_uptake, PAR, α, T, Knut, NUT, PHY, Iopt) -
         NtoN * (
-            POM_decay_denitr(r_pom_nut_nut, POM, OXY, O2_suboxic, NUT) +
-            DOM_decay_denitr(r_dom_nut_nut, DOM, OXY, O2_suboxic, NUT)
+            POM_decay_denitr(r_pom_nut_nut, POM, O₂, O2_suboxic, NUT) +
+            DOM_decay_denitr(r_dom_nut_nut, DOM, O₂, O2_suboxic, NUT)
         )
     )
     # Denitrification of POM and DOM leads to decrease of NUT (i.e. NOx)
 end
 
-@inline function (bgc::OXYDEP)(::Val{:PHY}, x, y, z, t, NUT, PHY, HET, POM, DOM, OXY, T, PAR)
+@inline function (bgc::OXYDEP)(::Val{:PHY}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
     Max_uptake = bgc.Max_uptake
     Knut = bgc.Knut
     α = bgc.initial_photosynthetic_slope
@@ -370,7 +370,7 @@ end
     )
 end
 
-@inline function (bgc::OXYDEP)(::Val{:HET}, x, y, z, t, NUT, PHY, HET, POM, DOM, OXY, T, PAR)
+@inline function (bgc::OXYDEP)(::Val{:HET}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
     r_phy_het = bgc.r_phy_het
     Kphy = bgc.Kphy
     r_pom_het = bgc.r_pom_het
@@ -382,11 +382,11 @@ end
 
     return (
         Uz * (GrazPhy(r_phy_het, Kphy, PHY, HET) + GrazPOM(r_pom_het, Kpom, POM, HET)) -
-        MortHet(r_het_pom, HET, OXY, O2_suboxic) - RespHet(r_het_nut, HET)
+        MortHet(r_het_pom, HET, O₂, O2_suboxic) - RespHet(r_het_nut, HET)
     )
 end
 
-@inline function (bgc::OXYDEP)(::Val{:POM}, x, y, z, t, NUT, PHY, HET, POM, DOM, OXY, T, PAR)
+@inline function (bgc::OXYDEP)(::Val{:POM}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
     r_phy_het = bgc.r_phy_het
     Kphy = bgc.Kphy
     r_pom_het = bgc.r_pom_het
@@ -405,13 +405,13 @@ end
         (1.0 - Hz) *
         (GrazPhy(r_phy_het, Kphy, PHY, HET) + GrazPOM(r_pom_het, Kpom, POM, HET)) +
         MortPhy(r_phy_pom, PHY) +
-        MortHet(r_het_pom, HET, OXY, O2_suboxic) - POM_decay_ox(r_pom_nut_oxy, POM) -
+        MortHet(r_het_pom, HET, O₂, O2_suboxic) - POM_decay_ox(r_pom_nut_oxy, POM) -
         Autolys(r_pom_dom, POM) - GrazPOM(r_pom_het, Kpom, POM, HET) -
-        POM_decay_denitr(r_pom_nut_nut, POM, OXY, O2_suboxic, NUT)
+        POM_decay_denitr(r_pom_nut_nut, POM, O₂, O2_suboxic, NUT)
     )
 end
 
-@inline function (bgc::OXYDEP)(::Val{:DOM}, x, y, z, t, NUT, PHY, HET, POM, DOM, OXY, T, PAR)
+@inline function (bgc::OXYDEP)(::Val{:DOM}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
     r_phy_het = bgc.r_phy_het
     Kphy = bgc.Kphy
     r_pom_het = bgc.r_pom_het
@@ -430,12 +430,12 @@ end
         (GrazPhy(r_phy_het, Kphy, PHY, HET) + GrazPOM(r_pom_het, Kpom, POM, HET)) +
         ExcrPhy(r_phy_dom, PHY) - DOM_decay_ox(r_dom_nut_oxy, DOM) +
         Autolys(r_pom_dom, POM) +
-        POM_decay_denitr(r_pom_nut_nut, POM, OXY, O2_suboxic, NUT)
+        POM_decay_denitr(r_pom_nut_nut, POM, O₂, O2_suboxic, NUT)
     )
     # Denitrification of "real DOM" into NH4 (DOM_decay_denitr) will not change state variable DOM
 end
 
-@inline function (bgc::OXYDEP)(::Val{:OXY}, x, y, z, t, NUT, PHY, HET, POM, DOM, OXY, T, PAR)
+@inline function (bgc::OXYDEP)(::Val{:O₂}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
     Max_uptake = bgc.Max_uptake
     Knut = bgc.Knut
     α = bgc.initial_photosynthetic_slope
@@ -455,11 +455,11 @@ end
             POM_decay_ox(r_pom_nut_oxy, POM) -
             GrowthPhy(Max_uptake, PAR, α, T, Knut, NUT, PHY, Iopt) # due to OM production and decay in normoxia
             +
-            DOM_decay_ox(r_dom_nut_oxy, DOM) * (F_subox(OXY, O2_suboxic))
+            DOM_decay_ox(r_dom_nut_oxy, DOM) * (F_subox(O₂, O2_suboxic))
         )
     )
     # (POM_decay_denitr + DOM_decay_denitr) & !denitrification doesn't change oxygen
-    # (DOM_decay_ox(r_dom_nut_oxy,DOM)*(F_subox) !additional consumption of OXY due to oxidation of reduced froms of S,Mn,Fe etc.
+    # (DOM_decay_ox(r_dom_nut_oxy,DOM)*(F_subox) !additional consumption of O₂ due to oxidation of reduced froms of S,Mn,Fe etc.
     # in suboxic conditions (F_subox) equals consumption for NH4 oxidation (Yakushev et al, 2008)
 
 end
