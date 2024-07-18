@@ -154,9 +154,9 @@ progress_message(sim) = @printf(
 simulation.callbacks[:progress] = Callback(progress_message, TimeInterval(10days))
 
 NUT, PHY, HET, POM, DOM, O₂ = model.tracers
-T = model.auxiliary_fields.T
+T = model.tracers.T
 PAR = model.auxiliary_fields.PAR
-S = model.auxiliary_fields.S
+S = model.tracers.S
 
 output_prefix = joinpath(homedir(), "data_Varna", "columney_snapshots")
 simulation.output_writers[:profiles] = JLD2OutputWriter(
