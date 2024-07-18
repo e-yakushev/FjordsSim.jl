@@ -53,7 +53,7 @@ const year = years = 365days
 
 ## Grid
 depth_extent = 100meters
-grid = RectilinearGrid(size = (160, 32), extent = (10000meters, 500meters), topology = (Bounded, Flat, Bounded))
+grid = RectilinearGrid(size = (5, 5), extent = (500meters, 100meters), topology = (Bounded, Flat, Bounded))
 
 ## Model
 biogeochemistry =
@@ -142,7 +142,7 @@ set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0, T = T�
 
 ## Simulation
 stoptime = 1095
-simulation = Simulation(model, Δt = 6minutes, stop_time = (stoptime)days)
+simulation = Simulation(model, Δt = 1minutes, stop_time = (stoptime)days)
 progress_message(sim) = @printf(
     "Iteration: %04d, time: %s, Δt: %s, wall time: %s\n",
     iteration(sim),
@@ -153,12 +153,10 @@ progress_message(sim) = @printf(
 
 simulation.callbacks[:progress] = Callback(progress_message, TimeInterval(10days))
 
-NUT, PHY, HET, POM, DOM, O₂ = model.tracers
-T = model.tracers.T
+NUT, PHY, HET, POM, DOM, O₂, T, S = model.tracers
 PAR = model.auxiliary_fields.PAR
-S = model.tracers.S
 
-output_prefix = joinpath(homedir(), "data_Varna", "columney_snapshots")
+output_prefix = "out"
 simulation.output_writers[:profiles] = JLD2OutputWriter(
     model,
     (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR),
