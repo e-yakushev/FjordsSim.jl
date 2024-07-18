@@ -86,8 +86,8 @@ OXY_bottom = FluxBoundaryCondition(OXY_bottom_cond, discrete_form = true)
 ## nut
 NUT_bottom_cond(i, j, grid, clock, fields) =
     (
-        F_ox(fields.O₂[i, 1], O2_suboxic) * (b_NUT - fields.NUT[i, 1]) +
-        F_subox(fields.O₂[i, 1], O2_suboxic) * (0.0 - fields.NUT[i, 1])
+        F_ox(fields.O₂[i, j, 1], O2_suboxic) * (b_NUT - fields.NUT[i, j, 1]) +
+        F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.NUT[i, j, 1])
     ) / Trel
 NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond, discrete_form = true)
 
