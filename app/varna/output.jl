@@ -18,13 +18,13 @@ using .OXYDEPModel
 #/1
 
 
-stoptime = 1095
-depth_extent = 100meters
-grid = RectilinearGrid(size = (1, 1, 25), extent = (20meters, 20meters, depth_extent))
+stoptime = 730
+depth_extent = 10meters
+grid = RectilinearGrid(size = (1, 1, 10), extent = (500meters, 500meters, 10meters), topology = (Bounded, Bounded, Bounded))
 
 
-
-filename = joinpath(homedir(), "data_Varna", "columney_snapshots")
+# filename = joinpath(homedir(), "data_Varna", "columney_snapshots")
+filename = "out"
 ## Load saved output
 @info "Loading saved outputs..."
 PHY = FieldTimeSeries("$filename.jld2", "PHY")
@@ -34,14 +34,14 @@ POM = FieldTimeSeries("$filename.jld2", "POM")
 DOM = FieldTimeSeries("$filename.jld2", "DOM")
 O₂ = FieldTimeSeries("$filename.jld2", "O₂")
 T = FieldTimeSeries("$filename.jld2", "T")
-#S =   FieldTimeSeries("$filename.jld2", "S")
+S =   FieldTimeSeries("$filename.jld2", "S")
 PAR = FieldTimeSeries("$filename.jld2", "PAR")
 
 @info "Saved outputs loaded..."
 
 z = jldopen("$filename.jld2")["grid"]["zᵃᵃᶜ"]
 times = T.times
-
+#times = StepRangeLen(0.0, 1, (160 * 86400))
 # 2
 biogeochemistry =
     OXYDEP(; grid, particles = nothing)
@@ -61,7 +61,6 @@ for (i, t) in enumerate(times)
     )
 end
 
-
 ## Plot
 
 fig = Figure(size = (1500, 1000), fontsize = 20)
@@ -69,8 +68,8 @@ fig = Figure(size = (1500, 1000), fontsize = 20)
 axis_kwargs = (
     xlabel = "Time (days)",
     ylabel = "z (m)",
-    limits = ((0, times[end] / days), (-(depth_extent + 10), 10)),
-    xticks = collect(0:365:stoptime),
+ #   limits = ((0, times[end] / days), (-(depth_extent + 10), 10)),
+ #   xticks = collect(0:10:stoptime),
 )
 
 axPHY = Axis(fig[1, 3]; title = "PHY, mmolN/m³", axis_kwargs...)
@@ -102,9 +101,12 @@ axT = Axis(fig[2, 5]; title = "T, oC", axis_kwargs...)
 hmT = heatmap!(times / days, z, interior(T, 1, 1, :, :)', colormap = Reverse(:RdYlBu))
 Colorbar(fig[2, 6], hmT)
 
-axPAR = Axis(fig[1, 5]; title = "PAR  μE⋅m-2⋅s-1", axis_kwargs...)
-hmPAR = heatmap!(times / days, z, interior(PAR, 1, 1, :, :)', colormap = :grayC100) # :linear_grey_0_100_c0_n256)
-Colorbar(fig[1, 6], hmPAR)
+axS = Axis(fig[1, 5]; title = "S, psu", axis_kwargs...)
+hmS = heatmap!(times / days, z, interior(S, 1, 1, :, :)', colormap = Reverse(:RdYlBu))
+Colorbar(fig[1, 6], hmS)
+#axPAR = Axis(fig[1, 5]; title = "PAR  μE⋅m-2⋅s-1", axis_kwargs...)
+#hmPAR = heatmap!(times / days, z, interior(PAR, 1, 1, :, :)', colormap = :grayC100) # :linear_grey_0_100_c0_n256)
+#Colorbar(fig[1, 6], hmPAR)
 
 @info "Z-Time plots made"
 
@@ -121,3 +123,4 @@ Legend(fig[4, 5], axNburying, framevisible = false)
 
 
 save("output.png", fig)
+
