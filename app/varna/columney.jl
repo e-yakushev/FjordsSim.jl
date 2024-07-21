@@ -33,7 +33,7 @@ using .OXYDEPModel
 const year = years = 365days
 
 ## Surface PAR and turbulent vertical diffusivity based on idealised mixed layer depth 
-@inline PAR⁰(x, t) =
+@inline PAR⁰(x, y, t) =
     60 *
     (1 - cos((t + 15days) * 2π / year)) *
     (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
@@ -45,15 +45,10 @@ const year = years = 365days
 @inline MLD(t) =
     -(10 + 340 * (1 - fmld1(year - eps(year)) * exp(-mod(t, year) / 25days) - fmld1(mod(t, year))))
 @inline κₜ(x, z, t) = 1.e-3 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 1.5e-3
-@inline temp(x, z, t) =
-    2.4 * cos(t * 2π / year + 50days) * (0.5 - 0.5 * tanh(0.25 * (abs(z) - 20))) + 10
-@inline salt(x, z, t) =
-    (2.4 * cos(t * 2π / year + 50days)) * (0.5 - 0.5 * tanh(0.25 * (abs(z) - 20))) + 33
-
 
 ## Grid
-depth_extent = 100meters
-grid = RectilinearGrid(size = (5, 5), extent = (500meters, 100meters), topology = (Bounded, Flat, Bounded))
+#depth_extent = 100meters
+grid = RectilinearGrid(size = (1, 1, 10), extent = (500meters, 500meters, 10meters), topology = (Bounded, Bounded, Bounded)) #topology = (Bounded, Flat, Bounded))
 
 ## Model
 biogeochemistry =
@@ -76,10 +71,10 @@ bu = 0.7           # Burial coeficient for lower boundary (0<Bu<1), 1 - for no b
 
 ## oxy
 OXY_top = GasExchange(; gas = :O₂)
-OXY_bottom_cond(i, grid, clock, fields) =
+OXY_bottom_cond(i, j, grid, clock, fields) =
     -(
-        F_ox(fields.O₂[i, 1], O2_suboxic) * b_ox +
-        F_subox(fields.O₂[i, 1], O2_suboxic) * (0.0 - fields.O₂[i, 1])
+        F_ox(fields.O₂[i, j, 1], O2_suboxic) * b_ox +
+        F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.O₂[i, j, 1])
     ) / Trel
 OXY_bottom = FluxBoundaryCondition(OXY_bottom_cond, discrete_form = true)
 
@@ -115,9 +110,10 @@ DOM_bottom_cond(i, j, grid, clock, fields) =
     ) / Trel
 DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
 
-@inline front(x, z, μ, δ) = μ + δ * tanh((x - 7000 + 4 * z) / 500)
-
-Tᵢ(x, z) = front(x, z, 9, 0.05)
+@inline front(x, y, z, μ, δ) = μ + δ * tanh((x - 7000 + 4 * z) / 500)
+#Tᵢ(x, y, z) = front(x, y, z, 9, 0.05)
+Tᵢ(x, y, z) = front(x, y, z, 15, 0.05)
+Sᵢ(x, y, z) = front(x, y, z, 35, 0.05)
 
 ## Model instantiation
 model = NonhydrostaticModel(;
@@ -127,22 +123,22 @@ model = NonhydrostaticModel(;
     biogeochemistry,
     buoyancy = SeawaterBuoyancy(constant_salinity = true),
     boundary_conditions = (
-        # O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom),
-        NUT = FieldBoundaryConditions(bottom = NUT_bottom),
-        # DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
-        # POM = FieldBoundaryConditions(bottom = POM_bottom),
-        # PHY = FieldBoundaryConditions(bottom = PHY_bottom),
-        # HET = FieldBoundaryConditions(bottom = HET_bottom),
+         O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom),
+         NUT = FieldBoundaryConditions(bottom = NUT_bottom),
+         DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
+         POM = FieldBoundaryConditions(bottom = POM_bottom),
+         PHY = FieldBoundaryConditions(bottom = PHY_bottom),
+         HET = FieldBoundaryConditions(bottom = HET_bottom),
     ),
-    tracers=(:S)
+    tracers=(:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T, :S)
 )
 
 ## Set model
-set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0, T = Tᵢ)
+set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0, T = Tᵢ, S = Sᵢ)
 
 ## Simulation
-stoptime = 1095
-simulation = Simulation(model, Δt = 1minutes, stop_time = (stoptime)days)
+stoptime = 730
+simulation = Simulation(model, Δt = 6minutes, stop_time = (stoptime)days)
 progress_message(sim) = @printf(
     "Iteration: %04d, time: %s, Δt: %s, wall time: %s\n",
     iteration(sim),
