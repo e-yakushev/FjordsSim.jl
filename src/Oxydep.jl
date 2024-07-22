@@ -25,7 +25,7 @@ Required submodels
 
 module OXYDEPModel
 
-export OxygenDepletionModel, OXYDEP
+export OXYDEP
 
 using Oceananigans: fields
 using Oceananigans.Units
@@ -76,7 +76,7 @@ function update_biogeochemical_state!(model, PAR::TwoBandPhotosyntheticallyActiv
     fill_halo_regions!(PAR.field, model.clock, fields(model))
 end
 
-struct OxygenDepletionModel{FT,W} <: AbstractContinuousFormBiogeochemistry
+struct OXYDEP{FT,W} <: AbstractContinuousFormBiogeochemistry
     # PHY
     initial_photosynthetic_slope::FT # α, 1/(W/m²)/s
     Iopt::FT   # Optimal irradiance (W/m2) =50 (Savchuk, 2002)
@@ -113,7 +113,7 @@ struct OxygenDepletionModel{FT,W} <: AbstractContinuousFormBiogeochemistry
     # sinking
     sinking_velocities::W
 
-    function OxygenDepletionModel(
+    function OXYDEP(  
         initial_photosynthetic_slope::FT,
         Iopt::FT,
         alphaI::FT,
@@ -178,7 +178,7 @@ struct OxygenDepletionModel{FT,W} <: AbstractContinuousFormBiogeochemistry
     end
 end
 
-function OxygenDepletionModel(;
+function OXYDEP(;
     grid,
     initial_photosynthetic_slope::FT = 0.1953 / day, # 1/(W/m²)/s
     Iopt::FT = 50.0,     # (W/m2)
@@ -222,7 +222,7 @@ function OxygenDepletionModel(;
 ) where {FT,LA,S,P,M}
     sinking_velocities = setup_velocity_fields(sinking_speeds, grid, open_bottom)
 
-    underlying_biogeochemistry = OxygenDepletionModel(
+    underlying_biogeochemistry = OXYDEP(
         initial_photosynthetic_slope,
         Iopt,
         alphaI,
@@ -267,8 +267,6 @@ function OxygenDepletionModel(;
         modifiers,
     )
 end
-
-const OXYDEP = OxygenDepletionModel
 
 required_biogeochemical_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T)
 required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR,)
@@ -473,11 +471,11 @@ end
 end
 
 summary(::OXYDEP{FT,NamedTuple{K,V}}) where {FT,K,V} =
-    string("OxygenDepletionModel{$FT} model, with $K sinking")
+    string("OXYDEP{$FT} model, with $K sinking")
 show(io::IO, model::OXYDEP{FT}) where {FT} = print(
     io,
     string(
-        "OxygenDepletionModel{$FT} model \n",
+        "OXYDEP{$FT} model \n",
         "└── Sinking Velocities:",
         "\n",
         show_sinking_velocities(model.sinking_velocities),
@@ -486,7 +484,7 @@ show(io::IO, model::OXYDEP{FT}) where {FT} = print(
 
 @inline maximum_sinking_velocity(bgc::OXYDEP) = maximum(abs, bgc.sinking_velocities.POM.w)
 
-adapt_structure(to, oxydep::OXYDEP) = OxygenDepletionModel(
+adapt_structure(to, oxydep::OXYDEP) = OXYDEP(
     adapt(to, oxydep.initial_photosynthetic_slope),
     adapt(to, oxydep.Iopt),
     adapt(to, oxydep.alphaI),
