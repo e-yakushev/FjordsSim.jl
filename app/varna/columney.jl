@@ -116,7 +116,7 @@ Tᵢ(x, y, z) = front(x, y, z, 15, 0.05)
 Sᵢ(x, y, z) = front(x, y, z, 35, 0.05)
 
 ## Model instantiation
-model = NonhydrostaticModel(;
+model = HydrostaticFreeSurfaceModel(;
     grid,
     clock,
     closure = ScalarDiffusivity(ν = 1e-4, κ = 1e-4),
