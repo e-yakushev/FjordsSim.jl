@@ -42,57 +42,15 @@ import Oceananigans.Biogeochemistry:
     required_biogeochemical_tracers,
     update_tendencies!
 
-## Oxydep
-include("../../src/Oxydep.jl")
-using .OXYDEPModel
+include("../../src/FjordsSim.jl")
+include("setup.jl")
+
+using .FjordsSim
 
 ## Setup
-arch = GPU()
-save_interval = 30minutes
-
-## Grid
-z_levels = -reverse([0.0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
-z_middle =
-    -reverse([
-        0.5,
-        1.5,
-        2.5,
-        3.5,
-        4.5,
-        5.5,
-        6.5,
-        7.5,
-        8.5,
-        9.5,
-        10.5,
-        11.5,
-        12.5,
-        13.5,
-        14.5,
-        15.5,
-        16.5,
-        17.5,
-        18.5,
-        19.5,
-    ])
-Nx = 119
-Ny = 42
-Nz = length(z_levels) - 1
-dx = 200  # m
-dy = 50  # m
-underlying_grid = RectilinearGrid(
-    arch,
-    topology = (Bounded, Bounded, Bounded),
-    size = (Nx, Ny, Nz),
-    x = (0, dx * Nx),
-    y = (0, dy * Ny),
-    z = z_levels,
-    halo = (7, 7, 7),
-)
-
-filepath_topo = joinpath(homedir(), "data_Varna", "Varna_topo.jld2")
-@load filepath_topo depth
-grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(depth); active_cells_map = true)
+# save_interval = 30minutes
+setup_grid = SetupGridPredefinedFromFile(args_grid...)
+grid = ImmersedBoundaryGrid(setup_grid)
 
 ## Biogeochemistry
 const year = years = 365days
@@ -108,48 +66,48 @@ const year = years = 365days
 biogeochemistry = OXYDEP(; grid, surface_photosynthetically_active_radiation = PAR⁰)
 
 ## Initial Conditions
-z_ini = -reverse([0.5, 1, 2, 3, 4, 6, 8, 9, 10, 12, 16, 20])
-tprof = reverse([20, 20, 20, 20, 18, 15, 14, 13, 12, 12, 12, 12])
-itp = LinearInterpolation(z_ini, tprof)
-tprof_target = itp(z_middle)
-
-T₀ = Array{Float64}(undef, Nx, Ny, Nz)
-for i = 1:Nx
-    for j = 1:Ny
-        T₀[i, j, :] = tprof_target
-    end
-end
-
-sprof = reverse([14, 14.1, 14.2, 14.5, 14.8, 15, 15.1, 15.2, 15.3, 15.4, 15.5, 15.5])
-itps = LinearInterpolation(z_ini, sprof)
-sprof_target = itps(z_middle)
-
-S₀ = Array{Float64}(undef, Nx, Ny, Nz)
-for i = 1:Nx
-    for j = 1:Ny
-        S₀[i, j, :] = sprof_target
-    end
-end
+# z_ini = -reverse([0.5, 1, 2, 3, 4, 6, 8, 9, 10, 12, 16, 20])
+# tprof = reverse([20, 20, 20, 20, 18, 15, 14, 13, 12, 12, 12, 12])
+# itp = LinearInterpolation(z_ini, tprof)
+# tprof_target = itp(z_middle)
+# 
+# T₀ = Array{Float64}(undef, Nx, Ny, Nz)
+# for i = 1:Nx
+#     for j = 1:Ny
+#         T₀[i, j, :] = tprof_target
+#     end
+# end
+# 
+# sprof = reverse([14, 14.1, 14.2, 14.5, 14.8, 15, 15.1, 15.2, 15.3, 15.4, 15.5, 15.5])
+# itps = LinearInterpolation(z_ini, sprof)
+# sprof_target = itps(z_middle)
+# 
+# S₀ = Array{Float64}(undef, Nx, Ny, Nz)
+# for i = 1:Nx
+#     for j = 1:Ny
+#         S₀[i, j, :] = sprof_target
+#     end
+# end
 
 ## Physics
-const surface_νz = 1e-2
-const background_νz = 1e-4
-const background_κz = 1e-5
-
-@inline νz(x, y, z, t) = ifelse(z > -15, surface_νz, background_νz)
-
-horizontal_viscosity = HorizontalScalarDiffusivity(ν = 1e3)
-vertical_viscosity =
-    VerticalScalarDiffusivity(VerticallyImplicitTimeDiscretization(), ν = νz, κ = background_κz)
-convective_adjustment = ConvectiveAdjustmentVerticalDiffusivity(convective_κz = 0.1)
-κ_skew = 900.0      # [m² s⁻¹] skew diffusivity
-κ_symmetric = 900.0 # [m² s⁻¹] symmetric diffusivity
-
-gent_mcwilliams_diffusivity =
-    IsopycnalSkewSymmetricDiffusivity(; κ_skew, κ_symmetric, slope_limiter = FluxTapering(1e-2))
-
-closure =
-    (vertical_viscosity, horizontal_viscosity, convective_adjustment, gent_mcwilliams_diffusivity)
+# const surface_νz = 1e-2
+# const background_νz = 1e-4
+# const background_κz = 1e-5
+# 
+# @inline νz(x, y, z, t) = ifelse(z > -15, surface_νz, background_νz)
+# 
+# horizontal_viscosity = HorizontalScalarDiffusivity(ν = 1e3)
+# vertical_viscosity =
+#     VerticalScalarDiffusivity(VerticallyImplicitTimeDiscretization(), ν = νz, κ = background_κz)
+# convective_adjustment = ConvectiveAdjustmentVerticalDiffusivity(convective_κz = 0.1)
+# κ_skew = 900.0      # [m² s⁻¹] skew diffusivity
+# κ_symmetric = 900.0 # [m² s⁻¹] symmetric diffusivity
+# 
+# gent_mcwilliams_diffusivity =
+#     IsopycnalSkewSymmetricDiffusivity(; κ_skew, κ_symmetric, slope_limiter = FluxTapering(1e-2))
+# 
+# closure =
+#     (vertical_viscosity, horizontal_viscosity, convective_adjustment, gent_mcwilliams_diffusivity)
 
 ## Boundary confitions
 reference_density = 1000.0

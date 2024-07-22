@@ -23,7 +23,7 @@ Required submodels
 * Photosynthetically available radiation: PAR (W/m²)
 """
 
-module OXYDEPModel
+module OxydepModel
 
 export OXYDEP
 

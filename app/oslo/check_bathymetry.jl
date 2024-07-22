@@ -6,7 +6,7 @@ include("setup.jl")
 
 using .FjordsSim
 
-setup_grid = SetupGridStretchedVericalFaces(;args_grid...)
+setup_grid = SetupGridRegrid(;args_grid...)
 grid = ImmersedBoundaryGrid(setup_grid)
 λ, φ, z = nodes(grid.underlying_grid, Center(), Center(), Center())
 

@@ -9,7 +9,7 @@ include("setup.jl")
 using .FjordsSim
 
 ## Setup
-setup_grid = SetupGridStretchedVericalFaces(;args_grid...)
+setup_grid = SetupGridRegrid(;args_grid...)
 grid = ImmersedBoundaryGrid(setup_grid)
 
 coriolis = HydrostaticSphericalCoriolis()
