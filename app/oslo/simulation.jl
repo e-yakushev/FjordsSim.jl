@@ -9,11 +9,11 @@ include("setup.jl")
 using .FjordsSim
 
 ## Setup
-setup = FjordsSetup(;oslo_fjord_setup...)
+setup_grid = SetupGridStretchedVericalFaces(;args_grid...)
+grid = ImmersedBoundaryGrid(setup_grid)
 
 coriolis = HydrostaticSphericalCoriolis()
 closure = ScalarDiffusivity(ν=1e-4, κ=1e-4)
-grid = ImmersedBoundaryGrid(setup)
 buoyancy = SeawaterBuoyancy(equation_of_state=LinearEquationOfState(thermal_expansion = 2e-4,
                                                                     haline_contraction = 8e-4))
 
@@ -88,7 +88,7 @@ u, v, w = model.velocities
 T = model.tracers.T
 S = model.tracers.S
 
-output_prefix = joinpath(homedir(), "data_fjords", "oslo_fjord")
+output_prefix = joinpath(homedir(), "data_fjords", "oslo")
 pickup = false
 save_interval = 1hour;
 

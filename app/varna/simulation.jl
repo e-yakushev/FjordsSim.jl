@@ -47,7 +47,7 @@ include("../../src/Oxydep.jl")
 using .OXYDEPModel
 
 ## Setup
-arch = CPU()
+arch = GPU()
 save_interval = 30minutes
 
 ## Grid
@@ -81,6 +81,7 @@ Nz = length(z_levels) - 1
 dx = 200  # m
 dy = 50  # m
 underlying_grid = RectilinearGrid(
+    arch,
     topology = (Bounded, Bounded, Bounded),
     size = (Nx, Ny, Nz),
     x = (0, dx * Nx),
@@ -288,19 +289,19 @@ OXY_bottom = FluxBoundaryCondition(OXY_bottom_cond, discrete_form = true)
 NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond, discrete_form = true) #ValueBoundaryCondition(10.0)
 
 #---PHY----------------------
-w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:PHY)).w[1, 1, 1]
-@inline PHY_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_PHY * fields.PHY[i, j, 1]
-PHY_bottom = FluxBoundaryCondition(PHY_bottom_cond, discrete_form = true)
+# w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:PHY)).w[1, 1, 1]
+# @inline PHY_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_PHY * fields.PHY[i, j, 1]
+# PHY_bottom = FluxBoundaryCondition(PHY_bottom_cond, discrete_form = true)
 
 #---HET----------------------
-w_HET = biogeochemical_drift_velocity(biogeochemistry, Val(:HET)).w[1, 1, 1]
-@inline HET_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_HET * fields.HET[i, j, 1]
-HET_bottom = FluxBoundaryCondition(HET_bottom_cond, discrete_form = true)
+# w_HET = biogeochemical_drift_velocity(biogeochemistry, Val(:HET)).w[1, 1, 1]
+# @inline HET_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_HET * fields.HET[i, j, 1]
+# HET_bottom = FluxBoundaryCondition(HET_bottom_cond, discrete_form = true)
 
 #---POM----------------------
-w_POM = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[1, 1, 1]
-@inline POM_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_POM * fields.POM[i, j, 1]
-POM_bottom = FluxBoundaryCondition(POM_bottom_cond, discrete_form = true)
+# w_POM = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[1, 1, 1]
+# @inline POM_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_POM * fields.POM[i, j, 1]
+# POM_bottom = FluxBoundaryCondition(POM_bottom_cond, discrete_form = true)
 
 #---DOM----------------------
 DOM_top = ValueBoundaryCondition(0.0)
@@ -313,9 +314,9 @@ DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true) #, par
 oxy_bcs = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom)
 nut_bcs = FieldBoundaryConditions(bottom = NUT_bottom)
 dom_bcs = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom)
-pom_bcs = FieldBoundaryConditions(bottom = POM_bottom)
-phy_bcs = FieldBoundaryConditions(bottom = PHY_bottom)
-het_bcs = FieldBoundaryConditions(bottom = HET_bottom)
+# pom_bcs = FieldBoundaryConditions(bottom = POM_bottom)
+# phy_bcs = FieldBoundaryConditions(bottom = PHY_bottom)
+# het_bcs = FieldBoundaryConditions(bottom = HET_bottom)
 
 boundary_conditions = (
     u = u_bcs,
@@ -323,9 +324,9 @@ boundary_conditions = (
     O₂ = oxy_bcs,
     NUT = nut_bcs,
     DOM = dom_bcs,
-    POM = pom_bcs,
-    PHY = phy_bcs,
-    HET = het_bcs,
+    # POM = pom_bcs,
+    # PHY = phy_bcs,
+    # HET = het_bcs,
 )
 
 ## River forcing
@@ -365,19 +366,19 @@ model = HydrostaticFreeSurfaceModel(;
     closure,
     biogeochemistry,
     buoyancy = SeawaterBuoyancy(),
-    boundary_conditions,
-    forcing = (T = Tforcing, S = Sforcing),
+    # boundary_conditions,
+    # forcing = (T = Tforcing, S = Sforcing),
     momentum_advection = VectorInvariant(),
     tracer_advection = WENO(underlying_grid),
-    tracers = (:T, :S),
+    tracers = (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T, :S),
 )
 
 ## Set initial conditions
 set!(model, T = T₀, S = S₀, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0)
 
 ## Simulation
-Δt = 0.5seconds
-stop_time = 1hours
+Δt = 1seconds
+stop_time = 24hours
 simulation = Simulation(model; Δt, stop_time)
 progress(sim) = @info "Time : $(prettytime(sim.model.clock.time)),
                         max(|u|): $(maximum(abs, sim.model.velocities.u)),
@@ -405,10 +406,10 @@ simulation.output_writers[:surface_fields] = JLD2OutputWriter(
 )
 
 # checkpoints_prefix = joinpath(homedir(), "data_Varna", "simulation_chkpnt")
-simulation.output_writers[:checkpointer] =
+# simulation.output_writers[:checkpointer] =
     # Checkpointer(model; schedule = IterationInterval(200), prefix = checkpoints_prefix)
-    Checkpointer(model; schedule = IterationInterval(200), prefix = "model_checkpoint")
+    # Checkpointer(model; schedule = IterationInterval(200), prefix = "model_checkpoint")
 
 
 ## run simulation
-run!(simulation, pickup = true)
+run!(simulation)  # , pickup = true)

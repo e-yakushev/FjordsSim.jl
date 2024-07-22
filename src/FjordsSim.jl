@@ -1,6 +1,6 @@
 module FjordsSim
 
-export FjordsSetup, ImmersedBoundaryGrid
+export SetupGridStretchedVericalFaces, ImmersedBoundaryGrid
 
 import Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid
 
@@ -14,7 +14,7 @@ include("VerticalGrids.jl")
 using .Bathymetry: regrid_bathymetry
 using .VerticalGrids
 
-struct FjordsSetup
+struct SetupGridStretchedVericalFaces
     arch::AbstractSerialArchitecture
     size::Tuple
     latitude::Tuple
@@ -27,7 +27,7 @@ struct FjordsSetup
     minimum_depth::Number
 end
 
-function FjordsSetup(;
+function SetupGridStretchedVericalFaces(;
     Nx::Integer,
     Ny::Integer,
     latitude::Tuple,
@@ -52,33 +52,33 @@ function FjordsSetup(;
 
     Nz = length(z_faces) - 1
 
-    return FjordsSetup(
+    return SetupGridStretchedVericalFaces(
         arch,
         (Nx, Ny, Nz),
         latitude,
         longitude,
         z_faces,
         halo,
-        joinpath(homedir(), "fjords_data"),
+        joinpath(homedir(), "data_fjords"),
         filename,
         height_above_water,
         minimum_depth,
     )
 end
 
-function ImmersedBoundaryGrid(setup::FjordsSetup)
-    grid = LatitudeLongitudeGrid(setup.arch;
-                                 size = setup.size,
-                                 latitude = setup.latitude,
-                                 longitude = setup.longitude,
-                                 z = setup.z,
-                                 halo = setup.halo)
+function ImmersedBoundaryGrid(setup_grid::SetupGridStretchedVericalFaces)
+    grid = LatitudeLongitudeGrid(setup_grid.arch;
+                                 size = setup_grid.size,
+                                 latitude = setup_grid.latitude,
+                                 longitude = setup_grid.longitude,
+                                 z = setup_grid.z,
+                                 halo = setup_grid.halo)
     h = regrid_bathymetry(
         grid;
-        height_above_water=setup.height_above_water,
-        minimum_depth=setup.minimum_depth,
-        dir=setup.datadir,
-        filename = setup.filename,
+        height_above_water=setup_grid.height_above_water,
+        minimum_depth=setup_grid.minimum_depth,
+        dir=setup_grid.datadir,
+        filename = setup_grid.filename,
     )
 
     return ImmersedBoundaryGrid(grid, GridFittedBottom(h))

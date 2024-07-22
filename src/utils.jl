@@ -1,5 +1,15 @@
 using NCDatasets
 
+"""
+# Example usage
+filename = "./app/varna/Varna_brom.nc"
+T, S, U = read_TSU_forcing(filename)
+
+# Display the shapes of the loaded arrays
+println("Temperature shape: ", size(T))
+println("Salinity shape: ", size(S))
+println("Velocity shape: ", size(U))
+"""
 function read_TSU_forcing(filename::String)
     # reads temperature, salinity and velocities from netcdf.
     # currently for _brom.nc files prepared for 2DBP
@@ -22,12 +32,3 @@ function read_TSU_forcing(filename::String)
     
     return temperature, salinity, velocity
 end
-
-# Example usage
-filename = "./app/varna/Varna_brom.nc"
-T, S, U = read_TSU_forcing(filename)
-
-# Display the shapes of the loaded arrays
-println("Temperature shape: ", size(T))
-println("Salinity shape: ", size(S))
-println("Velocity shape: ", size(U))
