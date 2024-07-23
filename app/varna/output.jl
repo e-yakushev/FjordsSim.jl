@@ -59,7 +59,15 @@ for (i, t) in enumerate(times)
         biogeochemical_drift_velocity(model.biogeochemistry, Val(:PHY)).w[1, 1, 1] +
         HET[1, 1, 1, i] * biogeochemical_drift_velocity(model.biogeochemistry, Val(:HET)).w[1, 1, 1]
     )
+    nitrogen_burying[i] = (
+        POM[1, 1, 1, i] *
+        biogeochemical_drift_velocity(model.biogeochemistry, Val(:POM)).w[1, 1, 1] +
+        PHY[1, 1, 1, i] *
+        biogeochemical_drift_velocity(model.biogeochemistry, Val(:PHY)).w[1, 1, 1] +
+        HET[1, 1, 1, i] * biogeochemical_drift_velocity(model.biogeochemistry, Val(:HET)).w[1, 1, 1]
+    )
 end
+
 
 ## Plot
 
@@ -83,6 +91,8 @@ Colorbar(fig[2, 4], hmHET)
 axPOM = Axis(fig[3, 3]; title = "POM, mmolN/m³", axis_kwargs...)
 hmPOM =
     heatmap!(times / days, z, interior(POM, 1, 1, :, :)', colormap = Reverse(:greenbrownterrain)) #(:bilbao25))
+hmPOM =
+    heatmap!(times / days, z, interior(POM, 1, 1, :, :)', colormap = Reverse(:greenbrownterrain)) #(:bilbao25))
 Colorbar(fig[3, 4], hmPOM)
 
 axDOM = Axis(fig[3, 1]; title = "DOM, mmolN/m³", axis_kwargs...)
@@ -91,9 +101,11 @@ Colorbar(fig[3, 2], hmDOM)
 
 axNUT = Axis(fig[1, 1]; title = "NUT, mmolN/m³", axis_kwargs...)
 hmNUT = heatmap!(times / days, z, interior(NUT, 1, 1, :, :)', colormap = Reverse(:cherry))
+hmNUT = heatmap!(times / days, z, interior(NUT, 1, 1, :, :)', colormap = Reverse(:cherry))
 Colorbar(fig[1, 2], hmNUT)
 
 axOXY = Axis(fig[2, 1]; title = "OXY, mmol/m³", axis_kwargs...)
+hmOXY = heatmap!(times / days, z, interior(O₂, 1, 1, :, :)', colormap = :turbo)
 hmOXY = heatmap!(times / days, z, interior(O₂, 1, 1, :, :)', colormap = :turbo)
 Colorbar(fig[2, 2], hmOXY)
 
@@ -108,6 +120,16 @@ Colorbar(fig[1, 6], hmS)
 #hmPAR = heatmap!(times / days, z, interior(PAR, 1, 1, :, :)', colormap = :grayC100) # :linear_grey_0_100_c0_n256)
 #Colorbar(fig[1, 6], hmPAR)
 
+@info "Z-Time plots made"
+
+
+axNburying = Axis(
+    fig[3, 5],
+    xlabel = "Time (days)",
+    ylabel = "Flux (mmolN/m²/year)",
+    title = "N burying",
+    limits = ((0, times[end] / days), nothing),
+)
 @info "Z-Time plots made"
 
 
