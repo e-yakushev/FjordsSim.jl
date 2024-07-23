@@ -1,11 +1,8 @@
-module Bathymetry
-
-export regrid_bathymetry
+using FjordsSim: download_progress
 
 using ImageMorphology
-using ..DataWrangling: download_progress
-
-using Oceananigans
+using NCDatasets
+using Downloads
 using Oceananigans.Architectures: architecture
 using Oceananigans.Grids: halo_size, λnodes, φnodes
 using Oceananigans.Grids: x_domain, y_domain
@@ -14,10 +11,6 @@ using Oceananigans.Utils: pretty_filesize, launch!
 using Oceananigans.Fields: interpolate!
 using Oceananigans.BoundaryConditions
 using KernelAbstractions: @kernel, @index
-
-using NCDatasets
-using Downloads
-using Printf
 
 """
     regrid_bathymetry(target_grid;
@@ -68,14 +61,16 @@ Keyword Arguments:
                              Default is `Inf`. If a value < `Inf` is specified, connected regions will be preserved in order
                              of how many active cells they contain.
 """
-function regrid_bathymetry(target_grid;
-                           height_above_water = nothing,
-                           minimum_depth = 0,
-                           dir = joinpath(@__DIR__, "..", "data"),
-                           url = "https://www.ngdc.noaa.gov/thredds/fileServer/global/ETOPO2022/60s/60s_surface_elev_netcdf",
-                           filename = "ETOPO_2022_v1_60s_N90W180_surface.nc",
-                           interpolation_passes = 1,
-                           connected_regions_allowed = 3) # Allow an `Inf` number of ``lakes''
+function regrid_bathymetry(
+    target_grid;
+    height_above_water = nothing,
+    minimum_depth = 0,
+    dir = joinpath(@__DIR__, "..", "data"),
+    url = "https://www.ngdc.noaa.gov/thredds/fileServer/global/ETOPO2022/60s/60s_surface_elev_netcdf",
+    filename = "ETOPO_2022_v1_60s_N90W180_surface.nc",
+    interpolation_passes = 1,
+    connected_regions_allowed = 3,
+) # Allow an `Inf` number of ``lakes''
 
     filepath = joinpath(dir, filename)
 
@@ -89,7 +84,7 @@ function regrid_bathymetry(target_grid;
         end
 
         fileurl = joinpath(url, filename)
-        Downloads.download(fileurl, filepath; progress=download_progress, verbose=true)
+        Downloads.download(fileurl, filepath; progress = download_progress, verbose = true)
     end
 
     dataset = Dataset(filepath)
@@ -131,13 +126,13 @@ function regrid_bathymetry(target_grid;
     φ₂_data = φ_data[j₂] + Δφ / 2
 
     λ₁ ≈ λ₁_data || @warn "The westernmost meridian of `target_grid` $λ₁ does not coincide with " *
-                          "the closest meridian of the bathymetry grid, $λ₁_data."
+          "the closest meridian of the bathymetry grid, $λ₁_data."
     λ₂ ≈ λ₂_data || @warn "The easternmost meridian of `target_grid` $λ₂ does not coincide with " *
-                          "the closest meridian of the bathymetry grid, $λ₂_data."
+          "the closest meridian of the bathymetry grid, $λ₂_data."
     φ₁ ≈ φ₁_data || @warn "The southernmost parallel of `target_grid` $φ₁ does not coincide with " *
-                          "the closest parallel of the bathymetry grid, $φ₁_data."
+          "the closest parallel of the bathymetry grid, $φ₁_data."
     φ₂ ≈ φ₂_data || @warn "The northernmost parallel of `target_grid` $φ₂ does not coincide with " *
-                          "the closest parallel of the bathymetry grid, $φ₂_data."
+          "the closest parallel of the bathymetry grid, $φ₂_data."
 
     # Restrict bathymetry _data to region of interest
     λ_data = λ_data[ii]
@@ -157,71 +152,81 @@ function regrid_bathymetry(target_grid;
     Nyn = length(φ_data)
     Nzn = 1
 
-    native_grid = LatitudeLongitudeGrid(arch;
-                                        size = (Nxn, Nyn, Nzn),
-                                        latitude = (φ₁, φ₂),
-                                        longitude = (λ₁, λ₂),
-                                        z = (0, 1),
-                                        halo = (10, 10, 1))
+    native_grid = LatitudeLongitudeGrid(
+        arch;
+        size = (Nxn, Nyn, Nzn),
+        latitude = (φ₁, φ₂),
+        longitude = (λ₁, λ₂),
+        z = (0, 1),
+        halo = (10, 10, 1),
+    )
 
-    native_h = Field{Center, Center, Nothing}(native_grid)
+    native_h = Field{Center,Center,Nothing}(native_grid)
     set!(native_h, h_data)
 
-    target_h = interpolate_bathymetry_in_passes(native_h, target_grid;
-                                                passes = interpolation_passes,
-                                                connected_regions_allowed,
-                                                minimum_depth)
+    target_h = interpolate_bathymetry_in_passes(
+        native_h,
+        target_grid;
+        passes = interpolation_passes,
+        connected_regions_allowed,
+        minimum_depth,
+    )
 
     return target_h
 end
 
 # Here we can either use `regrid!` (three dimensional version) or `interpolate`
-function interpolate_bathymetry_in_passes(native_h, target_grid;
-                                          passes = 10,
-                                          connected_regions_allowed = 3,
-                                          minimum_depth = 0)
+function interpolate_bathymetry_in_passes(
+    native_h,
+    target_grid;
+    passes = 10,
+    connected_regions_allowed = 3,
+    minimum_depth = 0,
+)
     Nλt, Nφt = Nt = size(target_grid)
     Nλn, Nφn = Nn = size(native_h)
 
     if any(Nt[1:2] .> Nn[1:2]) # We are refining the grid (at least in one direction), more passes will not help!
-        target_h = Field{Center, Center, Nothing}(target_grid)
+        target_h = Field{Center,Center,Nothing}(target_grid)
         interpolate!(target_h, native_h)
         return target_h
     end
 
-    latitude  = y_domain(target_grid)
+    latitude = y_domain(target_grid)
     longitude = x_domain(target_grid)
 
     ΔNλ = floor((Nλn - Nλt) / passes)
     ΔNφ = floor((Nφn - Nφt) / passes)
 
-    Nλ = [Nλn - ΔNλ * pass for pass in 1:passes-1]
-    Nφ = [Nφn - ΔNφ * pass for pass in 1:passes-1]
+    Nλ = [Nλn - ΔNλ * pass for pass = 1:passes-1]
+    Nφ = [Nφn - ΔNφ * pass for pass = 1:passes-1]
 
     Nλ = Int[Nλ..., Nλt]
     Nφ = Int[Nφ..., Nφt]
 
-    old_h     = native_h
+    old_h = native_h
     TX, TY, _ = topology(target_grid)
 
-    for pass = 1:passes - 1
+    for pass = 1:passes-1
         new_size = (Nλ[pass], Nφ[pass], 1)
 
         @debug "pass number $pass with size $new_size"
-        new_grid = LatitudeLongitudeGrid(architecture(target_grid),
-                                         size = new_size,
-                                     latitude = (latitude[1],  latitude[2]),
-                                    longitude = (longitude[1], longitude[2]),
-                                            z = (0, 1),
-                                     topology = (TX, TY, Bounded))
+        new_grid = LatitudeLongitudeGrid(
+            architecture(target_grid),
+            size = new_size,
+            latitude = (latitude[1], latitude[2]),
+            longitude = (longitude[1], longitude[2]),
+            z = (0, 1),
+            topology = (TX, TY, Bounded),
+        )
 
-        new_h = Field{Center, Center, Nothing}(new_grid)
+        new_h = Field{Center,Center,Nothing}(new_grid)
 
         interpolate!(new_h, old_h)
         old_h = new_h
     end
 
-    target_h = Field{Center, Center, Nothing}(target_grid)
+    target_h = Field{Center,Center,Nothing}(target_grid)
     interpolate!(target_h, old_h)
 
     h_data = Array(interior(target_h, :, :, 1))
@@ -265,7 +270,7 @@ function remove_lakes!(h_data; connected_regions_allowed = Inf)
     end
 
     bathtmp = deepcopy(h_data)
-    batneg  = zeros(Bool, size(bathtmp)...)
+    batneg = zeros(Bool, size(bathtmp)...)
 
     batneg[bathtmp.<0] .= true
 
@@ -274,8 +279,8 @@ function remove_lakes!(h_data; connected_regions_allowed = Inf)
     total_elements = zeros(maximum(labels))
     label_elements = zeros(maximum(labels))
 
-    for i in 1:lastindex(total_elements)
-        total_elements[i] = sum(labels[labels .== i])
+    for i = 1:lastindex(total_elements)
+        total_elements[i] = sum(labels[labels.==i])
         label_elements[i] = i
     end
 
@@ -285,7 +290,7 @@ function remove_lakes!(h_data; connected_regions_allowed = Inf)
     total_elements = filter((x) -> x != total_elements[ocean_idx], total_elements)
     label_elements = filter((x) -> x != label_elements[ocean_idx], label_elements)
 
-    for _ in 1:connected_regions_allowed
+    for _ = 1:connected_regions_allowed
         next_maximum = findfirst(x -> x == maximum(total_elements), total_elements)
         push!(all_idx, label_elements[next_maximum])
         total_elements = filter((x) -> x != total_elements[next_maximum], total_elements)
@@ -294,10 +299,10 @@ function remove_lakes!(h_data; connected_regions_allowed = Inf)
 
     labels = Float64.(labels)
 
-    for i in 1:maximum(labels)
+    for i = 1:maximum(labels)
         remove_lake = (&).(Tuple(i != idx for idx in all_idx)...)
         if remove_lake
-            labels[labels .== i] .= NaN
+            labels[labels.==i] .= NaN
         end
     end
 
@@ -309,6 +314,3 @@ function remove_lakes!(h_data; connected_regions_allowed = Inf)
 
     return bathtmp
 end
-
-end # module
-

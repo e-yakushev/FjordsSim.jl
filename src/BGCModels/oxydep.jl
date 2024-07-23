@@ -23,10 +23,6 @@ Required submodels
 * Photosynthetically available radiation: PAR (W/m²)
 """
 
-module OxydepModel
-
-export OXYDEP
-
 using Oceananigans: fields
 using Oceananigans.Units
 using Oceananigans.Fields: Field, TracerFields, CenterField, ZeroField
@@ -531,4 +527,3 @@ adapt_structure(to, oxydep::OXYDEP) = OXYDEP(
 
 @inline conserved_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
 @inline sinking_tracers(bgc::OXYDEP) = keys(bgc.sinking_velocities)
-end # module
