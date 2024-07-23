@@ -45,78 +45,75 @@ import Oceananigans.Biogeochemistry:
 include("../../src/FjordsSim.jl")
 include("setup.jl")
 
-using .FjordsSim
-using .FjordsSim: ImmersedBoundaryGrid
+using .FjordsSim: ImmersedBoundaryGrid, OXYDEP, SetupGridPredefinedFromFile
 
-## Setup
+## Grid
 # save_interval = 30minutes
 setup_grid = SetupGridPredefinedFromFile(args_grid...)
 grid = ImmersedBoundaryGrid(setup_grid)
 
 ## Biogeochemistry
-const year = years = 365days
 # Surface PAR
 # Setting up idealised functions for PAR and diffusivity 
 # (details here can be ignored but these are typical of the North Atlantic)
+const year = years = 365days
 @inline PAR⁰(x, y, t) =
     60 *
     (1 - cos((t + 15days) * 2π / year)) *
     (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
-
-## Oxydep
-biogeochemistry = OXYDEP(; grid, surface_photosynthetically_active_radiation = PAR⁰)
+biogeochemistry = OXYDEP(; args_oxydep..., grid, surface_photosynthetically_active_radiation = PAR⁰)
 
 ## Initial Conditions
-# z_ini = -reverse([0.5, 1, 2, 3, 4, 6, 8, 9, 10, 12, 16, 20])
-# tprof = reverse([20, 20, 20, 20, 18, 15, 14, 13, 12, 12, 12, 12])
-# itp = LinearInterpolation(z_ini, tprof)
-# tprof_target = itp(z_middle)
-# 
-# T₀ = Array{Float64}(undef, Nx, Ny, Nz)
-# for i = 1:Nx
-#     for j = 1:Ny
-#         T₀[i, j, :] = tprof_target
-#     end
-# end
-# 
-# sprof = reverse([14, 14.1, 14.2, 14.5, 14.8, 15, 15.1, 15.2, 15.3, 15.4, 15.5, 15.5])
-# itps = LinearInterpolation(z_ini, sprof)
-# sprof_target = itps(z_middle)
-# 
-# S₀ = Array{Float64}(undef, Nx, Ny, Nz)
-# for i = 1:Nx
-#     for j = 1:Ny
-#         S₀[i, j, :] = sprof_target
-#     end
-# end
+z_ini = -reverse([0.5, 1, 2, 3, 4, 6, 8, 9, 10, 12, 16, 20])
+tprof = reverse([20, 20, 20, 20, 18, 15, 14, 13, 12, 12, 12, 12])
+itp = LinearInterpolation(z_ini, tprof)
+z_middle = setup_grid.z_middle
+tprof_target = itp(z_middle)
 
-## Physics
-# const surface_νz = 1e-2
-# const background_νz = 1e-4
-# const background_κz = 1e-5
-# 
-# @inline νz(x, y, z, t) = ifelse(z > -15, surface_νz, background_νz)
-# 
-# horizontal_viscosity = HorizontalScalarDiffusivity(ν = 1e3)
-# vertical_viscosity =
-#     VerticalScalarDiffusivity(VerticallyImplicitTimeDiscretization(), ν = νz, κ = background_κz)
-# convective_adjustment = ConvectiveAdjustmentVerticalDiffusivity(convective_κz = 0.1)
-# κ_skew = 900.0      # [m² s⁻¹] skew diffusivity
-# κ_symmetric = 900.0 # [m² s⁻¹] symmetric diffusivity
-# 
-# gent_mcwilliams_diffusivity =
-#     IsopycnalSkewSymmetricDiffusivity(; κ_skew, κ_symmetric, slope_limiter = FluxTapering(1e-2))
-# 
-# closure =
-#     (vertical_viscosity, horizontal_viscosity, convective_adjustment, gent_mcwilliams_diffusivity)
+Nx, Ny = setup_grid.Nx, setup_grid.Ny
+Nz = length(setup_grid.z_levels) - 1
+T₀ = Array{Float64}(undef, Nx, Ny, Nz)
+for i = 1:Nx
+    for j = 1:Ny
+        T₀[i, j, :] = tprof_target
+    end
+end
 
-## Boundary confitions
-reference_density = 1000.0
-reference_heat_capacity = 3991.0
-reference_salinity = 15
+sprof = reverse([14, 14.1, 14.2, 14.5, 14.8, 15, 15.1, 15.2, 15.3, 15.4, 15.5, 15.5])
+itps = LinearInterpolation(z_ini, sprof)
+sprof_target = itps(z_middle)
 
-## Wind stress 
+S₀ = Array{Float64}(undef, Nx, Ny, Nz)
+for i = 1:Nx
+    for j = 1:Ny
+        S₀[i, j, :] = sprof_target
+    end
+end
+
+## The turbulence closure
+const surface_νz = 1e-2
+const background_νz = 1e-4
+const background_κz = 1e-5
+
+@inline νz(x, y, z, t) = ifelse(z > -15, surface_νz, background_νz)
+
+horizontal_viscosity = HorizontalScalarDiffusivity(ν = 1e3)
+vertical_viscosity =
+    VerticalScalarDiffusivity(VerticallyImplicitTimeDiscretization(), ν = νz, κ = background_κz)
+convective_adjustment = ConvectiveAdjustmentVerticalDiffusivity(convective_κz = 0.1)
+κ_skew = 900.0      # [m² s⁻¹] skew diffusivity
+κ_symmetric = 900.0 # [m² s⁻¹] symmetric diffusivity
+
+gent_mcwilliams_diffusivity =
+    IsopycnalSkewSymmetricDiffusivity(; κ_skew, κ_symmetric, slope_limiter = FluxTapering(1e-2))
+
+closure =
+    (vertical_viscosity, horizontal_viscosity, convective_adjustment, gent_mcwilliams_diffusivity)
+
+## Boundary conditions
+# Wind stress 
 # https://en.wikipedia.org/wiki/Wind_stress
+reference_density = 1000.0
 Cd = 0.0025  # 0.0015
 ρₐᵢᵣ = 1.225
 Ntimes = 12
@@ -131,8 +128,7 @@ for i = 1:Nx
     end
 end
 
-## Time dependent fluxes
-const Nyears = 1.0
+# Time dependent fluxes
 const Nmonths = 12
 const thirty_days = 30days
 
@@ -158,7 +154,7 @@ const thirty_days = 30days
     return cyclic_interpolate(τ₁, τ₂, time)
 end
 
-## Bottom drag
+# Bottom drag
 Δz_top = @allowscalar grid.Δzᵃᵃᶜ[Nz]
 
 # Linear bottom drag:
@@ -200,7 +196,6 @@ v_immersed_bc = ImmersedBoundaryCondition(
     north = no_slip_bc,
 )
 
-## Constructing BC
 u_bottom_drag_bc = FluxBoundaryCondition(u_bottom_drag, discrete_form = true, parameters = μ)
 v_bottom_drag_bc = FluxBoundaryCondition(v_bottom_drag, discrete_form = true, parameters = μ)
 
@@ -208,13 +203,13 @@ u_wind_stress_bc = FluxBoundaryCondition(surface_wind_stress, discrete_form = tr
 v_wind_stress_bc = FluxBoundaryCondition(surface_wind_stress, discrete_form = true, parameters = τʸ);
 
 u_bcs = FieldBoundaryConditions(
-    top = u_wind_stress_bc,
+    # top = u_wind_stress_bc,
     bottom = u_bottom_drag_bc,
     immersed = u_immersed_bc,
 )
 
 v_bcs = FieldBoundaryConditions(
-    top = v_wind_stress_bc,
+    # top = v_wind_stress_bc,
     bottom = v_bottom_drag_bc,
     immersed = v_immersed_bc,
 )
@@ -232,7 +227,6 @@ bu = 0.7           # Burial coeficient for lower boundary (0<Bu<1), 1 - for no b
 @inline F_ox(conc, threshold) = (0.5 + 0.5 * tanh(conc - threshold))
 @inline F_subox(conc, threshold) = (0.5 - 0.5 * tanh(conc - threshold))
 
-#---OXY----------------------
 OXY_top = GasExchange(; gas = :O₂)
 @inline OXY_bottom_cond(i, j, grid, clock, fields) = @inbounds -(
     F_ox(fields.O₂[i, j, 1], O2_suboxic) * b_ox +
@@ -240,29 +234,24 @@ OXY_top = GasExchange(; gas = :O₂)
 ) / Trel
 OXY_bottom = FluxBoundaryCondition(OXY_bottom_cond, discrete_form = true)
 
-#---NUT----------------------
 @inline NUT_bottom_cond(i, j, grid, clock, fields) = @inbounds (
     F_ox(fields.O₂[i, j, 1], O2_suboxic) * (b_NUT - fields.NUT[i, j, 1]) +
     F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.NUT[i, j, 1])
 ) / Trel
 NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond, discrete_form = true) #ValueBoundaryCondition(10.0)
 
-#---PHY----------------------
 # w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:PHY)).w[1, 1, 1]
 # @inline PHY_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_PHY * fields.PHY[i, j, 1]
 # PHY_bottom = FluxBoundaryCondition(PHY_bottom_cond, discrete_form = true)
 
-#---HET----------------------
 # w_HET = biogeochemical_drift_velocity(biogeochemistry, Val(:HET)).w[1, 1, 1]
 # @inline HET_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_HET * fields.HET[i, j, 1]
 # HET_bottom = FluxBoundaryCondition(HET_bottom_cond, discrete_form = true)
 
-#---POM----------------------
 # w_POM = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[1, 1, 1]
 # @inline POM_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_POM * fields.POM[i, j, 1]
 # POM_bottom = FluxBoundaryCondition(POM_bottom_cond, discrete_form = true)
 
-#---DOM----------------------
 DOM_top = ValueBoundaryCondition(0.0)
 @inline DOM_bottom_cond(i, j, grid, clock, fields) = @inbounds (
     F_ox(fields.O₂[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) +
@@ -280,9 +269,9 @@ dom_bcs = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom)
 boundary_conditions = (
     u = u_bcs,
     v = v_bcs,
-    O₂ = oxy_bcs,
-    NUT = nut_bcs,
-    DOM = dom_bcs,
+    # O₂ = oxy_bcs,
+    # NUT = nut_bcs,
+    # DOM = dom_bcs,
     # POM = pom_bcs,
     # PHY = phy_bcs,
     # HET = het_bcs,
@@ -298,14 +287,14 @@ S_source = 0
 # Index of the point source at the middle of the southern wall.
 source_index = (1, 13, Nz)
 
-# # Point source
+# Point source
+
 # @inline T_point_source(i, j, k, grid, time, U, C, p) =
 #     @inbounds ifelse((i, j, k) == p.source_index, -p.λ * (C.T[i, j, k] - p.T_source), 0)
 
 # @inline S_point_source(i, j, k, grid, time, U, C, p) =
 #     @inbounds ifelse((i, j, k) == p.source_index, -p.λ * (C.S[i, j, k] - p.S_source), 0)
 
-# Point source
 T_point_source(i, j, k, grid, clock, model_fields) =
     @inbounds ifelse((i, j, k) == (1, 13, Nz), -λ * (model_fields.T[i, j, k] - T_source), 0)
 
@@ -325,10 +314,10 @@ model = HydrostaticFreeSurfaceModel(;
     closure,
     biogeochemistry,
     buoyancy = SeawaterBuoyancy(),
-    # boundary_conditions,
+    boundary_conditions,
     # forcing = (T = Tforcing, S = Sforcing),
     momentum_advection = VectorInvariant(),
-    tracer_advection = WENO(underlying_grid),
+    tracer_advection = WENO(grid.underlying_grid),
     tracers = (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T, :S),
 )
 
@@ -366,8 +355,8 @@ simulation.output_writers[:surface_fields] = JLD2OutputWriter(
 
 # checkpoints_prefix = joinpath(homedir(), "data_Varna", "simulation_chkpnt")
 # simulation.output_writers[:checkpointer] =
-    # Checkpointer(model; schedule = IterationInterval(200), prefix = checkpoints_prefix)
-    # Checkpointer(model; schedule = IterationInterval(200), prefix = "model_checkpoint")
+# Checkpointer(model; schedule = IterationInterval(200), prefix = checkpoints_prefix)
+# Checkpointer(model; schedule = IterationInterval(200), prefix = "model_checkpoint")
 
 
 ## run simulation
