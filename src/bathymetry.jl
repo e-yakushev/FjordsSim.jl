@@ -1,5 +1,3 @@
-using FjordsSim: download_progress
-
 using ImageMorphology
 using NCDatasets
 using Downloads

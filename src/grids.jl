@@ -1,5 +1,3 @@
-using FjordsSim: regrid_bathymetry
-
 using FileIO
 using Oceananigans
 using Oceananigans.Architectures

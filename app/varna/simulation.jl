@@ -46,6 +46,7 @@ include("../../src/FjordsSim.jl")
 include("setup.jl")
 
 using .FjordsSim
+using .FjordsSim: ImmersedBoundaryGrid
 
 ## Setup
 # save_interval = 30minutes
