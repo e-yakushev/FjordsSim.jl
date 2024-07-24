@@ -57,7 +57,8 @@ grid = RectilinearGrid(size = (1, 1, 10), extent = (500meters, 500meters, 10mete
 
 ## Model
 biogeochemistry =
-    OXYDEP(; grid,
+    OXYDEP(; grid, 
+    args_oxydep...,
     surface_photosynthetically_active_radiation = PAR⁰,
     TS_forced = true,
     scale_negatives=true)

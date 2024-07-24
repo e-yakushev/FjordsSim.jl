@@ -57,7 +57,7 @@ const year = years = 365days
     60 *
     (1 - cos((t + 15days) * 2π / year)) *
     (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
-biogeochemistry = OXYDEP(; grid, args_oxydep..., surface_photosynthetically_active_radiation = PAR⁰)
+biogeochemistry = OXYDEP(; grid, args_oxydep..., TS_forced = false, surface_photosynthetically_active_radiation = PAR⁰)
 
 ## The turbulence closure
 closure = turbulence_closures_a()
