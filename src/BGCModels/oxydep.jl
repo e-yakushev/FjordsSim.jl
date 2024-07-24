@@ -23,10 +23,6 @@ Required submodels
 * Photosynthetically available radiation: PAR (W/m²)
 """
 
-module OXYDEPModel
-
-export OXYDEP
-
 using Oceananigans: fields
 using Oceananigans.Units
 using Oceananigans.Fields: Field, TracerFields, CenterField, ZeroField
@@ -76,7 +72,7 @@ function update_biogeochemical_state!(model, PAR::TwoBandPhotosyntheticallyActiv
     fill_halo_regions!(PAR.field, model.clock, fields(model))
 end
 
-struct OXYDEP{FT, B, W} <: AbstractContinuousFormBiogeochemistry
+struct OXYDEP{FT,B,W} <: AbstractContinuousFormBiogeochemistry
     # PHY
     initial_photosynthetic_slope::FT # α, 1/(W/m²)/s
     Iopt::FT   # Optimal irradiance (W/m2) =50 (Savchuk, 2002)
@@ -110,13 +106,10 @@ struct OXYDEP{FT, B, W} <: AbstractContinuousFormBiogeochemistry
     CtoN::FT # Redfield (106/16) to NO3, (uM(C)/uM(N)) 
     NtoN::FT # Richards denitrification (84.8/16.), (uM(N)/uM(N))
     NtoB::FT # N[uM]/BIOMASS [mg/m3], (uM(N) / mgWW/m3)
-
-    optionals :: B
-
-    # sinking
+    optionals::B
     sinking_velocities::W
 
-    function OXYDEP(  
+    function OXYDEP(
         initial_photosynthetic_slope::FT,
         Iopt::FT,
         alphaI::FT,
@@ -145,13 +138,11 @@ struct OXYDEP{FT, B, W} <: AbstractContinuousFormBiogeochemistry
         CtoN::FT,
         NtoN::FT,
         NtoB::FT,
-
         optionals::B,
-
         sinking_velocities::W,
-    ) where {FT, B, W}
+    ) where {FT,B,W}
 
-        return new{FT, B, W}(
+        return new{FT,B,W}(
             initial_photosynthetic_slope,
             Iopt,
             alphaI,
@@ -222,15 +213,14 @@ function OXYDEP(;
         surface_PAR = surface_photosynthetically_active_radiation,
     ),
     sediment_model::S = nothing,
-
     TS_forced::Bool = false,
-
     sinking_speeds = (PHY = 0.15 / day, HET = 0.4 / day, POM = 10.0 / day),
     open_bottom::Bool = true,
     scale_negatives = false,
     particles::P = nothing,
-    modifiers::M = nothing) where {FT,LA,S,P,M}
-    
+    modifiers::M = nothing,
+) where {FT,LA,S,P,M}
+
     sinking_velocities = setup_velocity_fields(sinking_speeds, grid, open_bottom)
     optionals = Val(TS_forced)
 
@@ -263,9 +253,7 @@ function OXYDEP(;
         CtoN,
         NtoN,
         NtoB,
-
         optionals,
-        
         sinking_velocities,
     )
 
@@ -283,10 +271,12 @@ function OXYDEP(;
     )
 end
 
-required_biogeochemical_tracers(::OXYDEP{<:Any, <:Val{false}, <:Any}) = (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T)
-required_biogeochemical_tracers(::OXYDEP{<:Any, <:Val{true}, <:Any})= (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
-required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any, <:Val{false}, <:Any}) = (:PAR,)
-required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any, <:Val{true}, <:Any}) = (:PAR, :T)
+required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{false},<:Any}) =
+    (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T)
+required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{true},<:Any}) =
+    (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
+required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{false},<:Any}) = (:PAR,)
+required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{true},<:Any}) = (:PAR, :T)
 
 # Limiting equations and switches
 @inline yy(value, consta) = consta^2 / (value^2 + consta^2)   #This is a squared Michaelis-Menten type of limiter
@@ -487,8 +477,7 @@ end
     end
 end
 
-summary(::OXYDEP{FT,NamedTuple{K,V}}) where {FT,K,V} =
-    string("OXYDEP{$FT} model, with $K sinking")
+summary(::OXYDEP{FT,NamedTuple{K,V}}) where {FT,K,V} = string("OXYDEP{$FT} model, with $K sinking")
 show(io::IO, model::OXYDEP{FT}) where {FT} = print(
     io,
     string(
@@ -548,4 +537,3 @@ adapt_structure(to, oxydep::OXYDEP) = OXYDEP(
 
 @inline conserved_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
 @inline sinking_tracers(bgc::OXYDEP) = keys(bgc.sinking_velocities)
-end # module

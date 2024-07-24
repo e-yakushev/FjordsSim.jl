@@ -1,4 +1,7 @@
-oslo_fjord_setup = (
+using Oceananigans.Architectures
+
+args_grid = (
+    arch = CPU(),
     Nx = 70,
     Ny = 70,
     latitude = (59.65, 59.92),
