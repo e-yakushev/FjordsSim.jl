@@ -6,8 +6,8 @@ include("setup.jl")
 
 using .FjordsSim
 
-setup = FjordsSetup(;oslo_fjord_setup...)
-grid = ImmersedBoundaryGrid(setup)
+setup_grid = SetupGridRegrid(;args_grid...)
+grid = ImmersedBoundaryGrid(setup_grid)
 λ, φ, z = nodes(grid.underlying_grid, Center(), Center(), Center())
 
 h = interior(grid.immersed_boundary.bottom_height)

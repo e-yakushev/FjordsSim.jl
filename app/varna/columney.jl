@@ -20,6 +20,7 @@ using OceanBioME.SLatissimaModel: SLatissima
 using Oceananigans.Fields: FunctionField, ConstantField
 using Oceananigans.Units
 using Interpolations
+using Interpolations
 using JLD2
 
 import Oceananigans.Biogeochemistry: update_tendencies!
@@ -28,12 +29,14 @@ import Oceananigans.Biogeochemistry:
     required_biogeochemical_auxiliary_fields,
     biogeochemical_drift_velocity
 
-include("../../src/ForcingInput.jl")
-using .ForcingInput: read_TSU_forcing, make_input_grid, regrid_tracer_over_timesteps
+include("../../src/FjordsSim.jl")
+include("setup.jl")
 
-include("../../src/Oxydep.jl")
-using .OXYDEPModel
+using .FjordsSim:
+    OXYDEP,
+    read_TSU_forcing
 
+const year = 365days
 const year = 365days
 
 ## Surface PAR and turbulent vertical diffusivity based on idealised mixed layer depth 
@@ -57,10 +60,14 @@ grid = RectilinearGrid(size = (1, 1, 12), extent = (500meters, 500meters, 67mete
 
 ## Model
 biogeochemistry =
-    OXYDEP(; grid,
+    OXYDEP(; grid, 
+    args_oxydep...,
     surface_photosynthetically_active_radiation = PAR⁰,
     TS_forced = true,
     scale_negatives=true)
+
+# T = FunctionField{Center,Center,Center}(temp, grid; clock)
+# S = FunctionField{Center,Center,Center}(salt, grid; clock)
 
 ## Boundary conditions
 O2_suboxic = 30.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
@@ -117,8 +124,7 @@ DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
 
 
 ## Hydrophysics forcing
-
-filename = "app/varna/Varna_brom.nc"
+filename = joinpath(homedir(), "BadgerArtifacts", "Varna_brom.nc")
 Tnc, Snc, Unc, depth, times = read_TSU_forcing(filename)
 
 # restore z-faces from nc file, as it provides us only centers of layers. dz=5
@@ -153,6 +159,7 @@ model = NonhydrostaticModel(;
     closure = ScalarDiffusivity(ν = 1e-3, κ = 1e-3), #(ν = 1e-4, κ = 1e-4),
     biogeochemistry,
     # buoyancy = SeawaterBuoyancy(constant_salinity = true),
+    # buoyancy = SeawaterBuoyancy(constant_salinity = true),
     boundary_conditions = (
          O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom),
          NUT = FieldBoundaryConditions(bottom = NUT_bottom),
@@ -163,9 +170,12 @@ model = NonhydrostaticModel(;
     ),
     auxiliary_fields = (; S, T),
     tracers=(:NUT, :PHY, :HET, :POM, :DOM, :O₂)
+    auxiliary_fields = (; S, T),
+    tracers=(:NUT, :PHY, :HET, :POM, :DOM, :O₂)
 )
 
 ## Set model
+set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0,)
 set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0,)
 
 ## Simulation
@@ -182,11 +192,14 @@ progress_message(sim) = @printf(
 simulation.callbacks[:progress] = Callback(progress_message, TimeInterval(10days))
 
 NUT, PHY, HET, POM, DOM, O₂ = model.tracers
+NUT, PHY, HET, POM, DOM, O₂ = model.tracers
 PAR = model.auxiliary_fields.PAR
 T = model.auxiliary_fields.T
 S = model.auxiliary_fields.S
+T = model.auxiliary_fields.T
+S = model.auxiliary_fields.S
 
-output_prefix = "out"
+output_prefix = joinpath(homedir(), "data_Varna", "columney_snapshots")
 simulation.output_writers[:profiles] = JLD2OutputWriter(
     model,
     (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR),
