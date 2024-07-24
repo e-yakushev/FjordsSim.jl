@@ -1,7 +1,9 @@
 using FileIO
+using JLD2
 using Oceananigans
 using Oceananigans.Architectures
-using JLD2
+
+import Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid
 
 struct SetupGridRegrid
     arch::AbstractSerialArchitecture
@@ -60,6 +62,7 @@ struct SetupGridPredefinedFromFile
     arch::AbstractSerialArchitecture
     Nx::Integer
     Ny::Integer
+    Nz::Integer
     dx::Integer
     dy::Integer
     z_levels::Vector
@@ -88,11 +91,10 @@ function ImmersedBoundaryGrid(setup_grid::SetupGridRegrid)
 end
 
 function ImmersedBoundaryGrid(setup_grid::SetupGridPredefinedFromFile)
-    Nz = length(setup_grid.z_levels) - 1
     underlying_grid = RectilinearGrid(
         setup_grid.arch,
         topology = (Bounded, Bounded, Bounded),
-        size = (setup_grid.Nx, setup_grid.Ny, Nz),
+        size = (setup_grid.Nx, setup_grid.Ny, setup_grid.Nz),
         x = (0, setup_grid.dx * setup_grid.Nx),
         y = (0, setup_grid.dy * setup_grid.Ny),
         z = setup_grid.z_levels,

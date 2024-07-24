@@ -1,12 +1,12 @@
 module FjordsSim
 
-export SetupGridRegrid, SetupGridPredefinedFromFile, ImmersedBoundaryGrid, OXYDEP
-
-import Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid
-
 include("utils.jl")
 include("bathymetry.jl")
 include("grids.jl")
+include("initial_conditions.jl")
+include("turbulence_closures.jl")
+include("boundary_conditions.jl")
+include("forcing.jl")
 
 include("BGCModels/BGCModels.jl")
 

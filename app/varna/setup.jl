@@ -5,6 +5,7 @@ args_grid = (
     arch = GPU(),
     Nx = 119,
     Ny = 42,
+    Nz = 20,
     dx = 200,
     dy = 50,
     z_levels = -reverse([

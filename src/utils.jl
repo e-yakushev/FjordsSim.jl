@@ -4,12 +4,7 @@ using Printf
 """
 # Example usage
 filename = "./app/varna/Varna_brom.nc"
-T, S, U = read_TSU_forcing(filename)
-
-# Display the shapes of the loaded arrays
-println("Temperature shape: ", size(T))
-println("Salinity shape: ", size(S))
-println("Velocity shape: ", size(U))
+T, S, U, depth, time = read_TSU_forcing(filename)
 """
 function read_TSU_forcing(filename::String)
     # reads temperature, salinity and velocities from netcdf.
@@ -17,21 +12,19 @@ function read_TSU_forcing(filename::String)
 
     # Open the NetCDF file
     ds = Dataset(filename, "r")
-
-    # Ensure that the variables "temp", "salt" and "u" exist
-    if !haskey(ds, "temp") || !haskey(ds, "salt") || !haskey(ds, "u")
-        error("The NetCDF file does not contain the required variables 'temp', 'salt' and 'u'.")
-    end
-
+    
     # Read the variables
-    temperature = ds["temp"][:, :]
-    salinity = ds["salt"][:, :]
-    velocity = ds["u"][:, :]
+    temperature = reverse(ds["temp"][:,:], dims=2)
+    salinity = reverse(ds["salt"][:, :], dims=2)
+    velocity = reverse(ds["u"][:, :], dims=2)
 
+    depth = reverse(ds["depth"][:])
+    time = ds["oc_time"][:]
+    
     # Close the dataset
     close(ds)
-
-    return temperature, salinity, velocity
+    
+    return temperature, salinity, velocity, depth, time
 end
 
 """
