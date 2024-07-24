@@ -19,6 +19,7 @@ using OceanBioME.Boundaries.Sediments: sinking_flux
 using OceanBioME.SLatissimaModel: SLatissima
 using Oceananigans.Fields: FunctionField, ConstantField
 using Oceananigans.Units
+using Interpolations
 using JLD2
 
 import Oceananigans.Biogeochemistry: update_tendencies!
@@ -27,10 +28,13 @@ import Oceananigans.Biogeochemistry:
     required_biogeochemical_auxiliary_fields,
     biogeochemical_drift_velocity
 
-include("../../src/Oxydep.jl")
-using .OXYDEPModel
+include("../../src/FjordsSim.jl")
+include("setup.jl")
 
-const year = years = 365days
+using .FjordsSim:
+    OXYDEP
+
+const year = 365days
 
 ## Surface PAR and turbulent vertical diffusivity based on idealised mixed layer depth 
 @inline PAR⁰(x, y, t) =
@@ -48,12 +52,15 @@ const year = years = 365days
 
 ## Grid
 #depth_extent = 100meters
-grid = RectilinearGrid(size = (1, 1, 10), extent = (500meters, 500meters, 10meters), topology = (Bounded, Bounded, Bounded)) #topology = (Bounded, Flat, Bounded))
+grid = RectilinearGrid(size = (1, 1, 10), extent = (500meters, 500meters, 10meters), topology = (Bounded, Bounded, Bounded))
 
 ## Model
 biogeochemistry =
-    OXYDEP(; grid, surface_photosynthetically_active_radiation = PAR⁰, particles = nothing)
-clock = Clock(; time = 0.0)
+    OXYDEP(; grid,
+    surface_photosynthetically_active_radiation = PAR⁰,
+    TS_forced = true,
+    scale_negatives=true)
+
 # T = FunctionField{Center,Center,Center}(temp, grid; clock)
 # S = FunctionField{Center,Center,Center}(salt, grid; clock)
 
@@ -110,10 +117,35 @@ DOM_bottom_cond(i, j, grid, clock, fields) =
     ) / Trel
 DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
 
-@inline front(x, y, z, μ, δ) = μ + δ * tanh((x - 7000 + 4 * z) / 500)
-#Tᵢ(x, y, z) = front(x, y, z, 9, 0.05)
-Tᵢ(x, y, z) = front(x, y, z, 15, 0.05)
-Sᵢ(x, y, z) = front(x, y, z, 35, 0.05)
+
+## Hydrophysics forcing
+
+filename = "app/varna/Varna_brom.nc"
+Tnc, Snc, Unc, depth, times = read_TSU_forcing(filename)
+
+# restore z-faces from nc file, as it provides us only centers of layers. dz=5
+# z-faces are needed to construct input_grid
+z_faces = depth .+ 2.6
+z_faces
+# Create a bilinear interpolation object
+
+times = collect(range(0, stop=366*24*3600, step=3600))[1:8784]
+temp_itp = interpolate((times, z_faces), Tnc, Gridded(Linear()))
+sal_itp = interpolate((times, z_faces), Snc, Gridded(Linear()))
+
+# Define a function to perform bilinear interpolation
+function bilinear_interpolate(itp, t, z)
+    return itp(t, z)
+end
+
+
+t_function(x, y, z, t) = bilinear_interpolate(temp_itp, t, z)
+s_function(x, y, z, t) = bilinear_interpolate(sal_itp, t, z)
+
+clock = Clock(; time = times[1])
+
+T = FunctionField{Center, Center, Center}(t_function, grid; clock)
+S = FunctionField{Center, Center, Center}(s_function, grid; clock)
 
 ## Model instantiation
 model = NonhydrostaticModel(;
@@ -121,7 +153,7 @@ model = NonhydrostaticModel(;
     clock,
     closure = ScalarDiffusivity(ν = 1e-4, κ = 1e-4),
     biogeochemistry,
-    buoyancy = SeawaterBuoyancy(constant_salinity = true),
+    # buoyancy = SeawaterBuoyancy(constant_salinity = true),
     boundary_conditions = (
          O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom),
          NUT = FieldBoundaryConditions(bottom = NUT_bottom),
@@ -130,15 +162,16 @@ model = NonhydrostaticModel(;
          PHY = FieldBoundaryConditions(bottom = PHY_bottom),
          HET = FieldBoundaryConditions(bottom = HET_bottom),
     ),
-    tracers=(:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T, :S)
+    auxiliary_fields = (; S, T),
+    tracers=(:NUT, :PHY, :HET, :POM, :DOM, :O₂)
 )
 
 ## Set model
-set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0, T = Tᵢ, S = Sᵢ)
+set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0,)
 
 ## Simulation
 stoptime = 730
-simulation = Simulation(model, Δt = 6minutes, stop_time = (stoptime)days)
+simulation = Simulation(model, Δt = 6minutes, stop_time = 100days)
 progress_message(sim) = @printf(
     "Iteration: %04d, time: %s, Δt: %s, wall time: %s\n",
     iteration(sim),
@@ -149,8 +182,10 @@ progress_message(sim) = @printf(
 
 simulation.callbacks[:progress] = Callback(progress_message, TimeInterval(10days))
 
-NUT, PHY, HET, POM, DOM, O₂, T, S = model.tracers
+NUT, PHY, HET, POM, DOM, O₂ = model.tracers
 PAR = model.auxiliary_fields.PAR
+T = model.auxiliary_fields.T
+S = model.auxiliary_fields.S
 
 output_prefix = "out"
 simulation.output_writers[:profiles] = JLD2OutputWriter(
