@@ -121,7 +121,7 @@ DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
 
 
 ## Hydrophysics forcing
-filename = joinpath(homedir(), "BadgerArctifacts", "Varna_brom.nc")
+filename = joinpath(homedir(), "BadgerArtifacts", "Varna_brom.nc")
 Tnc, Snc, Unc, depth, times = read_TSU_forcing(filename)
 
 # restore z-faces from nc file, as it provides us only centers of layers. dz=5
