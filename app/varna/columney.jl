@@ -32,7 +32,8 @@ include("../../src/FjordsSim.jl")
 include("setup.jl")
 
 using .FjordsSim:
-    OXYDEP
+    OXYDEP,
+    read_TSU_forcing
 
 const year = 365days
 
@@ -119,8 +120,7 @@ DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
 
 
 ## Hydrophysics forcing
-
-filename = "app/varna/Varna_brom.nc"
+filename = joinpath(homedir(), "BadgerArctifacts", "Varna_brom.nc")
 Tnc, Snc, Unc, depth, times = read_TSU_forcing(filename)
 
 # restore z-faces from nc file, as it provides us only centers of layers. dz=5
@@ -187,7 +187,7 @@ PAR = model.auxiliary_fields.PAR
 T = model.auxiliary_fields.T
 S = model.auxiliary_fields.S
 
-output_prefix = "out"
+output_prefix = joinpath(homedir(), "data_Varna", "columney_snapshots")
 simulation.output_writers[:profiles] = JLD2OutputWriter(
     model,
     (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR),
