@@ -193,13 +193,13 @@ function OXYDEP(;
     alphaI::FT = 1.8,   # [d-1/(W/m2)]
     betaI::FT = 5.2e-4, # [d-1/(W/m2)]
     gammaD::FT = 0.71,  # (-)
-    Max_uptake::FT = 2.5 / day,  # 1/d 2.0 4 5
+    Max_uptake::FT = 2.5 / day,  # 1/d 2.5
     Knut::FT = 2.0,            # (nd)
     r_phy_nut::FT = 0.10 / day, # 1/d
     r_phy_pom::FT = 0.15 / day, # 1/d
     r_phy_dom::FT = 0.17 / day, # 1/d
-    r_phy_het::FT = 2.0 / day,  # 1/d 0.4
-    Kphy::FT = 0.1,             # (nd) 0.7
+    r_phy_het::FT = 0.4 / day,  # 1/d 0.4
+    Kphy::FT = 0.7,             # (nd) 0.7
     r_pom_het::FT = 0.7 / day,  # 1/d 0.7
     Kpom::FT = 2.0,     # (nd)
     Uz::FT = 0.6,       # (nd)

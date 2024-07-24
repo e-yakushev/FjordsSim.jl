@@ -41,18 +41,19 @@ const year = 365days
     60 *
     (1 - cos((t + 15days) * 2π / year)) *
     (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
-@inline H(t, t₀, t₁) = ifelse(t₀ < t < t₁, 1.0, 0.0)
-@inline fmld1(t) =
-    H(t, 50days, year) *
-    (1 / (1 + exp(-(t - 100days) / 5days))) *
-    (1 / (1 + exp((t - 330days) / 25days)))
-@inline MLD(t) =
-    -(10 + 340 * (1 - fmld1(year - eps(year)) * exp(-mod(t, year) / 25days) - fmld1(mod(t, year))))
-@inline κₜ(x, z, t) = 1.e-3 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 1.5e-3
+
+#@inline H(t, t₀, t₁) = ifelse(t₀ < t < t₁, 1.0, 0.0)
+#@inline fmld1(t) =
+#    H(t, 50days, year) *
+#    (1 / (1 + exp(-(t - 100days) / 5days))) *
+#    (1 / (1 + exp((t - 330days) / 25days)))
+#@inline MLD(t) =
+#    -(10 + 340 * (1 - fmld1(year - eps(year)) * exp(-mod(t, year) / 25days) - fmld1(mod(t, year))))
+#@inline κₜ(x, z, t) = 1.e-3 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 1.5e-3
 
 ## Grid
 #depth_extent = 100meters
-grid = RectilinearGrid(size = (1, 1, 10), extent = (500meters, 500meters, 10meters), topology = (Bounded, Bounded, Bounded))
+grid = RectilinearGrid(size = (1, 1, 12), extent = (500meters, 500meters, 67meters), topology = (Bounded, Bounded, Bounded))
 
 ## Model
 biogeochemistry =
@@ -61,9 +62,6 @@ biogeochemistry =
     TS_forced = true,
     scale_negatives=true)
 
-# T = FunctionField{Center,Center,Center}(temp, grid; clock)
-# S = FunctionField{Center,Center,Center}(salt, grid; clock)
-
 ## Boundary conditions
 O2_suboxic = 30.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
 Trel = 10000.0      # Relaxation time for exchange with the sediments (s/m)
@@ -71,7 +69,7 @@ b_ox = 15.0        # difference of OXY in the sediment and water,
 b_NUT = 15.0        # NUT in the sediment, (mmol/m3)  
 b_DOM_ox = 10.0    # OM in the sediment (oxic conditions), (mmol/m3) 
 b_DOM_anox = 20.0   # OM in the sediment (anoxic conditions), (mmol/m3)  
-bu = 0.7           # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
+bu = 0.8           # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
 
 @inline F_ox(conc, threshold) = (0.5 + 0.5 * tanh(conc - threshold))
 @inline F_subox(conc, threshold) = (0.5 - 0.5 * tanh(conc - threshold))
@@ -151,7 +149,8 @@ S = FunctionField{Center, Center, Center}(s_function, grid; clock)
 model = NonhydrostaticModel(;
     grid,
     clock,
-    closure = ScalarDiffusivity(ν = 1e-4, κ = 1e-4),
+    #closure = VerticallyImplicitTimeDiscretization(), #SmagorinskyLilly(), 
+    closure = ScalarDiffusivity(ν = 1e-3, κ = 1e-3), #(ν = 1e-4, κ = 1e-4),
     biogeochemistry,
     # buoyancy = SeawaterBuoyancy(constant_salinity = true),
     boundary_conditions = (
@@ -171,7 +170,7 @@ set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0,)
 
 ## Simulation
 stoptime = 730
-simulation = Simulation(model, Δt = 6minutes, stop_time = 100days)
+simulation = Simulation(model, Δt = 6minutes, stop_time = 365days)
 progress_message(sim) = @printf(
     "Iteration: %04d, time: %s, Δt: %s, wall time: %s\n",
     iteration(sim),
@@ -198,3 +197,6 @@ simulation.output_writers[:profiles] = JLD2OutputWriter(
 
 ## Run!
 run!(simulation)
+
+
+#include("../../varna/output.jl")
