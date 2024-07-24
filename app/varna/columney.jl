@@ -19,6 +19,7 @@ using OceanBioME.Boundaries.Sediments: sinking_flux
 using OceanBioME.SLatissimaModel: SLatissima
 using Oceananigans.Fields: FunctionField, ConstantField
 using Oceananigans.Units
+using Interpolations
 using JLD2
 
 import Oceananigans.Biogeochemistry: update_tendencies!
@@ -27,13 +28,16 @@ import Oceananigans.Biogeochemistry:
     required_biogeochemical_auxiliary_fields,
     biogeochemical_drift_velocity
 
+include("../../src/ForcingInput.jl")
+using .ForcingInput: read_TSU_forcing, make_input_grid, regrid_tracer_over_timesteps
+
 include("../../src/Oxydep.jl")
 using .OXYDEPModel
 
-const year = years = 365days
+const year = 365days
 
 ## Surface PAR and turbulent vertical diffusivity based on idealised mixed layer depth 
-@inline PAR⁰(x, t) =
+@inline PAR⁰(x, y, t) =
     60 *
     (1 - cos((t + 15days) * 2π / year)) *
     (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
@@ -45,20 +49,18 @@ const year = years = 365days
 @inline MLD(t) =
     -(10 + 340 * (1 - fmld1(year - eps(year)) * exp(-mod(t, year) / 25days) - fmld1(mod(t, year))))
 @inline κₜ(x, z, t) = 1.e-3 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 1.5e-3
-@inline temp(x, z, t) =
-    2.4 * cos(t * 2π / year + 50days) * (0.5 - 0.5 * tanh(0.25 * (abs(z) - 20))) + 10
-@inline salt(x, z, t) =
-    (2.4 * cos(t * 2π / year + 50days)) * (0.5 - 0.5 * tanh(0.25 * (abs(z) - 20))) + 33
-
 
 ## Grid
-depth_extent = 100meters
-grid = RectilinearGrid(size = (160, 32), extent = (10000meters, 500meters), topology = (Bounded, Flat, Bounded))
+#depth_extent = 100meters
+grid = RectilinearGrid(size = (1, 1, 10), extent = (500meters, 500meters, 10meters), topology = (Bounded, Bounded, Bounded))
 
 ## Model
 biogeochemistry =
-    OXYDEP(; grid, surface_photosynthetically_active_radiation = PAR⁰, particles = nothing)
-clock = Clock(; time = 0.0)
+    OXYDEP(; grid,
+    surface_photosynthetically_active_radiation = PAR⁰,
+    TS_forced = true,
+    scale_negatives=true)
+
 # T = FunctionField{Center,Center,Center}(temp, grid; clock)
 # S = FunctionField{Center,Center,Center}(salt, grid; clock)
 
@@ -76,18 +78,18 @@ bu = 0.7           # Burial coeficient for lower boundary (0<Bu<1), 1 - for no b
 
 ## oxy
 OXY_top = GasExchange(; gas = :O₂)
-OXY_bottom_cond(i, grid, clock, fields) =
+OXY_bottom_cond(i, j, grid, clock, fields) =
     -(
-        F_ox(fields.O₂[i, 1], O2_suboxic) * b_ox +
-        F_subox(fields.O₂[i, 1], O2_suboxic) * (0.0 - fields.O₂[i, 1])
+        F_ox(fields.O₂[i, j, 1], O2_suboxic) * b_ox +
+        F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.O₂[i, j, 1])
     ) / Trel
 OXY_bottom = FluxBoundaryCondition(OXY_bottom_cond, discrete_form = true)
 
 ## nut
 NUT_bottom_cond(i, j, grid, clock, fields) =
     (
-        F_ox(fields.O₂[i, 1], O2_suboxic) * (b_NUT - fields.NUT[i, 1]) +
-        F_subox(fields.O₂[i, 1], O2_suboxic) * (0.0 - fields.NUT[i, 1])
+        F_ox(fields.O₂[i, j, 1], O2_suboxic) * (b_NUT - fields.NUT[i, j, 1]) +
+        F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.NUT[i, j, 1])
     ) / Trel
 NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond, discrete_form = true)
 
@@ -115,9 +117,35 @@ DOM_bottom_cond(i, j, grid, clock, fields) =
     ) / Trel
 DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
 
-@inline front(x, z, μ, δ) = μ + δ * tanh((x - 7000 + 4 * z) / 500)
 
-Tᵢ(x, z) = front(x, z, 9, 0.05)
+## Hydrophysics forcing
+
+filename = "app/varna/Varna_brom.nc"
+Tnc, Snc, Unc, depth, times = read_TSU_forcing(filename)
+
+# restore z-faces from nc file, as it provides us only centers of layers. dz=5
+# z-faces are needed to construct input_grid
+z_faces = depth .+ 2.6
+z_faces
+# Create a bilinear interpolation object
+
+times = collect(range(0, stop=366*24*3600, step=3600))[1:8784]
+temp_itp = interpolate((times, z_faces), Tnc, Gridded(Linear()))
+sal_itp = interpolate((times, z_faces), Snc, Gridded(Linear()))
+
+# Define a function to perform bilinear interpolation
+function bilinear_interpolate(itp, t, z)
+    return itp(t, z)
+end
+
+
+t_function(x, y, z, t) = bilinear_interpolate(temp_itp, t, z)
+s_function(x, y, z, t) = bilinear_interpolate(sal_itp, t, z)
+
+clock = Clock(; time = times[1])
+
+T = FunctionField{Center, Center, Center}(t_function, grid; clock)
+S = FunctionField{Center, Center, Center}(s_function, grid; clock)
 
 ## Model instantiation
 model = NonhydrostaticModel(;
@@ -125,24 +153,25 @@ model = NonhydrostaticModel(;
     clock,
     closure = ScalarDiffusivity(ν = 1e-4, κ = 1e-4),
     biogeochemistry,
-    buoyancy = SeawaterBuoyancy(constant_salinity = true),
+    # buoyancy = SeawaterBuoyancy(constant_salinity = true),
     boundary_conditions = (
-        # O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom),
-        NUT = FieldBoundaryConditions(bottom = NUT_bottom),
-        # DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
-        # POM = FieldBoundaryConditions(bottom = POM_bottom),
-        # PHY = FieldBoundaryConditions(bottom = PHY_bottom),
-        # HET = FieldBoundaryConditions(bottom = HET_bottom),
+         O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom),
+         NUT = FieldBoundaryConditions(bottom = NUT_bottom),
+         DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
+         POM = FieldBoundaryConditions(bottom = POM_bottom),
+         PHY = FieldBoundaryConditions(bottom = PHY_bottom),
+         HET = FieldBoundaryConditions(bottom = HET_bottom),
     ),
-    tracers=(:S)
+    auxiliary_fields = (; S, T),
+    tracers=(:NUT, :PHY, :HET, :POM, :DOM, :O₂)
 )
 
 ## Set model
-set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0, T = Tᵢ)
+set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0,)
 
 ## Simulation
-stoptime = 1095
-simulation = Simulation(model, Δt = 6minutes, stop_time = (stoptime)days)
+stoptime = 730
+simulation = Simulation(model, Δt = 6minutes, stop_time = 100days)
 progress_message(sim) = @printf(
     "Iteration: %04d, time: %s, Δt: %s, wall time: %s\n",
     iteration(sim),
@@ -154,11 +183,11 @@ progress_message(sim) = @printf(
 simulation.callbacks[:progress] = Callback(progress_message, TimeInterval(10days))
 
 NUT, PHY, HET, POM, DOM, O₂ = model.tracers
-T = model.auxiliary_fields.T
 PAR = model.auxiliary_fields.PAR
+T = model.auxiliary_fields.T
 S = model.auxiliary_fields.S
 
-output_prefix = joinpath(homedir(), "data_Varna", "columney_snapshots")
+output_prefix = "out"
 simulation.output_writers[:profiles] = JLD2OutputWriter(
     model,
     (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR),
