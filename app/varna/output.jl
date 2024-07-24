@@ -17,10 +17,11 @@ include("../../src/Oxydep.jl")
 using .OXYDEPModel
 #/1
 
-
-stoptime = 730
-depth_extent = 10meters
-grid = RectilinearGrid(size = (1, 1, 10), extent = (500meters, 500meters, 10meters), topology = (Bounded, Bounded, Bounded))
+year=365days
+stoptime = 365
+#depth_extent = 10meters
+#grid = RectilinearGrid(size = (1, 1, 10), extent = (500meters, 500meters, 10meters), topology = (Bounded, Bounded, Bounded))
+grid = RectilinearGrid(size = (1, 1, 12), extent = (500meters, 500meters, 67meters), topology = (Bounded, Bounded, Bounded))
 
 
 # filename = joinpath(homedir(), "data_Varna", "columney_snapshots")
@@ -51,20 +52,30 @@ model = NonhydrostaticModel(; grid,
 #/2
 
 nitrogen_burying = zeros(length(times))
+POM_burying = zeros(length(times))
+PHY_burying = zeros(length(times))
+HET_burying = zeros(length(times))
+
 for (i, t) in enumerate(times)
     nitrogen_burying[i] = (
         POM[1, 1, 1, i] *
         biogeochemical_drift_velocity(model.biogeochemistry, Val(:POM)).w[1, 1, 1] +
         PHY[1, 1, 1, i] *
         biogeochemical_drift_velocity(model.biogeochemistry, Val(:PHY)).w[1, 1, 1] +
-        HET[1, 1, 1, i] * biogeochemical_drift_velocity(model.biogeochemistry, Val(:HET)).w[1, 1, 1]
+        HET[1, 1, 1, i] * 
+        biogeochemical_drift_velocity(model.biogeochemistry, Val(:HET)).w[1, 1, 1]
     )
-    nitrogen_burying[i] = (
+    POM_burying[i] = (
         POM[1, 1, 1, i] *
-        biogeochemical_drift_velocity(model.biogeochemistry, Val(:POM)).w[1, 1, 1] +
-        PHY[1, 1, 1, i] *
-        biogeochemical_drift_velocity(model.biogeochemistry, Val(:PHY)).w[1, 1, 1] +
-        HET[1, 1, 1, i] * biogeochemical_drift_velocity(model.biogeochemistry, Val(:HET)).w[1, 1, 1]
+        biogeochemical_drift_velocity(model.biogeochemistry, Val(:POM)).w[1, 1, 1]
+    )
+    PHY_burying[i] = (
+        POM[1, 1, 1, i] *
+        biogeochemical_drift_velocity(model.biogeochemistry, Val(:PHY)).w[1, 1, 1]
+    )
+    HET_burying[i] = (
+        POM[1, 1, 1, i] *
+        biogeochemical_drift_velocity(model.biogeochemistry, Val(:HET)).w[1, 1, 1]
     )
 end
 
@@ -109,40 +120,62 @@ hmOXY = heatmap!(times / days, z, interior(O₂, 1, 1, :, :)', colormap = :turbo
 hmOXY = heatmap!(times / days, z, interior(O₂, 1, 1, :, :)', colormap = :turbo)
 Colorbar(fig[2, 2], hmOXY)
 
+axPAR = Axis(fig[1, 5]; title = "PAR  μE⋅m-2⋅s-1", axis_kwargs...)
+hmPAR = heatmap!(times / days, z, interior(PAR, 1, 1, :, :)', colormap = :grayC100) # :linear_grey_0_100_c0_n256)
+Colorbar(fig[1, 6], hmPAR)
+
 axT = Axis(fig[2, 5]; title = "T, oC", axis_kwargs...)
 hmT = heatmap!(times / days, z, interior(T, 1, 1, :, :)', colormap = Reverse(:RdYlBu))
 Colorbar(fig[2, 6], hmT)
 
-axS = Axis(fig[1, 5]; title = "S, psu", axis_kwargs...)
+axS = Axis(fig[3, 5]; title = "S, psu", axis_kwargs...)
 hmS = heatmap!(times / days, z, interior(S, 1, 1, :, :)', colormap = Reverse(:RdYlBu))
-Colorbar(fig[1, 6], hmS)
-#axPAR = Axis(fig[1, 5]; title = "PAR  μE⋅m-2⋅s-1", axis_kwargs...)
-#hmPAR = heatmap!(times / days, z, interior(PAR, 1, 1, :, :)', colormap = :grayC100) # :linear_grey_0_100_c0_n256)
-#Colorbar(fig[1, 6], hmPAR)
+Colorbar(fig[3, 6], hmS)
 
 @info "Z-Time plots made"
 
+save("out_vars.png", fig)
+
+fig2 = Figure(size = (1500, 1000), fontsize = 20)
 
 axNburying = Axis(
-    fig[3, 5],
-    xlabel = "Time (days)",
-    ylabel = "Flux (mmolN/m²/year)",
-    title = "N burying",
-    limits = ((0, times[end] / days), nothing),
-)
-@info "Z-Time plots made"
-
-
-axNburying = Axis(
-    fig[3, 5],
+    fig2[1, 1],
     xlabel = "Time (days)",
     ylabel = "Flux (mmolN/m²/year)",
     title = "N burying",
     limits = ((0, times[end] / days), nothing),
 )
 lines!(axNburying, times / days, nitrogen_burying / 1e3 * year, linewidth = 3, label = "N burying")
-Legend(fig[4, 5], axNburying, framevisible = false)
+
+axPOMburying = Axis(
+    fig2[1, 2],
+    xlabel = "Time (days)",
+    ylabel = "Flux (mmolN/m²/year)",
+    title = "POM burying",
+    limits = ((0, times[end] / days), nothing),
+)
+lines!(axPOMburying, times / days, POM_burying / 1e3 * year, linewidth = 3, color = :brown,  label = "POM burying")
+
+axPHYburying = Axis(
+    fig2[2, 1],
+    xlabel = "Time (days)",
+    ylabel = "Flux (mmolN/m²/year)",
+    title = "PHY burying",
+    limits = ((0, times[end] / days), nothing),
+)
+lines!(axPHYburying, times / days, PHY_burying / 1e3 * year, linewidth = 3, color = :red,  label = "PHYburying")
+
+axHETburying = Axis(
+    fig2[2, 2],
+    xlabel = "Time (days)",
+    ylabel = "Flux (mmolN/m²/year)",
+    title = "HET burying",
+    limits = ((0, times[end] / days), nothing),
+)
+lines!(axHETburying, times / days, HET_burying / 1e3 * year, linewidth = 3, color = :black, label = "HET burying")
 
 
-save("output.png", fig)
+@info "Fluxes plots made"
+
+save("out_fluxes.png", fig2)
 
