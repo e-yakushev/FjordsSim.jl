@@ -108,73 +108,6 @@ struct OXYDEP{FT,B,W} <: AbstractContinuousFormBiogeochemistry
     NtoB::FT # N[uM]/BIOMASS [mg/m3], (uM(N) / mgWW/m3)
     optionals::B
     sinking_velocities::W
-
-    function OXYDEP(
-        initial_photosynthetic_slope::FT,
-        Iopt::FT,
-        alphaI::FT,
-        betaI::FT,
-        gammaD::FT,
-        Max_uptake::FT,
-        Knut::FT,
-        r_phy_nut::FT,
-        r_phy_pom::FT,
-        r_phy_dom::FT,
-        r_phy_het::FT,
-        Kphy::FT,
-        r_pom_het::FT,
-        Kpom::FT,
-        Uz::FT,
-        Hz::FT,
-        r_het_nut::FT,
-        r_het_pom::FT,
-        r_pom_nut_oxy::FT,
-        r_pom_dom::FT,
-        r_dom_nut_oxy::FT,
-        O2_suboxic::FT,
-        r_pom_nut_nut::FT,
-        r_dom_nut_nut::FT,
-        OtoN::FT,
-        CtoN::FT,
-        NtoN::FT,
-        NtoB::FT,
-        optionals::B,
-        sinking_velocities::W,
-    ) where {FT,B,W}
-
-        return new{FT,B,W}(
-            initial_photosynthetic_slope,
-            Iopt,
-            alphaI,
-            betaI,
-            gammaD,
-            Max_uptake,
-            Knut,
-            r_phy_nut,
-            r_phy_pom,
-            r_phy_dom,
-            r_phy_het,
-            Kphy,
-            r_pom_het,
-            Kpom,
-            Uz,
-            Hz,
-            r_het_nut,
-            r_het_pom,
-            r_pom_nut_oxy,
-            r_pom_dom,
-            r_dom_nut_oxy,
-            O2_suboxic,
-            r_pom_nut_nut,
-            r_dom_nut_nut,
-            OtoN,
-            CtoN,
-            NtoN,
-            NtoB,
-            optionals,
-            sinking_velocities,
-        )
-    end
 end
 
 function OXYDEP(;
@@ -276,7 +209,7 @@ required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{false},<:Any}) =
 required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{true},<:Any}) =
     (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
 required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{false},<:Any}) = (:PAR,)
-required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{true},<:Any}) = (:PAR, :T)
+required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{true},<:Any}) = (:T, :PAR)
 
 # Limiting equations and switches
 @inline yy(value, consta) = consta^2 / (value^2 + consta^2)   #This is a squared Michaelis-Menten type of limiter
@@ -519,6 +452,7 @@ adapt_structure(to, oxydep::OXYDEP) = OXYDEP(
     adapt(to, oxydep.CtoN),
     adapt(to, oxydep.NtoN),
     adapt(to, oxydep.NtoB),
+    adapt(to, oxydep.optionals),
     adapt(to, oxydep.sinking_velocities),
 )
 

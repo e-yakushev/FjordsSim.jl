@@ -92,7 +92,7 @@ T₀, S₀ = initial_conditions_temp_salt_3d_predefined(setup_grid)
 set!(model, T = T₀, S = S₀, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0)
 
 ## Simulation
-Δt = 1seconds
+Δt = 0.5seconds
 stop_time = 24hours
 simulation = Simulation(model; Δt, stop_time)
 progress(sim) = @info "Time : $(prettytime(sim.model.clock.time)),
