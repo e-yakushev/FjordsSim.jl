@@ -171,8 +171,6 @@ model = NonhydrostaticModel(;
     ),
     auxiliary_fields = (; S, T),
     tracers=(:NUT, :PHY, :HET, :POM, :DOM, :O₂)
-    auxiliary_fields = (; S, T),
-    tracers=(:NUT, :PHY, :HET, :POM, :DOM, :O₂)
 )
 
 ## Set model
