@@ -37,6 +37,8 @@ using .FjordsSim:
 
 const year = 365days
 
+stoptime = 730days  # Set simulation stoptime here!
+
 ## Surface PAR and turbulent vertical diffusivity based on idealised mixed layer depth 
 @inline PAR⁰(x, y, t) =
     60 *
@@ -127,8 +129,8 @@ Tnc, Snc, Unc, depth, times = read_TSU_forcing(filename)
 # z-faces are needed to construct input_grid
 z_faces = depth .+ 2.6
 z_faces
-# Create a bilinear interpolation object
 
+# Create a bilinear interpolation object
 times = collect(range(0, stop=366*24*3600, step=3600))[1:8784]
 temp_itp = interpolate((times, z_faces), Tnc, Gridded(Linear()))
 sal_itp = interpolate((times, z_faces), Snc, Gridded(Linear()))
@@ -139,8 +141,8 @@ function bilinear_interpolate(itp, t, z)
 end
 
 
-t_function(x, y, z, t) = bilinear_interpolate(temp_itp, t, z)
-s_function(x, y, z, t) = bilinear_interpolate(sal_itp, t, z)
+t_function(x, y, z, t) = bilinear_interpolate(temp_itp, mod(t, 365days), z)
+s_function(x, y, z, t) = bilinear_interpolate(sal_itp, mod(t, 365days), z)
 
 clock = Clock(; time = times[1])
 
@@ -170,8 +172,7 @@ model = NonhydrostaticModel(;
 set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0,)
 
 ## Simulation
-stoptime = 730
-simulation = Simulation(model, Δt = 6minutes, stop_time = 100days)
+simulation = Simulation(model, Δt = 6minutes, stop_time = stoptime)
 progress_message(sim) = @printf(
     "Iteration: %04d, time: %s, Δt: %s, wall time: %s\n",
     iteration(sim),
