@@ -26,3 +26,6 @@ docs/site/
 Manifest.toml
 
 .vscode/
+*.jld2
+.ipynb_checkpoints/
+*.png
