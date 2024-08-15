@@ -54,24 +54,6 @@ import OceanBioME: maximum_sinking_velocity
 import OceanBioME.Boundaries.Sediments:
     nitrogen_flux, carbon_flux, remineralisation_receiver, sinking_tracers
 
-function update_biogeochemical_state!(model, PAR::TwoBandPhotosyntheticallyActiveRadiation)
-    arch = architecture(model.grid)
-    launch!(
-        arch,
-        model.grid,
-        :xy,
-        update_TwoBandPhotosyntheticallyActiveRadiation!,
-        PAR.field,
-        model.grid,
-        model.tracers.PHY,
-        PAR.surface_PAR,
-        model.clock.time,
-        PAR,
-    )
-
-    fill_halo_regions!(PAR.field, model.clock, fields(model))
-end
-
 struct OXYDEP{FT,B,W} <: AbstractContinuousFormBiogeochemistry
     # PHY
     initial_photosynthetic_slope::FT # α, 1/(W/m²)/s

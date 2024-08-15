@@ -38,12 +38,12 @@ include("setup.jl")
 
 using .FjordsSim:
     ImmersedBoundaryGrid,
-    OXYDEP,
+    # OXYDEP,
     SetupGridPredefinedFromFile,
     initial_conditions_temp_salt_3d_predefined,
     turbulence_closures_a,
     # bgh_oxydep_boundary_conditions,
-    # rivers_forcing,
+    rivers_forcing,
     physics_boundary_conditions
 
 ## Grid
@@ -52,19 +52,19 @@ grid = ImmersedBoundaryGrid(setup_grid)
 
 ## Biogeochemistry
 # (details here can be ignored but these are typical of the North Atlantic)
-const year = years = 365days
-@inline PAR⁰(x, y, t) =
-    60 *
-    (1 - cos((t + 15days) * 2π / year)) *
-    (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
-biogeochemistry = OXYDEP(; grid, args_oxydep..., TS_forced = false, surface_photosynthetically_active_radiation = PAR⁰)
+# const year = years = 365days
+# @inline PAR⁰(x, y, t) =
+#     60 *
+#     (1 - cos((t + 15days) * 2π / year)) *
+#     (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
+# biogeochemistry = OXYDEP(; grid, args_oxydep..., TS_forced = false, surface_photosynthetically_active_radiation = PAR⁰)
 
 ## The turbulence closure
 closure = turbulence_closures_a()
 
 ## Boundary conditions
 # physics
-u_bcs, v_bcs = physics_boundary_conditions()
+u_bcs, v_bcs = physics_boundary_conditions(setup_grid.arch, setup_grid.Nx, setup_grid.Ny)
 
 # BGC boundary conditions
 # todo
@@ -72,49 +72,52 @@ u_bcs, v_bcs = physics_boundary_conditions()
 boundary_conditions = (u = u_bcs, v = v_bcs)
 
 ## River forcing
-# forcing = rivers_forcing()
+forcing = rivers_forcing(setup_grid.Nz)
 
 ## Model
 model = HydrostaticFreeSurfaceModel(;
     grid,
     closure,
-    biogeochemistry,
+    # biogeochemistry,
     buoyancy = SeawaterBuoyancy(),
     boundary_conditions,
-    # forcing = forcing,
+    forcing = forcing,
     momentum_advection = VectorInvariant(),
     tracer_advection = WENO(grid.underlying_grid),
-    tracers = (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T, :S),
+    # tracers = (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T, :S),
 )
 
 ## Set initial conditions
 T₀, S₀ = initial_conditions_temp_salt_3d_predefined(setup_grid)
-set!(model, T = T₀, S = S₀, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0)
+set!(model, T = T₀, S = S₀)  # , NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0)
 
 ## Simulation
 Δt = 0.5seconds
-stop_time = 24hours
+stop_time = 3hours
 simulation = Simulation(model; Δt, stop_time)
+
 progress(sim) = @info "Time : $(prettytime(sim.model.clock.time)),
-                        max(|u|): $(maximum(abs, sim.model.velocities.u)),
-                        max(S): $(maximum(model.tracers.S)),
-                        Δt: $(prettytime(sim.Δt))"
-simulation.callbacks[:progress] = Callback(progress, IterationInterval(20))
+    max(|u|): $(maximum(abs, sim.model.velocities.u)),
+    max(S): $(maximum(model.tracers.S)),
+    Δt: $(prettytime(sim.Δt)),
+    walltime: $(prettytime(sim.run_wall_time))"
+simulation.callbacks[:progress] = Callback(progress, IterationInterval(100))
+
 u, v, w = model.velocities
 T = model.tracers.T
 S = model.tracers.S
-O₂ = model.tracers.O₂
-NUT = model.tracers.NUT
-DOM = model.tracers.DOM
-POM = model.tracers.POM
-PHY = model.tracers.PHY
-HET = model.tracers.HET
+# O₂ = model.tracers.O₂
+# NUT = model.tracers.NUT
+# DOM = model.tracers.DOM
+# POM = model.tracers.POM
+# PHY = model.tracers.PHY
+# HET = model.tracers.HET
 
 output_prefix = joinpath(homedir(), "data_Varna", "simulation_snapshots")
 simulation.output_writers[:surface_fields] = JLD2OutputWriter(
     model,
-    (; u, v, w, T, S, O₂, NUT, DOM, POM, PHY, HET),
-    schedule = TimeInterval(2minutes),
+    (; u, v, w, T, S),
+    schedule = TimeInterval(1hour),
     filename = "$output_prefix.jld2",
     with_halos = true,
     overwrite_existing = true,
