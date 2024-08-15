@@ -144,13 +144,13 @@ function bilinear_interpolate(itp, t, z)
 end
 
 
-t_function(x, y, z, t) = bilinear_interpolate(temp_itp, mod(t, 365days), z)
-s_function(x, y, z, t) = bilinear_interpolate(sal_itp, mod(t, 365days), z)
+T_function(x, y, z, t) = bilinear_interpolate(temp_itp, mod(t, 365days), z)
+S_function(x, y, z, t) = bilinear_interpolate(sal_itp, mod(t, 365days), z)
 
 clock = Clock(; time = times[1])
 
-T = FunctionField{Center, Center, Center}(t_function, grid; clock)
-S = FunctionField{Center, Center, Center}(s_function, grid; clock)
+T = FunctionField{Center, Center, Center}(T_function, grid; clock)
+S = FunctionField{Center, Center, Center}(S_function, grid; clock)
 
 ## Model instantiation
 model = NonhydrostaticModel(;

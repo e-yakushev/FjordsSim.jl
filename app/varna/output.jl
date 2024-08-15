@@ -13,19 +13,22 @@ import Oceananigans.Biogeochemistry:
     required_biogeochemical_auxiliary_fields,
     biogeochemical_drift_velocity
 
-include("../../src/Oxydep.jl")
-using .OXYDEPModel
+include("../../src/FjordsSim.jl")
+using .FjordsSim:
+       OXYDEP
+#include("../../src/BGCModels/oxydep.jl")
+#using .OXYDEPModel
 #/1
 
 year=365days
-stoptime = 365
+stoptime = 730
 #depth_extent = 10meters
 #grid = RectilinearGrid(size = (1, 1, 10), extent = (500meters, 500meters, 10meters), topology = (Bounded, Bounded, Bounded))
 grid = RectilinearGrid(size = (1, 1, 12), extent = (500meters, 500meters, 67meters), topology = (Bounded, Bounded, Bounded))
 
 
-# filename = joinpath(homedir(), "data_Varna", "columney_snapshots")
-filename = "out"
+filename = joinpath(homedir(), "data_Varna", "columney_snapshots")
+ 
 ## Load saved output
 @info "Loading saved outputs..."
 PHY = FieldTimeSeries("$filename.jld2", "PHY")

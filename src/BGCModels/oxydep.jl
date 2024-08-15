@@ -278,6 +278,10 @@ required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{true},<:Any}) =
 required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{false},<:Any}) = (:PAR,)
 required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{true},<:Any}) = (:PAR, :T)
 
+###include("core.jl")
+"""
+OxyDep basic biogeochemical transformations between NUT, PHY, HET, DOM, POM, O2
+"""
 # Limiting equations and switches
 @inline yy(value, consta) = consta^2 / (value^2 + consta^2)   #This is a squared Michaelis-Menten type of limiter
 @inline F_ox(conc, threshold) = (0.5 + 0.5 * tanh(conc - threshold))
