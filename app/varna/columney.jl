@@ -23,7 +23,6 @@ using Interpolations
 using Interpolations
 using JLD2
 using CairoMakie
-
 import Oceananigans.Biogeochemistry: update_tendencies!
 import Oceananigans.Biogeochemistry:
     required_biogeochemical_tracers,
@@ -38,7 +37,6 @@ using .FjordsSim:
     read_TSU_forcing
 
 const year = 365days
-
 stoptime = 365days  # Set simulation stoptime here!
 
 ## Surface PAR and turbulent vertical diffusivity based on idealised mixed layer depth 
@@ -126,18 +124,20 @@ DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
 
 
 ## Hydrophysics forcing
-filename = joinpath(homedir(), "BadgerArtifacts", "Varna_brom.nc")
-Tnc, Snc, Unc, depth, times = read_TSU_forcing(filename)
+# filename = joinpath(homedir(), "BadgerArtifacts", "Varna_brom.nc")
+filename = "C:\\Users\\ABE\\OneDrive\\scripts\\Julia_scripts\\BadgerArtifacts\\Varna_brom.nc"
+
+Tnc, Snc, Unc, Kznc, depth, times = read_TSU_forcing(filename)
 
 # restore z-faces from nc file, as it provides us only centers of layers. dz=5
 # z-faces are needed to construct input_grid
 z_faces = depth .+ 2.6
 z_faces
 
-# Create a bilinear interpolation object
 times = collect(range(0, stop=366*24*3600, step=3600))[1:8784]
 temp_itp = interpolate((times, z_faces), Tnc, Gridded(Linear()))
 sal_itp = interpolate((times, z_faces), Snc, Gridded(Linear()))
+kz_itp = interpolate((times, z_faces), Kznc, Gridded(Linear()))
 
 # Define a function to perform bilinear interpolation
 function bilinear_interpolate(itp, t, z)
@@ -147,21 +147,22 @@ end
 
 T_function(x, y, z, t) = bilinear_interpolate(temp_itp, mod(t, 365days), z)
 S_function(x, y, z, t) = bilinear_interpolate(sal_itp, mod(t, 365days), z)
+Kz_function(x, y, z, t) = bilinear_interpolate(kz_itp, mod(t, 365days), clamp(z, -67, 0))
 
 clock = Clock(; time = times[1])
 
 T = FunctionField{Center, Center, Center}(T_function, grid; clock)
 S = FunctionField{Center, Center, Center}(S_function, grid; clock)
 
+κ = FunctionField{Center, Center, Center}(Kz_function, grid; clock)
+
 ## Model instantiation
 model = NonhydrostaticModel(;
     grid,
     clock,
     #closure = VerticallyImplicitTimeDiscretization(), #SmagorinskyLilly(), 
-    closure = ScalarDiffusivity(ν = 1e-3, κ = 1e-3), #(ν = 1e-4, κ = 1e-4),
+    closure = ScalarDiffusivity(ν = κ, κ = κ), #(ν = 1e-4, κ = 1e-4),
     biogeochemistry,
-    # buoyancy = SeawaterBuoyancy(constant_salinity = true),
-    # buoyancy = SeawaterBuoyancy(constant_salinity = true),
     boundary_conditions = (
          O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom),
          NUT = FieldBoundaryConditions(bottom = NUT_bottom),
@@ -198,7 +199,8 @@ S = model.auxiliary_fields.S
 T = model.auxiliary_fields.T
 S = model.auxiliary_fields.S
 
-output_prefix = joinpath(homedir(), "data_Varna", "columney_snapshots")
+# output_prefix = joinpath(homedir(), "data_Varna", "columney_snapshots")
+output_prefix = joinpath("out")
 simulation.output_writers[:profiles] = JLD2OutputWriter(
     model,
     (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR),
