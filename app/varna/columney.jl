@@ -22,6 +22,7 @@ using Oceananigans.Units
 using Interpolations
 using Interpolations
 using JLD2
+using CairoMakie
 
 import Oceananigans.Biogeochemistry: update_tendencies!
 import Oceananigans.Biogeochemistry:
@@ -38,7 +39,7 @@ using .FjordsSim:
 
 const year = 365days
 
-stoptime = 730days  # Set simulation stoptime here!
+stoptime = 365days  # Set simulation stoptime here!
 
 ## Surface PAR and turbulent vertical diffusivity based on idealised mixed layer depth 
 @inline PAR⁰(x, y, t) =
@@ -209,5 +210,4 @@ simulation.output_writers[:profiles] = JLD2OutputWriter(
 ## Run!
 run!(simulation)
 
-
-#include("../../varna/output.jl")
+include("images.jl")
