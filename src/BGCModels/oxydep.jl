@@ -278,6 +278,20 @@ required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{true},<:Any}) =
 required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{false},<:Any}) = (:PAR,)
 required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{true},<:Any}) = (:PAR, :T)
 
+@inline (bgc::OXYDEP)(tracer::Val{:NUT}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, args...) = @inbounds bgc(tracer, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, args[end])
+@inline (bgc::OXYDEP)(tracer::Val{:PHY}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, args...) = @inbounds bgc(tracer, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, args[end])
+@inline (bgc::OXYDEP)(tracer::Val{:HET}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, args...) = @inbounds bgc(tracer, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, args[end])
+@inline (bgc::OXYDEP)(tracer::Val{:POM}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, args...) = @inbounds bgc(tracer, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, args[end])
+@inline (bgc::OXYDEP)(tracer::Val{:DOM}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, args...) = @inbounds bgc(tracer, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, args[end])
+@inline (bgc::OXYDEP)(tracer::Val{:O₂}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, args...)  = @inbounds bgc(tracer, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, args[end])
+
+#@inline (bgc::OXYDEP{<:Any, <:Val{(true, true, false)}, <:Any})(tracer::Val{:DIC}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, PAR) = bgc(tracer, x, y, z, t, NUT, PHY, HET, POM, DOM, DIC, Alk, PAR)
+@inline (bgc::OXYDEP{<:Any, <:Val{(true, true, false)}, <:Any})(tracer::Val{:Ch_free}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, PAR) = bgc(tracer, x, y, z, t, NUT, PHY, HET, POM, DOM, Ch_free, Ch_PHY, Ch_HET, Ch_POM, Ch_DOM, PAR)
+@inline (bgc::OXYDEP{<:Any, <:Val{(true, true, false)}, <:Any})(tracer::Val{:Ch_PHY}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, PAR)  = bgc(tracer, x, y, z, t, NUT, PHY, HET, POM, DOM, Ch_free, Ch_PHY, Ch_HET, Ch_POM, Ch_DOM, PAR)
+@inline (bgc::OXYDEP{<:Any, <:Val{(true, true, false)}, <:Any})(tracer::Val{:Ch_HET}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, PAR)  = bgc(tracer, x, y, z, t, NUT, PHY, HET, POM, DOM, Ch_free, Ch_PHY, Ch_HET, Ch_POM, Ch_DOM, PAR)
+@inline (bgc::OXYDEP{<:Any, <:Val{(true, true, false)}, <:Any})(tracer::Val{:Ch_POM}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, PAR)  = bgc(tracer, x, y, z, t, NUT, PHY, HET, POM, DOM, Ch_free, Ch_PHY, Ch_HET, Ch_POM, Ch_DOM, PAR)
+@inline (bgc::OXYDEP{<:Any, <:Val{(true, true, false)}, <:Any})(tracer::Val{:Ch_DOM}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, PAR)  = bgc(tracer, x, y, z, t, NUT, PHY, HET, POM, DOM, Ch_free, Ch_PHY, Ch_HET, Ch_POM, Ch_DOM, PAR)
+
 include("core.jl")
 
 @inline function biogeochemical_drift_velocity(bgc::OXYDEP, ::Val{tracer_name}) where {tracer_name}
