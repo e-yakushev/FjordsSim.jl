@@ -2,7 +2,7 @@ using Oceananigans.Architectures
 using Oceananigans.Units
 
 args_grid = (
-    arch = CPU(),
+    arch = GPU(),
     # dx = 200,
     # dy = 50,
     z_levels = -reverse([

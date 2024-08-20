@@ -82,19 +82,7 @@ grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(depth); active_cel
 ## River forcing
 # forcing = rivers_forcing(setup_grid.Nz)
 
-## Model
-# model = HydrostaticFreeSurfaceModel(;
-#     grid,
-#     closure,
-#     # biogeochemistry,
-#     buoyancy = SeawaterBuoyancy(),
-#     boundary_conditions,
-#     forcing = forcing,
-#     momentum_advection = VectorInvariant(),
-#     tracer_advection = WENO(grid.underlying_grid),
-#     # tracers = (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T, :S),
-# )
-
+## Simulation
 Δt = 0.5seconds
 ocean_sim = ocean_simulation(grid; Δt, coriolis=nothing)
 model = ocean_sim.model
@@ -102,11 +90,6 @@ model = ocean_sim.model
 ## Set initial conditions
 T₀, S₀ = initial_conditions_temp_salt_3d_predefined(setup_grid)
 set!(model, T = T₀, S = S₀)  # , NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0)
-
-## Simulation
-# stop_time = 90days
-# ocean_simulation = Simulation(model; Δt, stop_time)
-# conjure_time_step_wizard!(simulation; cfl = 0.1, max_Δt = 1, max_change = 1.01)
 
 # underlying_grid_cpu = LatitudeLongitudeGrid(
 #     CPU();
@@ -204,7 +187,7 @@ nothing #hide
 # For this scope, we use the Oceananigans utility `conjure_time_step_wizard!` (see Oceanigans's documentation).
 
 ocean_sim.stop_time = 10days
-conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=1, max_change=1.01)
+conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=10, max_change=1.01)
 run!(coupled_simulation)
 nothing #hide
 
