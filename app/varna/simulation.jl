@@ -12,34 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-using Oceananigans:
-    SeawaterBuoyancy,
-    VectorInvariant,
-    WENO,
-    set!,
-    Simulation,
-    TimeInterval,
-    prettytime,
-    Callback,
-    IterationInterval,
-    JLD2OutputWriter,
-    run!
-using Oceananigans.Models: HydrostaticFreeSurfaceModel
-using Oceananigans.Units
+using FileIO
+using JLD2
+using ClimaOcean
+using Oceananigans
+using Oceananigans.OutputReaders: InMemory
+# using Oceananigans.Models: HydrostaticFreeSurfaceModel
+# using Oceananigans.Units
 
-import Oceananigans.Biogeochemistry:
-    biogeochemical_drift_velocity,
-    required_biogeochemical_auxiliary_fields,
-    required_biogeochemical_tracers,
-    update_tendencies!
+# import Oceananigans.Biogeochemistry:
+#     biogeochemical_drift_velocity,
+#     required_biogeochemical_auxiliary_fields,
+#     required_biogeochemical_tracers,
+#     update_tendencies!
 
 include("../../src/FjordsSim.jl")
 include("setup.jl")
 
 using .FjordsSim:
-    ImmersedBoundaryGrid,
+    # ImmersedBoundaryGrid,
     # OXYDEP,
-    SetupGridPredefinedFromFile,
+    # SetupGridPredefinedFromFile,
     initial_conditions_temp_salt_3d_predefined,
     turbulence_closures_a,
     # bgh_oxydep_boundary_conditions,
@@ -47,8 +40,20 @@ using .FjordsSim:
     physics_boundary_conditions
 
 ## Grid
-setup_grid = SetupGridPredefinedFromFile(args_grid...)
-grid = ImmersedBoundaryGrid(setup_grid)
+filepath_topo = joinpath(args_grid.datadir, args_grid.filename)
+@load filepath_topo depth
+Nx, Ny = size(depth)
+Nz = size(args_grid.z_middle)[1]
+setup_grid = (; args_grid..., Nx = Nx, Ny = Ny, Nz = Nz)
+z_faces = exponential_z_faces(; Nz=Nz, depth=20)
+underlying_grid = LatitudeLongitudeGrid(setup_grid.arch;
+     size=(setup_grid.Nx, setup_grid.Ny, setup_grid.Nz),
+     halo=(7, 7, 7),
+     z=z_faces,
+     latitude=(43.177, 43.214),
+     longitude=(27.640, 27.947))
+# depth[-setup_grid.minimum_depth .<= depth .< 0] .= -setup_grid.minimum_depth
+grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(depth); active_cells_map = true)
 
 ## Biogeochemistry
 # (details here can be ignored but these are typical of the North Atlantic)
@@ -58,6 +63,10 @@ grid = ImmersedBoundaryGrid(setup_grid)
 #     (1 - cos((t + 15days) * 2π / year)) *
 #     (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
 # biogeochemistry = OXYDEP(; grid, args_oxydep..., TS_forced = false, surface_photosynthetically_active_radiation = PAR⁰)
+
+backend = InMemory()
+atmosphere = JRA55_prescribed_atmosphere(setup_grid.arch; backend, grid)
+# radiation  = Radiation(arch)
 
 ## The turbulence closure
 closure = turbulence_closures_a()
@@ -93,8 +102,9 @@ set!(model, T = T₀, S = S₀)  # , NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 
 
 ## Simulation
 Δt = 0.5seconds
-stop_time = 3hours
+stop_time = 90days
 simulation = Simulation(model; Δt, stop_time)
+# conjure_time_step_wizard!(simulation; cfl = 0.1, max_Δt = 1, max_change = 1.01)
 
 progress(sim) = @info "Time : $(prettytime(sim.model.clock.time)),
     max(|u|): $(maximum(abs, sim.model.velocities.u)),

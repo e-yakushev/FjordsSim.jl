@@ -3,11 +3,8 @@ using Oceananigans.Units
 
 args_grid = (
     arch = GPU(),
-    Nx = 119,
-    Ny = 42,
-    Nz = 20,
-    dx = 200,
-    dy = 50,
+    # dx = 200,
+    # dy = 50,
     z_levels = -reverse([
         0.0,
         1,
@@ -53,9 +50,10 @@ args_grid = (
         18.5,
         19.5,
     ]),
+    minimum_depth = 2,
     halo = (7, 7, 7),
-    datadir = joinpath(homedir(), "data_Varna"),
-    filename = "Varna_topo.jld2",
+    datadir = joinpath(homedir(), "BadgerArtifacts"),
+    filename = "Varna_topo_channels.jld2",
 )
 
 args_oxydep = (

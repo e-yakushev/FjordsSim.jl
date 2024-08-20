@@ -15,8 +15,8 @@ function wind_data_hardcoded(Nx, Ny)
     Cd = 0.0025
     ρₐᵢᵣ = 1.225
     Ntimes = 12
-    uwind = [0.1, 1, 2, 1, 3, 1, 1, 2, 1, 1, 1, 3]
-    vwind = [0.1, 2, 2, 3, 1, 1, 2, 2, 1, 2, 1, 2]
+    uwind = [9, 3, 2, 1, 3, 1, 1, 2, 1, 1, 1, 3]
+    vwind = [6, 9, 2, 3, 1, 1, 2, 2, 1, 2, 1, 2]
     τˣ = Array{Float64}(undef, Nx, Ny, Ntimes)
     τʸ = Array{Float64}(undef, Nx, Ny, Ntimes)
     for i = 1:Nx
@@ -28,11 +28,11 @@ function wind_data_hardcoded(Nx, Ny)
     return τˣ, τʸ
 end
 
-function wind_data_hardcoded(arch::CPU, Nx, Ny)
+function wind_data_hardcoded(::CPU, Nx, Ny)
     return wind_data_hardcoded(Nx, Ny)
 end
 
-function wind_data_hardcoded(arch::GPU, Nx, Ny)
+function wind_data_hardcoded(::GPU, Nx, Ny)
     τˣ, τʸ = wind_data_hardcoded(Nx, Ny)
     return cu(τˣ), cu(τʸ)
 end
@@ -113,17 +113,17 @@ function bottom_drag()
 end
 
 function physics_boundary_conditions(arch, Nx, Ny)
-    u_wind_stress_bc, v_wind_stress_bc = wind_stress(arch, Nx, Ny)
+    # u_wind_stress_bc, v_wind_stress_bc = wind_stress(arch, Nx, Ny)
     u_immersed_bc, v_immersed_bc, u_bottom_drag_bc, v_bottom_drag_bc = bottom_drag()
 
     u_bcs = FieldBoundaryConditions(
-        top = u_wind_stress_bc,
+        # top = u_wind_stress_bc,
         bottom = u_bottom_drag_bc,
         immersed = u_immersed_bc,
     )
 
     v_bcs = FieldBoundaryConditions(
-        top = v_wind_stress_bc,
+        # top = v_wind_stress_bc,
         bottom = v_bottom_drag_bc,
         immersed = v_immersed_bc,
     )
