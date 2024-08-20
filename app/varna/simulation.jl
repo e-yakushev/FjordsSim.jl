@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+using Printf
 using FileIO
 using JLD2
 using ClimaOcean
@@ -33,11 +34,11 @@ using .FjordsSim:
     # ImmersedBoundaryGrid,
     # OXYDEP,
     # SetupGridPredefinedFromFile,
-    initial_conditions_temp_salt_3d_predefined,
-    turbulence_closures_a,
+    initial_conditions_temp_salt_3d_predefined
+    # turbulence_closures_a,
     # bgh_oxydep_boundary_conditions,
-    rivers_forcing,
-    physics_boundary_conditions
+    # rivers_forcing,
+    # physics_boundary_conditions
 
 ## Grid
 filepath_topo = joinpath(args_grid.datadir, args_grid.filename)
@@ -45,13 +46,15 @@ filepath_topo = joinpath(args_grid.datadir, args_grid.filename)
 Nx, Ny = size(depth)
 Nz = size(args_grid.z_middle)[1]
 setup_grid = (; args_grid..., Nx = Nx, Ny = Ny, Nz = Nz)
-z_faces = exponential_z_faces(; Nz=Nz, depth=20)
-underlying_grid = LatitudeLongitudeGrid(setup_grid.arch;
-     size=(setup_grid.Nx, setup_grid.Ny, setup_grid.Nz),
-     halo=(7, 7, 7),
-     z=z_faces,
-     latitude=(43.177, 43.214),
-     longitude=(27.640, 27.947))
+z_faces = exponential_z_faces(; Nz = Nz, depth = 20)
+underlying_grid = LatitudeLongitudeGrid(
+    setup_grid.arch;
+    size = (setup_grid.Nx, setup_grid.Ny, setup_grid.Nz),
+    halo = (7, 7, 7),
+    z = z_faces,
+    latitude = (43.177, 43.214),
+    longitude = (27.640, 27.947),
+)
 # depth[-setup_grid.minimum_depth .<= depth .< 0] .= -setup_grid.minimum_depth
 grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(depth); active_cells_map = true)
 
@@ -64,74 +67,160 @@ grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(depth); active_cel
 #     (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
 # biogeochemistry = OXYDEP(; grid, args_oxydep..., TS_forced = false, surface_photosynthetically_active_radiation = PAR⁰)
 
-backend = InMemory()
-atmosphere = JRA55_prescribed_atmosphere(setup_grid.arch; backend, grid)
-# radiation  = Radiation(arch)
-
 ## The turbulence closure
-closure = turbulence_closures_a()
+# closure = turbulence_closures_a()
 
 ## Boundary conditions
 # physics
-u_bcs, v_bcs = physics_boundary_conditions(setup_grid.arch, setup_grid.Nx, setup_grid.Ny)
+# u_bcs, v_bcs = physics_boundary_conditions(setup_grid.arch, setup_grid.Nx, setup_grid.Ny)
 
 # BGC boundary conditions
 # todo
 
-boundary_conditions = (u = u_bcs, v = v_bcs)
+# boundary_conditions = (u = u_bcs, v = v_bcs)
 
 ## River forcing
-forcing = rivers_forcing(setup_grid.Nz)
+# forcing = rivers_forcing(setup_grid.Nz)
 
 ## Model
-model = HydrostaticFreeSurfaceModel(;
-    grid,
-    closure,
-    # biogeochemistry,
-    buoyancy = SeawaterBuoyancy(),
-    boundary_conditions,
-    forcing = forcing,
-    momentum_advection = VectorInvariant(),
-    tracer_advection = WENO(grid.underlying_grid),
-    # tracers = (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T, :S),
-)
+# model = HydrostaticFreeSurfaceModel(;
+#     grid,
+#     closure,
+#     # biogeochemistry,
+#     buoyancy = SeawaterBuoyancy(),
+#     boundary_conditions,
+#     forcing = forcing,
+#     momentum_advection = VectorInvariant(),
+#     tracer_advection = WENO(grid.underlying_grid),
+#     # tracers = (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T, :S),
+# )
+
+Δt = 0.5seconds
+ocean_sim = ocean_simulation(grid; Δt, coriolis=nothing)
+model = ocean_sim.model
 
 ## Set initial conditions
 T₀, S₀ = initial_conditions_temp_salt_3d_predefined(setup_grid)
 set!(model, T = T₀, S = S₀)  # , NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0)
 
 ## Simulation
-Δt = 0.5seconds
-stop_time = 90days
-simulation = Simulation(model; Δt, stop_time)
+# stop_time = 90days
+# ocean_simulation = Simulation(model; Δt, stop_time)
 # conjure_time_step_wizard!(simulation; cfl = 0.1, max_Δt = 1, max_change = 1.01)
 
-progress(sim) = @info "Time : $(prettytime(sim.model.clock.time)),
-    max(|u|): $(maximum(abs, sim.model.velocities.u)),
-    max(S): $(maximum(model.tracers.S)),
-    Δt: $(prettytime(sim.Δt)),
-    walltime: $(prettytime(sim.run_wall_time))"
-simulation.callbacks[:progress] = Callback(progress, IterationInterval(100))
+# underlying_grid_cpu = LatitudeLongitudeGrid(
+#     CPU();
+#     size = (setup_grid.Nx, setup_grid.Ny, setup_grid.Nz),
+#     halo = (7, 7, 7),
+#     z = z_faces,
+#     latitude = (43.177, 43.214),
+#     longitude = (27.640, 27.947),
+# )
+# grid_cpu =
+#     ImmersedBoundaryGrid(underlying_grid_cpu, GridFittedBottom(depth); active_cells_map = true)
+backend = InMemory()
+atmosphere = JRA55_prescribed_atmosphere(setup_grid.arch; backend, grid)
+radiation  = Radiation(setup_grid.arch)
+sea_ice = nothing
 
-u, v, w = model.velocities
-T = model.tracers.T
-S = model.tracers.S
+coupled_model = OceanSeaIceModel(ocean_sim, sea_ice; atmosphere, radiation)
+coupled_simulation = Simulation(coupled_model; Δt, stop_time=10days)
+
+wall_time = [time_ns()]
+
+# progress(sim) = @info "Time : $(prettytime(sim.model.clock.time)),
+#     max(|u|): $(maximum(abs, sim.model.velocities.u)),
+#     max(S): $(maximum(model.tracers.S)),
+#     Δt: $(prettytime(sim.Δt)),
+#     walltime: $(prettytime(sim.run_wall_time))"
+# simulation.callbacks[:progress] = Callback(progress, IterationInterval(100))
+
+function progress(sim)
+     ocean = sim.model.ocean
+     u, v, w = ocean.model.velocities
+     T = ocean.model.tracers.T
+
+     Tmax = maximum(interior(T))
+     Tmin = minimum(interior(T))
+     umax = maximum(abs, interior(u)), maximum(abs, interior(v)), maximum(abs, interior(w))
+     step_time = 1e-9 * (time_ns() - wall_time[1])
+
+     @info @sprintf("Time: %s, Iteration %d, Δt %s, max(vel): (%.2e, %.2e, %.2e), max(T): %.2f, min(T): %.2f, wtime: %s \n",
+          prettytime(ocean.model.clock.time),
+          ocean.model.clock.iteration,
+          prettytime(ocean.Δt),
+          umax..., Tmax, Tmin, prettytime(step_time))
+
+     wall_time[1] = time_ns()
+end
+
+coupled_simulation.callbacks[:progress] = Callback(progress, IterationInterval(100))
+nothing #hide
+
+# ### Set up output writers
+#
+# u, v, w = model.velocities
+# T = model.tracers.T
+# S = model.tracers.S
 # O₂ = model.tracers.O₂
 # NUT = model.tracers.NUT
 # DOM = model.tracers.DOM
 # POM = model.tracers.POM
 # PHY = model.tracers.PHY
 # HET = model.tracers.HET
+#
+# output_prefix = joinpath(homedir(), "data_Varna", "simulation_snapshots")
+# simulation.output_writers[:surface_fields] = JLD2OutputWriter(
+#     model,
+#     (; u, v, w, T, S),
+#     schedule = TimeInterval(1hour),
+#     filename = "$output_prefix.jld2",
+#     with_halos = true,
+#     overwrite_existing = true,
+# )
+# We define output writers to save the simulation data at regular intervals.
+# In this case, we save the surface fluxes and surface fields at a relatively high frequency (every day).
+# The `indices` keyword argument allows us to save down a slice at the surface, which is located at `k = grid.Nz`
 
-output_prefix = joinpath(homedir(), "data_Varna", "simulation_snapshots")
-simulation.output_writers[:surface_fields] = JLD2OutputWriter(
-    model,
-    (; u, v, w, T, S),
-    schedule = TimeInterval(1hour),
-    filename = "$output_prefix.jld2",
-    with_halos = true,
-    overwrite_existing = true,
-)
+ocean_sim.output_writers[:surface] = JLD2OutputWriter(model, merge(model.tracers, model.velocities);
+     schedule=TimeInterval(1hour),
+     filename="surface",
+     indices=(:, :, grid.Nz),
+     overwrite_existing=true,
+     array_type=Array{Float32})
+nothing #hide
+
+# ### Spinning up the simulation
+#
+# As an initial condition, we have interpolated ECCO tracer fields onto our custom grid.
+# The bathymetry of the original ECCO data may differ from our grid, so the initialization of the velocity
+# field might cause shocks if a large time step is used.
+#
+# Therefore, we spin up the simulation with a small time step to ensure that the interpolated initial
+# conditions adapt to the model numerics and parameterization without causing instability. A 10-day
+# integration with a maximum time step of 1.5 minutes should be sufficient to dissipate spurious
+# initialization shocks.
+# We use an adaptive time step that maintains the [CFL condition](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition) equal to 0.1.
+# For this scope, we use the Oceananigans utility `conjure_time_step_wizard!` (see Oceanigans's documentation).
+
+ocean_sim.stop_time = 10days
+conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=1, max_change=1.01)
+run!(coupled_simulation)
+nothing #hide
+
+# ### Running the simulation
+#
+# Now that the simulation has spun up, we can run it for the full 100 days.
+# We increase the maximum time step size to 10 minutes and let the simulation run for 100 days.
+# This time, we set the CFL in the time_step_wizard to be 0.25 as this is the maximum recommended CFL to be
+# used in conjunction with Oceananigans' hydrostatic time-stepping algorithm ([two step Adams-Bashfort](https://en.wikipedia.org/wiki/Linear_multistep_method))
+
+ocean_sim.stop_time = 100days
+coupled_simulation.stop_time = 100days
+conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=1, max_change=1.1)
+run!(coupled_simulation)
+nothing #hide
+
 
 # checkpoints_prefix = joinpath(homedir(), "data_Varna", "simulation_chkpnt")
 # simulation.output_writers[:checkpointer] =
@@ -139,4 +228,4 @@ simulation.output_writers[:surface_fields] = JLD2OutputWriter(
 # Checkpointer(model; schedule = IterationInterval(200), prefix = "model_checkpoint")
 
 ## run simulation
-run!(simulation)  # , pickup = true)
+# run!(simulation)  # , pickup = true)
