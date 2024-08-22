@@ -34,10 +34,10 @@ using .FjordsSim:
     # ImmersedBoundaryGrid,
     # OXYDEP,
     # SetupGridPredefinedFromFile,
-    initial_conditions_temp_salt_3d_predefined
+    initial_conditions_temp_salt_3d_predefined,
     # turbulence_closures_a,
     # bgh_oxydep_boundary_conditions,
-    # rivers_forcing,
+    rivers_forcing
     # physics_boundary_conditions
 
 ## Grid
@@ -80,11 +80,11 @@ grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(depth); active_cel
 # boundary_conditions = (u = u_bcs, v = v_bcs)
 
 ## River forcing
-# forcing = rivers_forcing(setup_grid.Nz)
+forcing = rivers_forcing(setup_grid.Nz)
 
 ## Simulation
-Δt = 0.5seconds
-ocean_sim = ocean_simulation(grid; Δt, coriolis=nothing)
+Δt = 1seconds
+ocean_sim = ocean_simulation(grid; Δt, forcing, coriolis=nothing)
 model = ocean_sim.model
 
 ## Set initial conditions
@@ -136,44 +136,32 @@ function progress(sim)
 
      wall_time[1] = time_ns()
 end
-
 coupled_simulation.callbacks[:progress] = Callback(progress, IterationInterval(100))
 nothing #hide
 
-# ### Set up output writers
+## Set up output writers
 #
-# u, v, w = model.velocities
-# T = model.tracers.T
-# S = model.tracers.S
-# O₂ = model.tracers.O₂
-# NUT = model.tracers.NUT
-# DOM = model.tracers.DOM
-# POM = model.tracers.POM
-# PHY = model.tracers.PHY
-# HET = model.tracers.HET
-#
-# output_prefix = joinpath(homedir(), "data_Varna", "simulation_snapshots")
-# simulation.output_writers[:surface_fields] = JLD2OutputWriter(
-#     model,
-#     (; u, v, w, T, S),
-#     schedule = TimeInterval(1hour),
-#     filename = "$output_prefix.jld2",
-#     with_halos = true,
-#     overwrite_existing = true,
-# )
-# We define output writers to save the simulation data at regular intervals.
-# In this case, we save the surface fluxes and surface fields at a relatively high frequency (every day).
-# The `indices` keyword argument allows us to save down a slice at the surface, which is located at `k = grid.Nz`
+surface_prefix = joinpath(homedir(), "data_Varna", "surface_snapshots")
+ocean_sim.output_writers[:surface] = JLD2OutputWriter(
+    model, merge(model.tracers, model.velocities);
+    schedule = TimeInterval(1day),
+    filename = "$surface_prefix.jld2",
+    indices=(:, :, grid.Nz),
+    overwrite_existing = true,
+    array_type=Array{Float32}
+)
 
-ocean_sim.output_writers[:surface] = JLD2OutputWriter(model, merge(model.tracers, model.velocities);
-     schedule=TimeInterval(1hour),
-     filename="surface",
-     indices=(:, :, grid.Nz),
-     overwrite_existing=true,
-     array_type=Array{Float32})
-nothing #hide
+profile_prefix = joinpath(homedir(), "data_Varna", "profile_snapshots")
+ocean_sim.output_writers[:profile] = JLD2OutputWriter(
+    model, merge(model.tracers, model.velocities);
+    schedule = TimeInterval(1day),
+    filename = "$profile_prefix.jld2",
+    indices=(:, 18, :),
+    overwrite_existing = true,
+    array_type=Array{Float32}
+)
 
-# ### Spinning up the simulation
+## Spinning up the simulation
 #
 # As an initial condition, we have interpolated ECCO tracer fields onto our custom grid.
 # The bathymetry of the original ECCO data may differ from our grid, so the initialization of the velocity
@@ -186,29 +174,20 @@ nothing #hide
 # We use an adaptive time step that maintains the [CFL condition](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition) equal to 0.1.
 # For this scope, we use the Oceananigans utility `conjure_time_step_wizard!` (see Oceanigans's documentation).
 
-ocean_sim.stop_time = 10days
-conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=10, max_change=1.01)
+ocean_sim.stop_time = 365days
+conjure_time_step_wizard!(ocean_sim; cfl=0.2, max_Δt=2minute, max_change=1.01)
 run!(coupled_simulation)
 nothing #hide
 
-# ### Running the simulation
+## Running the simulation
 #
 # Now that the simulation has spun up, we can run it for the full 100 days.
 # We increase the maximum time step size to 10 minutes and let the simulation run for 100 days.
 # This time, we set the CFL in the time_step_wizard to be 0.25 as this is the maximum recommended CFL to be
 # used in conjunction with Oceananigans' hydrostatic time-stepping algorithm ([two step Adams-Bashfort](https://en.wikipedia.org/wiki/Linear_multistep_method))
 
-ocean_sim.stop_time = 100days
-coupled_simulation.stop_time = 100days
-conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=1, max_change=1.1)
-run!(coupled_simulation)
-nothing #hide
-
-
-# checkpoints_prefix = joinpath(homedir(), "data_Varna", "simulation_chkpnt")
-# simulation.output_writers[:checkpointer] =
-# Checkpointer(model; schedule = IterationInterval(200), prefix = checkpoints_prefix)
-# Checkpointer(model; schedule = IterationInterval(200), prefix = "model_checkpoint")
-
-## run simulation
-# run!(simulation)  # , pickup = true)
+# ocean_sim.stop_time = 355days
+# coupled_simulation.stop_time = 355days
+# conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=1minutes, max_change=1.1)
+# run!(coupled_simulation)
+# nothing #hide
