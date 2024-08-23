@@ -10,10 +10,11 @@ NUT = FieldTimeSeries("$filename.jld2", "NUT")
 HET = FieldTimeSeries("$filename.jld2", "HET")
 POM = FieldTimeSeries("$filename.jld2", "POM")
 DOM = FieldTimeSeries("$filename.jld2", "DOM")
-O₂ = FieldTimeSeries("$filename.jld2", "O₂")
-T = FieldTimeSeries("$filename.jld2", "T")
+O₂ =  FieldTimeSeries("$filename.jld2", "O₂")
+T =   FieldTimeSeries("$filename.jld2", "T")
 S =   FieldTimeSeries("$filename.jld2", "S")
 PAR = FieldTimeSeries("$filename.jld2", "PAR")
+κ =   FieldTimeSeries("$filename.jld2", "κ")
 
 @info "Saved outputs loaded..."
 
@@ -65,7 +66,10 @@ axis_kwargs = (
     xlabel = "Time (days)",
     ylabel = "z (m)",
  #   limits = ((0, times[end] / days), (-(depth_extent + 10), 10)),
- #   xticks = collect(0:10:stoptime),
+     xticks = (0:365:stoptime),
+     xtickformat = "{:.0f}" #   values -> ["$(value)kg" for value in values]     
+ #    xtickformat = x -> @sprintf("%.1f", x)
+ #   xticks = collect(0:stoptime, 365),
 )
 
 axPHY = Axis(fig[1, 3]; title = "PHY, mmolN/m³", axis_kwargs...)
@@ -97,9 +101,13 @@ hmOXY = heatmap!(times / days, z, interior(O₂, 1, 1, :, :)', colormap = :turbo
 hmOXY = heatmap!(times / days, z, interior(O₂, 1, 1, :, :)', colormap = :turbo)
 Colorbar(fig[2, 2], hmOXY)
 
-axPAR = Axis(fig[1, 5]; title = "PAR  μE⋅m-2⋅s-1", axis_kwargs...)
-hmPAR = heatmap!(times / days, z, interior(PAR, 1, 1, :, :)', colormap = :grayC100) # :linear_grey_0_100_c0_n256)
-Colorbar(fig[1, 6], hmPAR)
+#axPAR = Axis(fig[1, 5]; title = "PAR  μE⋅m-2⋅s-1", axis_kwargs...)
+#hmPAR = heatmap!(times / days, z, interior(PAR, 1, 1, :, :)', colormap = :grayC100) # :linear_grey_0_100_c0_n256)
+#Colorbar(fig[1, 6], hmPAR)
+
+axκ = Axis(fig[1, 5]; title = "κ  m³/s", axis_kwargs...)
+hmκ = heatmap!(times / days, z, interior(κ, 1, 1, :, :)', colormap = Reverse(:RdYlBu)) # :linear_grey_0_100_c0_n256)
+Colorbar(fig[1, 6], hmκ)
 
 axT = Axis(fig[2, 5]; title = "T, oC", axis_kwargs...)
 hmT = heatmap!(times / days, z, interior(T, 1, 1, :, :)', colormap = Reverse(:RdYlBu))
