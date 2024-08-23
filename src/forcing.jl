@@ -1,6 +1,6 @@
 using Oceananigans: Forcing
 
-function rivers_forcing()
+function rivers_forcing(Nz)
     ## River forcing
     λ = 1 / (1minute)  # Relaxation timescale [s⁻¹].
 
@@ -32,5 +32,5 @@ function rivers_forcing()
     Tforcing = Forcing(T_point_source, field_dependencies = :T, discrete_form = true)
     Sforcing = Forcing(S_point_source, field_dependencies = :S, discrete_form = true)
 
-    return Tforcing, Sforcing
+    return (T = Tforcing, S = Sforcing)
 end

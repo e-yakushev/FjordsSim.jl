@@ -1,19 +1,22 @@
+using CUDA
 using Oceananigans.BoundaryConditions:
     FluxBoundaryCondition, ValueBoundaryCondition, FieldBoundaryConditions
 using Oceananigans.ImmersedBoundaries: ImmersedBoundaryCondition
 using Oceananigans.Operators: Δzᵃᵃᶜ, ℑxyᶜᶠᵃ, ℑxyᶠᶜᵃ
-
+using Oceananigans.Units
+using Oceananigans.Architectures
 using OceanBioME: GasExchange
 
-# Wind stress 
-# https://en.wikipedia.org/wiki/Wind_stress
-function wind_stress()
+const twelve_months = 12
+const thirty_days = 30days
+
+function wind_data_hardcoded(Nx, Ny)
     reference_density = 1000.0
-    Cd = 0.0025  # 0.0015
+    Cd = 0.0025
     ρₐᵢᵣ = 1.225
     Ntimes = 12
-    uwind = [10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    vwind = [8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    uwind = [9, 3, 2, 1, 3, 1, 1, 2, 1, 1, 1, 3]
+    vwind = [6, 9, 2, 3, 1, 1, 2, 2, 1, 2, 1, 2]
     τˣ = Array{Float64}(undef, Nx, Ny, Ntimes)
     τʸ = Array{Float64}(undef, Nx, Ny, Ntimes)
     for i = 1:Nx
@@ -22,29 +25,40 @@ function wind_stress()
             τʸ[i, j, :] = ρₐᵢᵣ * Cd .* (vwind .^ 2) ./ reference_density
         end
     end
+    return τˣ, τʸ
+end
 
-    # Time dependent fluxes
-    Nmonths = 12
-    thirty_days = 30days
+function wind_data_hardcoded(::CPU, Nx, Ny)
+    return wind_data_hardcoded(Nx, Ny)
+end
 
-    @inline current_time_index(time, tot_months) =
-        mod(unsafe_trunc(Int32, time / thirty_days), tot_months) + 1
-    @inline next_time_index(time, tot_months) =
-        mod(unsafe_trunc(Int32, time / thirty_days) + 1, tot_months) + 1
-    @inline cyclic_interpolate(u₁::Number, u₂, time) = u₁ + mod(time / thirty_days, 1) * (u₂ - u₁)
+function wind_data_hardcoded(::GPU, Nx, Ny)
+    τˣ, τʸ = wind_data_hardcoded(Nx, Ny)
+    return cu(τˣ), cu(τʸ)
+end
 
-    @inline function surface_wind_stress(i, j, grid, clock, fields, τ)
-        time = clock.time
-        n₁ = current_time_index(time, Nmonths)
-        n₂ = next_time_index(time, Nmonths)
+current_time_index(time, tot_months) =
+    mod(unsafe_trunc(Int32, time / thirty_days), tot_months) + 1
+next_time_index(time, tot_months) =
+    mod(unsafe_trunc(Int32, time / thirty_days) + 1, tot_months) + 1
+cyclic_interpolate(u₁::Number, u₂, time) = u₁ + mod(time / thirty_days, 1) * (u₂ - u₁)
 
-        @inbounds begin  # inbounds for faster performance, doesn't check the boundaries of the array
-            τ₁ = τ[i, j, n₁]
-            τ₂ = τ[i, j, n₂]
-        end
+function surface_wind_stress(i, j, grid, clock, fields, τ)
+    time = clock.time
+    n₁ = current_time_index(time, twelve_months)
+    n₂ = next_time_index(time, twelve_months)
 
-        return cyclic_interpolate(τ₁, τ₂, time)
+    @inbounds begin
+        τ₁ = τ[i, j, n₁]
+        τ₂ = τ[i, j, n₂]
     end
+
+    return cyclic_interpolate(τ₁, τ₂, time)
+end
+
+# Wind stress https://en.wikipedia.org/wiki/Wind_stress
+function wind_stress(arch, Nx, Ny)
+    τˣ, τʸ = wind_data_hardcoded(arch, Nx, Ny)
 
     u_wind_stress_bc =
         FluxBoundaryCondition(surface_wind_stress, discrete_form = true, parameters = τˣ)
@@ -98,8 +112,8 @@ function bottom_drag()
     return u_immersed_bc, v_immersed_bc, u_bottom_drag_bc, v_bottom_drag_bc
 end
 
-function physics_boundary_conditions()
-    # u_wind_stress_bc, v - wind_stress_bc = wind_stress()
+function physics_boundary_conditions(arch, Nx, Ny)
+    # u_wind_stress_bc, v_wind_stress_bc = wind_stress(arch, Nx, Ny)
     u_immersed_bc, v_immersed_bc, u_bottom_drag_bc, v_bottom_drag_bc = bottom_drag()
 
     u_bcs = FieldBoundaryConditions(
