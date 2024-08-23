@@ -67,9 +67,6 @@ grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(depth); active_cel
 #     (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
 # biogeochemistry = OXYDEP(; grid, args_oxydep..., TS_forced = false, surface_photosynthetically_active_radiation = PAR⁰)
 
-## The turbulence closure
-# closure = turbulence_closures_a()
-
 ## Boundary conditions
 # physics
 # u_bcs, v_bcs = physics_boundary_conditions(setup_grid.arch, setup_grid.Nx, setup_grid.Ny)
@@ -91,16 +88,6 @@ model = ocean_sim.model
 T₀, S₀ = initial_conditions_temp_salt_3d_predefined(setup_grid)
 set!(model, T = T₀, S = S₀)  # , NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0)
 
-# underlying_grid_cpu = LatitudeLongitudeGrid(
-#     CPU();
-#     size = (setup_grid.Nx, setup_grid.Ny, setup_grid.Nz),
-#     halo = (7, 7, 7),
-#     z = z_faces,
-#     latitude = (43.177, 43.214),
-#     longitude = (27.640, 27.947),
-# )
-# grid_cpu =
-#     ImmersedBoundaryGrid(underlying_grid_cpu, GridFittedBottom(depth); active_cells_map = true)
 backend = InMemory()
 atmosphere = JRA55_prescribed_atmosphere(setup_grid.arch; backend, grid)
 radiation  = Radiation(setup_grid.arch)
@@ -144,7 +131,7 @@ nothing #hide
 surface_prefix = joinpath(homedir(), "data_Varna", "surface_snapshots")
 ocean_sim.output_writers[:surface] = JLD2OutputWriter(
     model, merge(model.tracers, model.velocities);
-    schedule = TimeInterval(1day),
+    schedule = TimeInterval(1hour),
     filename = "$surface_prefix.jld2",
     indices=(:, :, grid.Nz),
     overwrite_existing = true,
@@ -154,7 +141,7 @@ ocean_sim.output_writers[:surface] = JLD2OutputWriter(
 profile_prefix = joinpath(homedir(), "data_Varna", "profile_snapshots")
 ocean_sim.output_writers[:profile] = JLD2OutputWriter(
     model, merge(model.tracers, model.velocities);
-    schedule = TimeInterval(1day),
+    schedule = TimeInterval(1hour),
     filename = "$profile_prefix.jld2",
     indices=(:, 18, :),
     overwrite_existing = true,
@@ -174,8 +161,9 @@ ocean_sim.output_writers[:profile] = JLD2OutputWriter(
 # We use an adaptive time step that maintains the [CFL condition](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition) equal to 0.1.
 # For this scope, we use the Oceananigans utility `conjure_time_step_wizard!` (see Oceanigans's documentation).
 
-ocean_sim.stop_time = 365days
-conjure_time_step_wizard!(ocean_sim; cfl=0.2, max_Δt=2minute, max_change=1.01)
+ocean_sim.stop_time = 10days
+coupled_simulation.stop_time = 10days
+conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=1minute, max_change=1.01)
 run!(coupled_simulation)
 nothing #hide
 
@@ -186,8 +174,8 @@ nothing #hide
 # This time, we set the CFL in the time_step_wizard to be 0.25 as this is the maximum recommended CFL to be
 # used in conjunction with Oceananigans' hydrostatic time-stepping algorithm ([two step Adams-Bashfort](https://en.wikipedia.org/wiki/Linear_multistep_method))
 
-# ocean_sim.stop_time = 355days
-# coupled_simulation.stop_time = 355days
-# conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=1minutes, max_change=1.1)
-# run!(coupled_simulation)
-# nothing #hide
+ocean_sim.stop_time = 355days
+coupled_simulation.stop_time = 355days
+conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=1minutes, max_change=1.01)
+run!(coupled_simulation)
+nothing #hide
