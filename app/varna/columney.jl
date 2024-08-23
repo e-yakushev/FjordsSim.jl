@@ -20,7 +20,6 @@ using OceanBioME.SLatissimaModel: SLatissima
 using Oceananigans.Fields: FunctionField, ConstantField
 using Oceananigans.Units
 using Interpolations
-using Interpolations
 using JLD2
 using CairoMakie
 import Oceananigans.Biogeochemistry: update_tendencies!
@@ -37,7 +36,7 @@ using .FjordsSim:
     read_TSU_forcing
 
 const year = 365days
-stoptime = 365days  # Set simulation stoptime here!
+stoptime = 1095days  # Set simulation stoptime here!
 
 ## Surface PAR and turbulent vertical diffusivity based on idealised mixed layer depth 
 @inline PAR⁰(x, y, t) =
@@ -73,10 +72,10 @@ biogeochemistry =
 O2_suboxic = 30.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
 Trel = 10000.0      # Relaxation time for exchange with the sediments (s/m)
 b_ox = 15.0        # difference of OXY in the sediment and water, 
-b_NUT = 15.0        # NUT in the sediment, (mmol/m3)  
-b_DOM_ox = 10.0    # OM in the sediment (oxic conditions), (mmol/m3) 
+b_NUT = 18.0        # NUT in the sediment, (mmol/m3)  
+b_DOM_ox = 6.0    # OM in the sediment (oxic conditions), (mmol/m3) 
 b_DOM_anox = 20.0   # OM in the sediment (anoxic conditions), (mmol/m3)  
-bu = 0.8           # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
+bu = 0.2 #0.4           # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
 
 @inline F_ox(conc, threshold) = (0.5 + 0.5 * tanh(conc - threshold))
 @inline F_subox(conc, threshold) = (0.5 - 0.5 * tanh(conc - threshold))
@@ -125,9 +124,13 @@ DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
 
 ## Hydrophysics forcing
 # filename = joinpath(homedir(), "BadgerArtifacts", "Varna_brom.nc")
-filename = "C:\\Users\\ABE\\OneDrive\\scripts\\Julia_scripts\\BadgerArtifacts\\Varna_brom.nc"
+# filename = "C:\\Users\\ABE\\OneDrive\\scripts\\Julia_scripts\\BadgerArtifacts\\Varna_brom.nc"
+#filename = "Varna_brom.nc"
+filename = "../../data_Varna/Varna_brom.nc"
 
 Tnc, Snc, Unc, Kznc, depth, times = read_TSU_forcing(filename)
+Kznc = 10. * Kznc
+Kznc[:,1] = Kznc[:,1] ./ 10.  # we decrease Kz above the bottom
 
 # restore z-faces from nc file, as it provides us only centers of layers. dz=5
 # z-faces are needed to construct input_grid
@@ -154,7 +157,7 @@ clock = Clock(; time = times[1])
 T = FunctionField{Center, Center, Center}(T_function, grid; clock)
 S = FunctionField{Center, Center, Center}(S_function, grid; clock)
 
-κ = FunctionField{Center, Center, Center}(Kz_function, grid; clock)
+κ = 5.0 * FunctionField{Center, Center, Center}(Kz_function, grid; clock)
 
 ## Model instantiation
 model = NonhydrostaticModel(;
@@ -177,7 +180,6 @@ model = NonhydrostaticModel(;
 
 ## Set model
 set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0,)
-set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0,)
 
 ## Simulation
 simulation = Simulation(model, Δt = 6minutes, stop_time = stoptime)
@@ -192,18 +194,15 @@ progress_message(sim) = @printf(
 simulation.callbacks[:progress] = Callback(progress_message, TimeInterval(10days))
 
 NUT, PHY, HET, POM, DOM, O₂ = model.tracers
-NUT, PHY, HET, POM, DOM, O₂ = model.tracers
 PAR = model.auxiliary_fields.PAR
 T = model.auxiliary_fields.T
 S = model.auxiliary_fields.S
-T = model.auxiliary_fields.T
-S = model.auxiliary_fields.S
 
-# output_prefix = joinpath(homedir(), "data_Varna", "columney_snapshots")
-output_prefix = joinpath("out")
+output_prefix = joinpath(homedir(), "data_Varna", "columney_snapshots")
+# output_prefix = joinpath("out")
 simulation.output_writers[:profiles] = JLD2OutputWriter(
     model,
-    (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR),
+    (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR, κ),
     filename = "$output_prefix.jld2",
     schedule = TimeInterval(1day),
     overwrite_existing = true,
@@ -212,4 +211,6 @@ simulation.output_writers[:profiles] = JLD2OutputWriter(
 ## Run!
 run!(simulation)
 
+
 include("images.jl")
+
