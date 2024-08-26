@@ -23,7 +23,8 @@ include("../../src/FjordsSim.jl")
 include("setup.jl")
 
 using .FjordsSim:
-    rivers_forcing
+    rivers_forcing,
+    biogeochemical_simulation
 
 ## Grid
 filepath_topo = joinpath(args_grid.datadir, args_grid.filename)
@@ -47,41 +48,52 @@ forcing = rivers_forcing(setup_grid.Nz)
 
 ## Simulation
 Δt = 1seconds
-ocean_sim = ocean_simulation(grid; Δt, forcing, coriolis=nothing)
+ocean_sim = biogeochemical_simulation(grid; Δt, forcing, coriolis = nothing)
 model = ocean_sim.model
 
 ## Set initial conditions
-set!(model, T = 10, S = 15)
+Ξ(z) = randn() * z / grid.Lz * (z / grid.Lz + 1)
+
+Ũ = 1e-3
+uᵢ(x, y, z) = Ũ * Ξ(z)
+vᵢ(x, y, z) = Ũ * Ξ(z)
+
+set!(model, u=uᵢ, v=vᵢ, P = 0.03, Z = 0.03, NO₃ = 4.0, NH₄ = 0.05, DIC = 2200.0, Alk = 2409.0, S = 15, T = 10)
 
 ## Atmosphere
 backend = InMemory()
 atmosphere = JRA55_prescribed_atmosphere(setup_grid.arch; backend, grid)
-radiation  = Radiation(setup_grid.arch)
+radiation = Radiation(setup_grid.arch)
 sea_ice = nothing
 
-## Coupled model / simulation
+## Coupled model
 coupled_model = OceanSeaIceModel(ocean_sim, sea_ice; atmosphere, radiation)
-coupled_simulation = Simulation(coupled_model; Δt, stop_time=10days)
+coupled_simulation = Simulation(coupled_model; Δt, stop_time = 10days)
 
 ## Callbacks
 wall_time = [time_ns()]
 function progress(sim)
-     ocean = sim.model.ocean
-     u, v, w = ocean.model.velocities
-     T = ocean.model.tracers.T
+    ocean = sim.model.ocean
+    u, v, w = ocean.model.velocities
+    T = ocean.model.tracers.T
 
-     Tmax = maximum(interior(T))
-     Tmin = minimum(interior(T))
-     umax = maximum(abs, interior(u)), maximum(abs, interior(v)), maximum(abs, interior(w))
-     step_time = 1e-9 * (time_ns() - wall_time[1])
+    Tmax = maximum(interior(T))
+    Tmin = minimum(interior(T))
+    umax = maximum(abs, interior(u)), maximum(abs, interior(v)), maximum(abs, interior(w))
+    step_time = 1e-9 * (time_ns() - wall_time[1])
 
-     @info @sprintf("Time: %s, Iteration %d, Δt %s, max(vel): (%.2e, %.2e, %.2e), max(T): %.2f, min(T): %.2f, wtime: %s \n",
-          prettytime(ocean.model.clock.time),
-          ocean.model.clock.iteration,
-          prettytime(ocean.Δt),
-          umax..., Tmax, Tmin, prettytime(step_time))
+    @info @sprintf(
+        "Time: %s, Iteration %d, Δt %s, max(vel): (%.2e, %.2e, %.2e), max(T): %.2f, min(T): %.2f, wtime: %s \n",
+        prettytime(ocean.model.clock.time),
+        ocean.model.clock.iteration,
+        prettytime(ocean.Δt),
+        umax...,
+        Tmax,
+        Tmin,
+        prettytime(step_time)
+    )
 
-     wall_time[1] = time_ns()
+    wall_time[1] = time_ns()
 end
 coupled_simulation.callbacks[:progress] = Callback(progress, IterationInterval(100))
 nothing #hide
@@ -89,22 +101,24 @@ nothing #hide
 ## Set up output writers
 surface_prefix = joinpath(homedir(), "data_Varna", "surface_snapshots")
 ocean_sim.output_writers[:surface] = JLD2OutputWriter(
-    model, merge(model.tracers, model.velocities);
+    model,
+    merge(model.tracers, model.velocities);
     schedule = TimeInterval(1hour),
     filename = "$surface_prefix.jld2",
-    indices=(:, :, grid.Nz),
+    indices = (:, :, grid.Nz),
     overwrite_existing = true,
-    array_type=Array{Float32}
+    array_type = Array{Float32},
 )
 
 profile_prefix = joinpath(homedir(), "data_Varna", "profile_snapshots")
 ocean_sim.output_writers[:profile] = JLD2OutputWriter(
-    model, merge(model.tracers, model.velocities);
+    model,
+    merge(model.tracers, model.velocities);
     schedule = TimeInterval(1hour),
     filename = "$profile_prefix.jld2",
-    indices=(:, 18, :),
+    indices = (:, 18, :),
     overwrite_existing = true,
-    array_type=Array{Float32}
+    array_type = Array{Float32},
 )
 
 ## Spinning up the simulation
@@ -122,7 +136,7 @@ ocean_sim.output_writers[:profile] = JLD2OutputWriter(
 
 ocean_sim.stop_time = 10days
 coupled_simulation.stop_time = 10days
-conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=10minutes, max_change=1.01)
+conjure_time_step_wizard!(ocean_sim; cfl = 0.1, max_Δt = 40seconds, max_change = 1.01)
 run!(coupled_simulation)
 nothing #hide
 
@@ -135,6 +149,6 @@ nothing #hide
 
 ocean_sim.stop_time = 355days
 coupled_simulation.stop_time = 355days
-conjure_time_step_wizard!(ocean_sim; cfl=0.2, max_Δt=10minutes, max_change=1.01)
+conjure_time_step_wizard!(ocean_sim; cfl = 0.2, max_Δt = 40seconds, max_change = 1.01)
 run!(coupled_simulation)
 nothing #hide
