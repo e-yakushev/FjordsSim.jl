@@ -132,7 +132,7 @@ nothing #hide
 surface_prefix = joinpath(homedir(), "data_Varna", "surface_snapshots")
 ocean_sim.output_writers[:surface] = JLD2OutputWriter(
     model, merge(model.tracers, model.velocities);
-    schedule = TimeInterval(1hour),
+    schedule = TimeInterval(6hour),
     filename = "$surface_prefix.jld2",
     indices=(:, :, grid.Nz),
     overwrite_existing = true,
@@ -142,9 +142,9 @@ ocean_sim.output_writers[:surface] = JLD2OutputWriter(
 profile_prefix = joinpath(homedir(), "data_Varna", "profile_snapshots")
 ocean_sim.output_writers[:profile] = JLD2OutputWriter(
     model, merge(model.tracers, model.velocities);
-    schedule = TimeInterval(1hour),
+    schedule = TimeInterval(6hour),
     filename = "$profile_prefix.jld2",
-    indices=(:,13:31,:),
+    indices=(:,9:28,:),
     overwrite_existing = true,
     array_type=Array{Float32}
 )
