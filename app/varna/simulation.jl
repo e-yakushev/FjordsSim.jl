@@ -45,8 +45,9 @@ filepath_topo = joinpath(args_grid.datadir, args_grid.filename)
 @load filepath_topo depth
 Nx, Ny = size(depth)
 Nz = size(args_grid.z_middle)[1]
+z_faces = args_grid.z_faces # exponential_z_faces(; Nz = Nz, depth = 20)
 setup_grid = (; args_grid..., Nx = Nx, Ny = Ny, Nz = Nz)
-z_faces = exponential_z_faces(; Nz = Nz, depth = 20)
+
 underlying_grid = LatitudeLongitudeGrid(
     setup_grid.arch;
     size = (setup_grid.Nx, setup_grid.Ny, setup_grid.Nz),
@@ -143,10 +144,14 @@ ocean_sim.output_writers[:profile] = JLD2OutputWriter(
     model, merge(model.tracers, model.velocities);
     schedule = TimeInterval(1hour),
     filename = "$profile_prefix.jld2",
-    indices=(:, 18, :),
+    indices=(:,13:31,:),
     overwrite_existing = true,
     array_type=Array{Float32}
 )
+
+# # checkpointer doesn't work with timestepper?
+# checkpoint_prefix = joinpath(homedir(), "data_Varna", "model_checkpoint")
+# coupled_simulation.output_writers[:checkpointer] = Checkpointer(coupled_model, schedule=IterationInterval(100000), prefix=checkpoint_prefix)
 
 ## Spinning up the simulation
 #
@@ -156,7 +161,7 @@ ocean_sim.output_writers[:profile] = JLD2OutputWriter(
 #
 # Therefore, we spin up the simulation with a small time step to ensure that the interpolated initial
 # conditions adapt to the model numerics and parameterization without causing instability. A 10-day
-# integration with a maximum time step of 1.5 minutes should be sufficient to dissipate spurious
+# integration with a maximum time step of 1.5 minutes Поshould be sufficient to dissipate spurious
 # initialization shocks.
 # We use an adaptive time step that maintains the [CFL condition](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition) equal to 0.1.
 # For this scope, we use the Oceananigans utility `conjure_time_step_wizard!` (see Oceanigans's documentation).
@@ -176,6 +181,6 @@ nothing #hide
 
 ocean_sim.stop_time = 355days
 coupled_simulation.stop_time = 355days
-conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=1minutes, max_change=1.01)
+conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=10minutes, max_change=1.01)
 run!(coupled_simulation)
 nothing #hide

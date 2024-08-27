@@ -5,7 +5,7 @@ function initial_conditions_temp_salt_3d_predefined(setup_grid)
     Nx, Ny, Nz = setup_grid.Nx, setup_grid.Ny, setup_grid.Nz
 
     z_ini = -reverse([0.5, 1, 2, 3, 4, 6, 8, 9, 10, 12, 16, 20])
-    tprof = reverse([20, 20, 20, 20, 18, 15, 14, 13, 12, 12, 12, 12])
+    tprof = reverse([12, 12, 12, 12, 11, 10, 9, 8, 8, 8, 8, 8])
     itp = LinearInterpolation(z_ini, tprof)
     tprof_target = itp(z_middle)
 

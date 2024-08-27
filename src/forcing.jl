@@ -2,13 +2,13 @@ using Oceananigans: Forcing
 
 function rivers_forcing(Nz)
     ## River forcing
-    λ = 1 / (1minute)  # Relaxation timescale [s⁻¹].
+    λ = 1 / (30minutes)  # Relaxation timescale [s⁻¹].
 
     # Temperature and salinity of the meltwater outflow.
-    T_source = 15
-    S_source = 0
+    T_source = 20
+    S_source = 0.5   # (G. Shtereva & Dzhurova, 2006a).
 
-    # Index of the point source at the middle of the southern wall.
+    # Index of the point source at the middle of the western wall.
     source_index = (1, 13, Nz)
 
     # Point source
@@ -32,5 +32,6 @@ function rivers_forcing(Nz)
     Tforcing = Forcing(T_point_source, field_dependencies = :T, discrete_form = true)
     Sforcing = Forcing(S_point_source, field_dependencies = :S, discrete_form = true)
 
-    return (T = Tforcing, S = Sforcing)
+    # return (T = Tforcing, S = Sforcing)  
+    return (S = Sforcing,)  
 end
