@@ -14,11 +14,12 @@
 
 ## Model setup
 using OceanBioME, Oceananigans, Printf
-using OceanBioME: Boundaries, GasExchange
-using OceanBioME.Boundaries.Sediments: sinking_flux
-using OceanBioME.SLatissimaModel: SLatissima
+using OceanBioME: GasExchange
+using OceanBioME.Sediments: sinking_flux
+#using OceanBioME.SLatissimaModel: SLatissima
 using Oceananigans.Fields: FunctionField, ConstantField
 using Oceananigans.Units
+using Oceananigans: Forcing
 using Interpolations
 using JLD2
 using CairoMakie
@@ -31,12 +32,10 @@ import Oceananigans.Biogeochemistry:
 include("../../src/FjordsSim.jl")
 include("setup.jl")
 
-using .FjordsSim:
-    OXYDEP,
-    read_TSU_forcing
+using .FjordsSim: OXYDEP, read_TSU_forcing
 
 const year = 365days
-stoptime = 1095days  # Set simulation stoptime here!
+stoptime = 1460days  # Set simulation stoptime here!
 
 ## Surface PAR and turbulent vertical diffusivity based on idealised mixed layer depth 
 @inline PAR⁰(x, y, t) =
@@ -44,100 +43,38 @@ stoptime = 1095days  # Set simulation stoptime here!
     (1 - cos((t + 15days) * 2π / year)) *
     (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
 
-#@inline H(t, t₀, t₁) = ifelse(t₀ < t < t₁, 1.0, 0.0)
-#@inline fmld1(t) =
-#    H(t, 50days, year) *
-#    (1 / (1 + exp(-(t - 100days) / 5days))) *
-#    (1 / (1 + exp((t - 330days) / 25days)))
-#@inline MLD(t) =
-#    -(10 + 340 * (1 - fmld1(year - eps(year)) * exp(-mod(t, year) / 25days) - fmld1(mod(t, year))))
-#@inline κₜ(x, z, t) = 1.e-3 * (1 + tanh((z - MLD(t)) / 10)) / 2 + 1.5e-3
-
 ## Grid
 #depth_extent = 100meters
-grid = RectilinearGrid(size = (1, 1, 12), extent = (500meters, 500meters, 67meters), topology = (Bounded, Bounded, Bounded))
+Nz = 12
+grid = RectilinearGrid(
+    size = (1, 1, Nz),
+    extent = (500meters, 500meters, 67meters),
+    topology = (Bounded, Bounded, Bounded),
+)
 
 ## Model
-biogeochemistry =
-    OXYDEP(; grid, 
+biogeochemistry = OXYDEP(;
+    grid,
     args_oxydep...,
     surface_photosynthetically_active_radiation = PAR⁰,
     TS_forced = true,
-    scale_negatives=true)
-
-# T = FunctionField{Center,Center,Center}(temp, grid; clock)
-# S = FunctionField{Center,Center,Center}(salt, grid; clock)
-
-## Boundary conditions
-O2_suboxic = 30.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
-Trel = 10000.0      # Relaxation time for exchange with the sediments (s/m)
-b_ox = 15.0        # difference of OXY in the sediment and water, 
-b_NUT = 18.0        # NUT in the sediment, (mmol/m3)  
-b_DOM_ox = 6.0    # OM in the sediment (oxic conditions), (mmol/m3) 
-b_DOM_anox = 20.0   # OM in the sediment (anoxic conditions), (mmol/m3)  
-bu = 0.2 #0.4           # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
-
-@inline F_ox(conc, threshold) = (0.5 + 0.5 * tanh(conc - threshold))
-@inline F_subox(conc, threshold) = (0.5 - 0.5 * tanh(conc - threshold))
-
-## oxy
-OXY_top = GasExchange(; gas = :O₂)
-OXY_bottom_cond(i, j, grid, clock, fields) =
-    -(
-        F_ox(fields.O₂[i, j, 1], O2_suboxic) * b_ox +
-        F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.O₂[i, j, 1])
-    ) / Trel
-OXY_bottom = FluxBoundaryCondition(OXY_bottom_cond, discrete_form = true)
-
-## nut
-NUT_bottom_cond(i, j, grid, clock, fields) =
-    (
-        F_ox(fields.O₂[i, j, 1], O2_suboxic) * (b_NUT - fields.NUT[i, j, 1]) +
-        F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.NUT[i, j, 1])
-    ) / Trel
-NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond, discrete_form = true)
-
-## phy
-w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:PHY)).w[1, 1, 1]
-PHY_bottom_cond(i, j, grid, clock, fields) = -bu * w_PHY * fields.PHY[i, j, 1]
-PHY_bottom = FluxBoundaryCondition(PHY_bottom_cond, discrete_form = true)
-
-## het
-w_HET = biogeochemical_drift_velocity(biogeochemistry, Val(:HET)).w[1, 1, 1]
-HET_bottom_cond(i, j, grid, clock, fields) = -bu * w_HET * fields.HET[i, j, 1]
-HET_bottom = FluxBoundaryCondition(HET_bottom_cond, discrete_form = true)
-
-## pom
-w_POM = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[1, 1, 1]
-POM_bottom_cond(i, j, grid, clock, fields) = -bu * w_POM * fields.POM[i, j, 1]
-POM_bottom = FluxBoundaryCondition(POM_bottom_cond, discrete_form = true)
-
-## dom
-DOM_top = ValueBoundaryCondition(0.0)
-DOM_bottom_cond(i, j, grid, clock, fields) =
-    (
-        F_ox(fields.O₂[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) +
-        F_subox(fields.O₂[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1])
-    ) / Trel
-DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
+    scale_negatives = true,
+)
 
 
 ## Hydrophysics forcing
-# filename = joinpath(homedir(), "BadgerArtifacts", "Varna_brom.nc")
-# filename = "C:\\Users\\ABE\\OneDrive\\scripts\\Julia_scripts\\BadgerArtifacts\\Varna_brom.nc"
-#filename = "Varna_brom.nc"
 filename = "../../data_Varna/Varna_brom.nc"
 
 Tnc, Snc, Unc, Kznc, depth, times = read_TSU_forcing(filename)
-Kznc = 10. * Kznc
-Kznc[:,1] = Kznc[:,1] ./ 10.  # we decrease Kz above the bottom
+Kznc = 10.0 * Kznc
+Kznc[:, 1] = Kznc[:, 1] ./ 10.0  # we decrease Kz above the bottom
 
 # restore z-faces from nc file, as it provides us only centers of layers. dz=5
 # z-faces are needed to construct input_grid
 z_faces = depth .+ 2.6
 z_faces
 
-times = collect(range(0, stop=366*24*3600, step=3600))[1:8784]
+times = collect(range(0, stop = 366 * 24 * 3600, step = 3600))[1:8784]
 temp_itp = interpolate((times, z_faces), Tnc, Gridded(Linear()))
 sal_itp = interpolate((times, z_faces), Snc, Gridded(Linear()))
 kz_itp = interpolate((times, z_faces), Kznc, Gridded(Linear()))
@@ -154,10 +91,86 @@ Kz_function(x, y, z, t) = bilinear_interpolate(kz_itp, mod(t, 365days), clamp(z,
 
 clock = Clock(; time = times[1])
 
-T = FunctionField{Center, Center, Center}(T_function, grid; clock)
-S = FunctionField{Center, Center, Center}(S_function, grid; clock)
+T = FunctionField{Center,Center,Center}(T_function, grid; clock)
+S = FunctionField{Center,Center,Center}(S_function, grid; clock)
 
-κ = 5.0 * FunctionField{Center, Center, Center}(Kz_function, grid; clock)
+κ = 5.0 * FunctionField{Center,Center,Center}(Kz_function, grid; clock)
+
+## Boundary conditions
+O2_suboxic = 30.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
+Trel = 10000.0      # Relaxation time for exchange with the sediments (s/m)
+b_ox = 15.0        # difference of OXY in the sediment and water, 
+b_NUT = 10.0        # NUT in the sediment, (mmol/m3)  18
+b_DOM_ox = 6.0    # OM in the sediment (oxic conditions), (mmol/m3) 
+b_DOM_anox = 20.0   # OM in the sediment (anoxic conditions), (mmol/m3)  
+bu = 0.2 #0.4           # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
+
+@inline F_ox(conc, threshold) = (0.5 + 0.5 * tanh(conc - threshold))
+@inline F_subox(conc, threshold) = (0.5 - 0.5 * tanh(conc - threshold))
+
+## oxy
+include("oxygen_saturation.jl")
+#O2_sat = oxygen_saturation(T[1, 1, 12], S[1, 1, 12], 0.0)
+# formulation for the Schmidt number in NERSEM for O2 following Wanninkhof 2014
+#temp = T[1, 1, 12]
+#Sc = 1920.4 - 135.6 * temp + 5.2122^2 - 0.10939 * temp^3 + 0.00093777 * temp^4
+#windspeed = 5 # m/s
+#ko2o = 0.251 * windspeed^2 * (Sc / 660.0)^-0.5 # Wanninkhof 2014
+#Qs = ko2o*(O2_sat-[1, 1, 12]) * 0.24/86400. #! 0.24 is to convert from [cm/h] to [m/day]
+#Oxy_top_cond(i, j, grid, clock, fields) =
+#    @inbounds (ko2o * (oxygen_saturation(fields.T[i, j, 12], fields.S[i, j, 12], 0.0) - fields.O₂[i, j, 12]) * 0.24 / 86400.0)
+#OXY_top = FluxBoundaryCondition(Oxy_top_cond, discrete_form = true)
+
+OXY_top = OxygenGasExchangeBoundaryCondition(;
+    air_concentration = oxygen_saturation(T[1, 1, Nz], S[1, 1, Nz], 0.0),
+)
+##T_point_source(i, j, k, grid, clock, model_fields) =
+##        @inbounds ifelse((i, j, k) == (1, 13, Nz), -λ * (model_fields.T[i, j, k] - T_source), 0)
+
+#OXY_bottom_cond(i, j, grid, clock, fields) =
+OXY_bottom_cond(i, j, grid, clock, fields) = @inbounds (
+    -(
+        F_ox(fields.O₂[i, j, 1], O2_suboxic) * b_ox +
+        F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.O₂[i, j, 1])
+    ) / Trel
+)
+OXY_bottom = FluxBoundaryCondition(OXY_bottom_cond, discrete_form = true)
+
+## nut
+#NUT_bottom_cond(i, j, grid, clock, fields) =
+NUT_bottom_cond(i, j, grid, clock, fields) = @inbounds (
+    (
+        F_ox(fields.O₂[i, j, 1], O2_suboxic) * (b_NUT - fields.NUT[i, j, 1]) +
+        F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.NUT[i, j, 1])
+    ) / Trel
+)
+NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond, discrete_form = true)
+
+## phy
+w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:PHY)).w[1, 1, 1]
+PHY_bottom_cond(i, j, grid, clock, fields) = @inbounds (-bu * w_PHY * fields.PHY[i, j, 1])
+PHY_bottom = FluxBoundaryCondition(PHY_bottom_cond, discrete_form = true)
+
+## het
+w_HET = biogeochemical_drift_velocity(biogeochemistry, Val(:HET)).w[1, 1, 1]
+HET_bottom_cond(i, j, grid, clock, fields) = @inbounds (-bu * w_HET * fields.HET[i, j, 1])
+HET_bottom = FluxBoundaryCondition(HET_bottom_cond, discrete_form = true)
+
+## pom
+w_POM = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[1, 1, 1]
+POM_bottom_cond(i, j, grid, clock, fields) = @inbounds (-bu * w_POM * fields.POM[i, j, 1])
+POM_bottom = FluxBoundaryCondition(POM_bottom_cond, discrete_form = true)
+
+## dom
+DOM_top = ValueBoundaryCondition(0.0)
+DOM_bottom_cond(i, j, grid, clock, fields) = @inbounds (
+    (
+        F_ox(fields.O₂[i, j, 1], O2_suboxic) * (b_DOM_ox - fields.DOM[i, j, 1]) +
+        F_subox(fields.O₂[i, j, 1], O2_suboxic) * 2.0 * (b_DOM_anox - fields.DOM[i, j, 1])
+    ) / Trel
+)
+DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
+
 
 ## Model instantiation
 model = NonhydrostaticModel(;
@@ -167,19 +180,19 @@ model = NonhydrostaticModel(;
     closure = ScalarDiffusivity(ν = κ, κ = κ), #(ν = 1e-4, κ = 1e-4),
     biogeochemistry,
     boundary_conditions = (
-         O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom),
-         NUT = FieldBoundaryConditions(bottom = NUT_bottom),
-         DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
-         POM = FieldBoundaryConditions(bottom = POM_bottom),
-         PHY = FieldBoundaryConditions(bottom = PHY_bottom),
-         HET = FieldBoundaryConditions(bottom = HET_bottom),
+        O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom),
+        NUT = FieldBoundaryConditions(bottom = NUT_bottom),
+        DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
+        POM = FieldBoundaryConditions(bottom = POM_bottom),
+        PHY = FieldBoundaryConditions(bottom = PHY_bottom),
+        HET = FieldBoundaryConditions(bottom = HET_bottom),
     ),
     auxiliary_fields = (; S, T),
-    tracers=(:NUT, :PHY, :HET, :POM, :DOM, :O₂)
+    tracers = (:NUT, :PHY, :HET, :POM, :DOM, :O₂),
 )
 
 ## Set model
-set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0,)
+set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0)
 
 ## Simulation
 simulation = Simulation(model, Δt = 6minutes, stop_time = stoptime)
@@ -188,7 +201,7 @@ progress_message(sim) = @printf(
     iteration(sim),
     prettytime(sim),
     prettytime(sim.Δt),
-    prettytime(sim.run_wall_time)
+    prettytime(sim.run_wall_time),
 )
 
 simulation.callbacks[:progress] = Callback(progress_message, TimeInterval(10days))

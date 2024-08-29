@@ -40,7 +40,8 @@ using OceanBioME.Light:
     update_TwoBandPhotosyntheticallyActiveRadiation!,
     default_surface_PAR,
     TwoBandPhotosyntheticallyActiveRadiation
-using OceanBioME.Boundaries.Sediments: sinking_flux
+using OceanBioME.Sediments: sinking_flux 
+# using OceanBioME.Boundaries.Sediments: sinking_flux
 
 import Adapt: adapt_structure, adapt
 import Base: show, summary
@@ -51,7 +52,7 @@ import Oceananigans.Biogeochemistry:
     update_biogeochemical_state!
 import OceanBioME: redfield, conserved_tracers
 import OceanBioME: maximum_sinking_velocity
-import OceanBioME.Boundaries.Sediments:
+import OceanBioME.Sediments: #import OceanBioME.Boundaries.Sediments:
     nitrogen_flux, carbon_flux, remineralisation_receiver, sinking_tracers
 
 function update_biogeochemical_state!(model, PAR::TwoBandPhotosyntheticallyActiveRadiation)
