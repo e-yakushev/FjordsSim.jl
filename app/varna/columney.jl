@@ -61,7 +61,6 @@ biogeochemistry = OXYDEP(;
     scale_negatives = true,
 )
 
-
 ## Hydrophysics forcing
 filename = "../../data_Varna/Varna_brom.nc"
 
@@ -84,7 +83,6 @@ function bilinear_interpolate(itp, t, z)
     return itp(t, z)
 end
 
-
 T_function(x, y, z, t) = bilinear_interpolate(temp_itp, mod(t, 365days), z)
 S_function(x, y, z, t) = bilinear_interpolate(sal_itp, mod(t, 365days), z)
 Kz_function(x, y, z, t) = bilinear_interpolate(kz_itp, mod(t, 365days), clamp(z, -67, 0))
@@ -98,36 +96,48 @@ S = FunctionField{Center,Center,Center}(S_function, grid; clock)
 
 ## Boundary conditions
 O2_suboxic = 30.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
-Trel = 10000.0      # Relaxation time for exchange with the sediments (s/m)
+Trel = 10000.0     # Relaxation time for exchange with the sediments (s/m)
 b_ox = 15.0        # difference of OXY in the sediment and water, 
-b_NUT = 10.0        # NUT in the sediment, (mmol/m3)  18
-b_DOM_ox = 6.0    # OM in the sediment (oxic conditions), (mmol/m3) 
-b_DOM_anox = 20.0   # OM in the sediment (anoxic conditions), (mmol/m3)  
-bu = 0.2 #0.4           # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
+b_NUT = 10.0       # NUT in the sediment, (mmol/m3)  18
+b_DOM_ox = 6.0     # OM in the sediment (oxic conditions), (mmol/m3) 
+b_DOM_anox = 20.0  # OM in the sediment (anoxic conditions), (mmol/m3)  
+bu = 0.2 #0.4      # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
+
+windspeed = 5.0    # m/s windspeed for gases exchange
 
 @inline F_ox(conc, threshold) = (0.5 + 0.5 * tanh(conc - threshold))
 @inline F_subox(conc, threshold) = (0.5 - 0.5 * tanh(conc - threshold))
 
 ## oxy
 include("oxygen_saturation.jl")
-#O2_sat = oxygen_saturation(T[1, 1, 12], S[1, 1, 12], 0.0)
-# formulation for the Schmidt number in NERSEM for O2 following Wanninkhof 2014
-#temp = T[1, 1, 12]
-#Sc = 1920.4 - 135.6 * temp + 5.2122^2 - 0.10939 * temp^3 + 0.00093777 * temp^4
-#windspeed = 5 # m/s
-#ko2o = 0.251 * windspeed^2 * (Sc / 660.0)^-0.5 # Wanninkhof 2014
-#Qs = ko2o*(O2_sat-[1, 1, 12]) * 0.24/86400. #! 0.24 is to convert from [cm/h] to [m/day]
-#Oxy_top_cond(i, j, grid, clock, fields) =
-#    @inbounds (ko2o * (oxygen_saturation(fields.T[i, j, 12], fields.S[i, j, 12], 0.0) - fields.O₂[i, j, 12]) * 0.24 / 86400.0)
-#OXY_top = FluxBoundaryCondition(Oxy_top_cond, discrete_form = true)
 
-OXY_top = OxygenGasExchangeBoundaryCondition(;
-    air_concentration = oxygen_saturation(T[1, 1, Nz], S[1, 1, Nz], 0.0),
+i = 1
+j = 1
+Sc = (                                              
+    1920.4 - 135.6 * T[1, 1, Nz] + 5.2122 * (T[i, j, Nz])^2 -
+    0.10939 * (T[i, j, Nz])^3 + 0.00093777 * (T[i, j, Nz])^4    # Sc, Schmidt number for O2 Wanninkhof 2014
 )
-##T_point_source(i, j, k, grid, clock, model_fields) =
-##        @inbounds ifelse((i, j, k) == (1, 13, Nz), -λ * (model_fields.T[i, j, k] - T_source), 0)
+ko2o = 0.251 * windspeed^2 * (Sc / 660.0)^(-0.5) # ko2o=0.251*windspeed^2*(Sc/660)^(-0.5)  Wanninkhof 2014
+o2sat = oxygen_saturation(T[i, j, Nz], S[i, j, Nz], 0.0)
+println(" Sc=",Sc," ko2o=",ko2o," o2sat=",o2sat)
 
-#OXY_bottom_cond(i, j, grid, clock, fields) =
+Oxy_top_cond(i, j, grid, clock, fields) = @inbounds ((
+              0.251 *                   # ko2o=0.251*windspeed^2*(Sc/660)^(-0.5)  Wanninkhof 2014
+              windspeed^2 *
+              (
+                  (                     # Sc, Schmidt number for O2 Wanninkhof 2014
+                      1920.4 - 135.6 * fields.T[i, j, Nz] + 5.2122 * (fields.T[i, j, Nz])^2 -
+                      0.10939 * (fields.T[i, j, Nz])^3 + 0.00093777 * (fields.T[i, j, Nz])^4   
+                  ) / 660.0
+              )^(-0.5)
+          ) *
+          (fields.O₂[i, j, Nz] - oxygen_saturation(fields.T[i, j, Nz], fields.S[i, j, Nz], 0.0))
+          ) * 0.24 / 86400.0            # 0.24 is to convert from [cm/h] to [m/day]  * 0.24  / 86400.0 
+OXY_top = FluxBoundaryCondition(Oxy_top_cond; discrete_form = true)
+
+#OXY_top = OxygenGasExchangeBoundaryCondition(;
+#    air_concentration = oxygen_saturation(T[1, 1, Nz], S[1, 1, Nz], 0.0),)
+
 OXY_bottom_cond(i, j, grid, clock, fields) = @inbounds (
     -(
         F_ox(fields.O₂[i, j, 1], O2_suboxic) * b_ox +
