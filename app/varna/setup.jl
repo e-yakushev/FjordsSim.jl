@@ -87,5 +87,5 @@ args_oxydep = (
     CtoN = 6.625, # (nd)
     NtoN = 5.3,   # (nd)
     NtoB = 0.016, # (nd)
-    sinking_speeds = (PHY = 0.15 / day, HET = 0.4 / day, POM = 10.0 / day),
+    sinking_speeds = (PHY = 0.15 / day, HET = 2. / day, POM = 10.0 / day),
 )
