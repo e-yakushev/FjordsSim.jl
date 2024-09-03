@@ -23,7 +23,9 @@ include("../../src/FjordsSim.jl")
 include("setup.jl")
 
 using .FjordsSim:
-    rivers_forcing
+    rivers_forcing,
+    varna_bc,
+    hydrophysics_simulation
 
 ## Grid
 filepath_topo = joinpath(args_grid.datadir, args_grid.filename)
@@ -47,7 +49,9 @@ forcing = rivers_forcing(setup_grid.Nz)
 
 ## Simulation
 Δt = 1seconds
-ocean_sim = ocean_simulation(grid; Δt, forcing, coriolis=nothing)
+bottom_drag_coefficient = 0.003
+boundary_conditions = varna_bc(grid, bottom_drag_coefficient)
+ocean_sim = hydrophysics_simulation(grid; Δt, forcing, coriolis=nothing, bottom_drag_coefficient, boundary_conditions)
 model = ocean_sim.model
 
 ## Set initial conditions
@@ -122,7 +126,7 @@ ocean_sim.output_writers[:profile] = JLD2OutputWriter(
 
 ocean_sim.stop_time = 10days
 coupled_simulation.stop_time = 10days
-conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=10minutes, max_change=1.01)
+conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=1.5minutes, max_change=1.01)
 run!(coupled_simulation)
 nothing #hide
 
@@ -135,6 +139,6 @@ nothing #hide
 
 ocean_sim.stop_time = 355days
 coupled_simulation.stop_time = 355days
-conjure_time_step_wizard!(ocean_sim; cfl=0.2, max_Δt=10minutes, max_change=1.01)
+conjure_time_step_wizard!(ocean_sim; cfl=0.2, max_Δt=1.5minutes, max_change=1.01)
 run!(coupled_simulation)
 nothing #hide

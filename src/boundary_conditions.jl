@@ -1,6 +1,6 @@
 using CUDA
 using Oceananigans.BoundaryConditions:
-    FluxBoundaryCondition, ValueBoundaryCondition, FieldBoundaryConditions
+    FluxBoundaryCondition, ValueBoundaryCondition, FieldBoundaryConditions, BoundaryCondition, Open
 using Oceananigans.ImmersedBoundaries: ImmersedBoundaryCondition
 using Oceananigans.Operators: Δzᵃᵃᶜ, ℑxyᶜᶠᵃ, ℑxyᶠᶜᵃ
 using Oceananigans.Units
@@ -183,4 +183,61 @@ function bgh_oxydep_boundary_conditions()
     het_bcs = FieldBoundaryConditions(bottom = HET_bottom)
 
     return oxy_bcs, nut_bcs, dom_bcs, pom_bcs, phy_bcs, het_bcs
+end
+
+function ocean_boundary_conditions(grid, bottom_drag_coefficient)
+    # Set up boundary conditions using Field
+    top_zonal_momentum_flux = τx = Field{Face,Center,Nothing}(grid)
+    top_meridional_momentum_flux = τy = Field{Center,Face,Nothing}(grid)
+    top_ocean_heat_flux = Jᵀ = Field{Center,Center,Nothing}(grid)
+    top_salt_flux = Jˢ = Field{Center,Center,Nothing}(grid)
+
+    u_bot_bc = FluxBoundaryCondition(
+        u_quadratic_bottom_drag,
+        discrete_form = true,
+        parameters = bottom_drag_coefficient,
+    )
+    v_bot_bc = FluxBoundaryCondition(
+        v_quadratic_bottom_drag,
+        discrete_form = true,
+        parameters = bottom_drag_coefficient,
+    )
+
+    ocean_boundary_conditions = (
+        u = FieldBoundaryConditions(top = FluxBoundaryCondition(τx), bottom = u_bot_bc),
+        v = FieldBoundaryConditions(top = FluxBoundaryCondition(τy), bottom = v_bot_bc),
+        T = FieldBoundaryConditions(top = FluxBoundaryCondition(Jᵀ)),
+        S = FieldBoundaryConditions(top = FluxBoundaryCondition(Jˢ)),
+    )
+    return ocean_boundary_conditions
+end
+
+function varna_bc(grid, bottom_drag_coefficient)
+    top_zonal_momentum_flux = τx = Field{Face,Center,Nothing}(grid)
+    top_meridional_momentum_flux = τy = Field{Center,Face,Nothing}(grid)
+    top_ocean_heat_flux = Jᵀ = Field{Center,Center,Nothing}(grid)
+    top_salt_flux = Jˢ = Field{Center,Center,Nothing}(grid)
+
+    u_bot_bc = FluxBoundaryCondition(
+        u_quadratic_bottom_drag,
+        discrete_form = true,
+        parameters = bottom_drag_coefficient,
+    )
+    v_bot_bc = FluxBoundaryCondition(
+        v_quadratic_bottom_drag,
+        discrete_form = true,
+        parameters = bottom_drag_coefficient,
+    )
+
+    # 42 is length of y ax
+    sin_flux(y, z, t) = @inbounds ifelse(z == grid.Nz, 0.05 * sin((2 * 3.14 / 42) * y) , 0)
+    u_bc = BoundaryCondition(Open, sin_flux)
+
+    bc = (
+        u = FieldBoundaryConditions(top = FluxBoundaryCondition(τx), bottom = u_bot_bc, east = u_bc),
+        v = FieldBoundaryConditions(top = FluxBoundaryCondition(τy), bottom = v_bot_bc),
+        T = FieldBoundaryConditions(top = FluxBoundaryCondition(Jᵀ)),
+        S = FieldBoundaryConditions(top = FluxBoundaryCondition(Jˢ)),
+    )
+    return bc
 end

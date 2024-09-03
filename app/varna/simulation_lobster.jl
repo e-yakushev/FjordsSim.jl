@@ -23,7 +23,7 @@ include("../../src/FjordsSim.jl")
 include("setup.jl")
 
 using .FjordsSim:
-    rivers_forcing,
+    rivers_forcing_with_NO₃,
     biogeochemical_simulation
 
 ## Grid
@@ -44,7 +44,7 @@ underlying_grid = LatitudeLongitudeGrid(
 grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(depth); active_cells_map = true)
 
 ## River forcing
-forcing = rivers_forcing(setup_grid.Nz)
+forcing = rivers_forcing_with_NO₃(setup_grid.Nz)
 
 ## Simulation
 Δt = 1seconds
@@ -58,7 +58,8 @@ Ũ = 1e-3
 uᵢ(x, y, z) = Ũ * Ξ(z)
 vᵢ(x, y, z) = Ũ * Ξ(z)
 
-set!(model, u=uᵢ, v=vᵢ, P = 0.03, Z = 0.03, NO₃ = 4.0, NH₄ = 0.05, DIC = 2200.0, Alk = 2409.0, S = 15, T = 10)
+# set!(model, u=uᵢ, v=vᵢ, P = 0.03, Z = 0.03, NO₃ = 4.0, NH₄ = 0.05, DIC = 2200.0, Alk = 2409.0, S = 15, T = 10)
+set!(model, u=uᵢ, v=vᵢ, P = 0.03, Z = 0.03, NO₃ = 4.0, NH₄ = 0.05, S = 15, T = 10)
 
 ## Atmosphere
 backend = InMemory()
