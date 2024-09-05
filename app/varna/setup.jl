@@ -76,10 +76,10 @@ args_oxydep = (
     Uz = 0.6,       # (nd)
     Hz = 0.5,       # (nd)
     r_het_nut = 0.15 / day,      # 1/d 0.05
-    r_het_pom = 0.10 / day,      # 1/d 0.02
+    r_het_pom = 0.15 / day,      # 1/d 0.02
     r_pom_nut_oxy = 0.006 / day, # 1/d
-    r_pom_dom = 0.01 / day,      # 1/d
-    r_dom_nut_oxy = 0.050 / day,  # 1/d
+    r_pom_dom = 0.05 / day,      # 1/d
+    r_dom_nut_oxy = 0.10 / day,  # 1/d
     O2_suboxic = 30.0,    # mmol/m3
     r_pom_nut_nut = 0.010 / day, # 1/d
     r_dom_nut_nut = 0.003 / day, # 1/d
@@ -87,5 +87,5 @@ args_oxydep = (
     CtoN = 6.625, # (nd)
     NtoN = 5.3,   # (nd)
     NtoB = 0.016, # (nd)
-    sinking_speeds = (PHY = 0.15 / day, HET = 2. / day, POM = 10.0 / day),
+    sinking_speeds = (PHY = 0.15 / day, HET = 4. / day, POM = 10.0 / day),
 )
