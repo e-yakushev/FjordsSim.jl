@@ -35,7 +35,7 @@ include("setup.jl")
 using .FjordsSim: OXYDEP, read_TSU_forcing
 
 const year = 365days
-stoptime = 1460days  # Set simulation stoptime here!
+stoptime = 730days  # Set simulation stoptime here!
 
 ## Surface PAR and turbulent vertical diffusivity based on idealised mixed layer depth 
 @inline PAR⁰(x, y, t) =
@@ -58,14 +58,17 @@ biogeochemistry = OXYDEP(;
     args_oxydep...,
     surface_photosynthetically_active_radiation = PAR⁰,
     TS_forced = true,
+    Chemicals = false,
     scale_negatives = true,
 )
+
+# Chemicals = false,
 
 ## Hydrophysics forcing
 filename = "../../data_Varna/Varna_brom.nc"
 
 Tnc, Snc, Unc, Kznc, depth, times = read_TSU_forcing(filename)
-Kznc = 10.0 * Kznc
+Kznc = 8.0 * Kznc #10
 Kznc[:, 1] = Kznc[:, 1] ./ 10.0  # we decrease Kz above the bottom
 
 # restore z-faces from nc file, as it provides us only centers of layers. dz=5
@@ -94,14 +97,15 @@ S = FunctionField{Center,Center,Center}(S_function, grid; clock)
 
 κ = 5.0 * FunctionField{Center,Center,Center}(Kz_function, grid; clock)
 
-## Boundary conditions
+#- - - - - - - - - - - - - - - - - - - - - - 
+## Boundary conditions for OxyDep
 O2_suboxic = 30.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
 Trel = 10000.0     # Relaxation time for exchange with the sediments (s/m)
 b_ox = 15.0        # difference of OXY in the sediment and water, 
 b_NUT = 10.0       # NUT in the sediment, (mmol/m3)  18
 b_DOM_ox = 6.0     # OM in the sediment (oxic conditions), (mmol/m3) 
 b_DOM_anox = 20.0  # OM in the sediment (anoxic conditions), (mmol/m3)  
-bu = 0.2 #0.4      # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
+bu = 0.85 #0.2 0.8=hyp     # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
 
 windspeed = 5.0    # m/s windspeed for gases exchange
 
@@ -109,34 +113,16 @@ windspeed = 5.0    # m/s windspeed for gases exchange
 @inline F_subox(conc, threshold) = (0.5 - 0.5 * tanh(conc - threshold))
 
 ## oxy
-include("oxygen_saturation.jl")
+include("sea_water_flux.jl")
 
-i = 1
-j = 1
-Sc = (                                              
-    1920.4 - 135.6 * T[1, 1, Nz] + 5.2122 * (T[i, j, Nz])^2 -
-    0.10939 * (T[i, j, Nz])^3 + 0.00093777 * (T[i, j, Nz])^4    # Sc, Schmidt number for O2 Wanninkhof 2014
-)
-ko2o = 0.251 * windspeed^2 * (Sc / 660.0)^(-0.5) # ko2o=0.251*windspeed^2*(Sc/660)^(-0.5)  Wanninkhof 2014
-o2sat = oxygen_saturation(T[i, j, Nz], S[i, j, Nz], 0.0)
-println(" Sc=",Sc," ko2o=",ko2o," o2sat=",o2sat)
-
-Oxy_top_cond(i, j, grid, clock, fields) = @inbounds ((
-              0.251 *                   # ko2o=0.251*windspeed^2*(Sc/660)^(-0.5)  Wanninkhof 2014
-              windspeed^2 *
-              (
-                  (                     # Sc, Schmidt number for O2 Wanninkhof 2014
-                      1920.4 - 135.6 * fields.T[i, j, Nz] + 5.2122 * (fields.T[i, j, Nz])^2 -
-                      0.10939 * (fields.T[i, j, Nz])^3 + 0.00093777 * (fields.T[i, j, Nz])^4   
-                  ) / 660.0
-              )^(-0.5)
-          ) *
-          (fields.O₂[i, j, Nz] - oxygen_saturation(fields.T[i, j, Nz], fields.S[i, j, Nz], 0.0))
-          ) * 0.24 / 86400.0            # 0.24 is to convert from [cm/h] to [m/day]  * 0.24  / 86400.0 
+Oxy_top_cond(i, j, grid, clock, fields) = @inbounds (OxygenSeaWaterFlux(
+    fields.T[i, j, Nz],
+    fields.S[i, j, Nz],
+    0.0,                # sea surface pressure
+    fields.O₂[i, j, Nz],
+    windspeed,
+))
 OXY_top = FluxBoundaryCondition(Oxy_top_cond; discrete_form = true)
-
-#OXY_top = OxygenGasExchangeBoundaryCondition(;
-#    air_concentration = oxygen_saturation(T[1, 1, Nz], S[1, 1, Nz], 0.0),)
 
 OXY_bottom_cond(i, j, grid, clock, fields) = @inbounds (
     -(
@@ -180,7 +166,7 @@ DOM_bottom_cond(i, j, grid, clock, fields) = @inbounds (
     ) / Trel
 )
 DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
-
+#- - - - - - - - - - - - - - - - - - - - - - 
 
 ## Model instantiation
 model = NonhydrostaticModel(;
@@ -234,6 +220,7 @@ simulation.output_writers[:profiles] = JLD2OutputWriter(
 ## Run!
 run!(simulation)
 
-
+## Make plots.
 include("images.jl")
 
+println(" OCTAHOBKA: BCE HAPucOBAHO !")
