@@ -63,3 +63,23 @@ function download_progress(total, now; filename = "")
 
     return nothing
 end
+
+wall_time = [time_ns()]
+function progress(sim)
+     ocean = sim.model.ocean
+     u, v, w = ocean.model.velocities
+     T = ocean.model.tracers.T
+
+     Tmax = maximum(interior(T))
+     Tmin = minimum(interior(T))
+     umax = maximum(abs, interior(u)), maximum(abs, interior(v)), maximum(abs, interior(w))
+     step_time = 1e-9 * (time_ns() - wall_time[1])
+
+     @info @sprintf("Time: %s, Iteration %d, Δt %s, max(vel): (%.2e, %.2e, %.2e), max(T): %.2f, min(T): %.2f, wtime: %s \n",
+          prettytime(ocean.model.clock.time),
+          ocean.model.clock.iteration,
+          prettytime(ocean.Δt),
+          umax..., Tmax, Tmin, prettytime(step_time))
+
+     wall_time[1] = time_ns()
+end

@@ -212,7 +212,8 @@ function ocean_boundary_conditions(grid, bottom_drag_coefficient)
     return ocean_boundary_conditions
 end
 
-function varna_bc(grid, bottom_drag_coefficient)
+function bc_varna(grid, bottom_drag_coefficient)
+    grid = grid[]
     top_zonal_momentum_flux = τx = Field{Face,Center,Nothing}(grid)
     top_meridional_momentum_flux = τy = Field{Center,Face,Nothing}(grid)
     top_ocean_heat_flux = Jᵀ = Field{Center,Center,Nothing}(grid)
