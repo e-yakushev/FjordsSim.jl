@@ -1,60 +1,17 @@
 using Oceananigans.Architectures
 using Oceananigans.Units
+using Oceananigans.BuoyancyModels: g_Earth
+using Oceananigans.Coriolis: Ω_Earth
+using Oceananigans.OutputReaders: InMemory
+using ClimaOcean
+using ClimaOcean.OceanSimulations:
+    default_ocean_closure, default_momentum_advection, default_tracer_advection
+using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
+using OceanBioME
 
-args_grid = (
-    arch = GPU(),
-    # dx = 200,
-    # dy = 50,
-    z_levels = -reverse([
-        0.0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15,
-        16,
-        17,
-        18,
-        19,
-        20,
-    ]),
-    z_middle = -reverse([
-        0.5,
-        1.5,
-        2.5,
-        3.5,
-        4.5,
-        5.5,
-        6.5,
-        7.5,
-        8.5,
-        9.5,
-        10.5,
-        11.5,
-        12.5,
-        13.5,
-        14.5,
-        15.5,
-        16.5,
-        17.5,
-        18.5,
-        19.5,
-    ]),
-    minimum_depth = 2,
-    halo = (7, 7, 7),
-    datadir = joinpath(homedir(), "BadgerArtifacts"),
-    filename = "Varna_topo_channels.jld2",
-)
+include("../../src/FjordsSim.jl")
+
+using .FjordsSim: grid_from_bathymetry_file!, forcing_varna, bc_varna, OXYDEP, PAR⁰
 
 args_oxydep = (
     initial_photosynthetic_slope = 0.1953 / day, # 1/(W/m²)/s
@@ -62,22 +19,22 @@ args_oxydep = (
     alphaI = 1.8,   # [d-1/(W/m2)]
     betaI = 5.2e-4, # [d-1/(W/m2)]
     gammaD = 0.71,  # (-)
-    Max_uptake = 2.5 / day,  # 1/d 2.0 4 5
-    Knut = 2.0,            # (nd)
+    Max_uptake = 1.7 / day,  # 1/d 2.0 4 5
+    Knut = 1.5,            # (nd) 2.0
     r_phy_nut = 0.10 / day, # 1/d
     r_phy_pom = 0.15 / day, # 1/d
     r_phy_dom = 0.17 / day, # 1/d
-    r_phy_het = 2.0 / day,  # 1/d 0.4
+    r_phy_het = 0.5 / day,  # 1/d 0.4 2.0
     Kphy = 0.1,             # (nd) 0.7
     r_pom_het = 0.7 / day,  # 1/d 0.7
     Kpom = 2.0,     # (nd)
     Uz = 0.6,       # (nd)
     Hz = 0.5,       # (nd)
     r_het_nut = 0.15 / day,      # 1/d 0.05
-    r_het_pom = 0.10 / day,      # 1/d 0.02
+    r_het_pom = 0.15 / day,      # 1/d 0.02
     r_pom_nut_oxy = 0.006 / day, # 1/d
-    r_pom_dom = 0.01 / day,      # 1/d
-    r_dom_nut_oxy = 0.050 / day,  # 1/d
+    r_pom_dom = 0.05 / day,      # 1/d
+    r_dom_nut_oxy = 0.10 / day,  # 1/d
     O2_suboxic = 30.0,    # mmol/m3
     r_pom_nut_nut = 0.010 / day, # 1/d
     r_dom_nut_nut = 0.003 / day, # 1/d
@@ -85,5 +42,124 @@ args_oxydep = (
     CtoN = 6.625, # (nd)
     NtoN = 5.3,   # (nd)
     NtoB = 0.016, # (nd)
-    sinking_speeds = (PHY = 0.15 / day, HET = 0.4 / day, POM = 10.0 / day),
+    sinking_speeds = (PHY = 0.15 / day, HET = 4.0 / day, POM = 10.0 / day),
 )
+
+free_surface_default(grid) = SplitExplicitFreeSurface(grid[]; cfl = 0.7)
+atmosphere_JRA55(arch, backend, grid) = JRA55_prescribed_atmosphere(arch; backend, grid = grid[])
+biogeochemistry_LOBSTER(grid) = LOBSTER(; grid = grid[], carbonates = false, open_bottom = false)
+biogeochemistry_OXYDEP(grid) = OXYDEP(;
+    grid = grid[],
+    args_oxydep...,
+    surface_photosynthetically_active_radiation = PAR⁰,
+    TS_forced = true,
+    Chemicals = false,
+    scale_negatives = true,
+)
+
+# Grid
+Nz = 10
+grid_callable! = grid_from_bathymetry_file!
+grid_parameters = (
+    arch = GPU(),
+    Nz = Nz,
+    halo = (7, 7, 7),
+    datadir = joinpath(homedir(), "BadgerArtifacts"),
+    filename = "Varna_topo_channels.jld2",
+    latitude = (43.177, 43.214),
+    longitude = (27.640, 27.947),
+)
+grid = Ref{Any}(nothing)
+
+mutable struct SetupVarna
+    grid_callable!::Function
+    grid_parameters::NamedTuple
+    grid::Ref
+    buoyancy::Any
+    closure::Any
+    tracer_advection::Any
+    momentum_advection::Any
+    tracers::Tuple
+    free_surface_callable::Function
+    free_surface_args::Tuple
+    coriolis::Any
+    forcing_callable::Union{Nothing,Function}
+    forcing_args::Union{Tuple,NamedTuple}
+    bc_callable::Function
+    bc_args::Tuple
+    atmosphere_callable::Function
+    atmosphere_args::NamedTuple
+    radiation::Any
+    biogeochemistry_callable::Union{Nothing,Function}
+    biogeochemistry_args::Union{Tuple,NamedTuple}
+
+    function SetupVarna(;
+        bottom_drag_coefficient = 0.003,
+        reference_density = 1020,
+        # Buoyancy
+        buoyancy = SeawaterBuoyancy(;
+            gravitational_acceleration = g_Earth,
+            equation_of_state = TEOS10EquationOfState(; reference_density),
+        ),
+        # Closure
+        closure = default_ocean_closure(),
+        # Tracer advection
+        tracer_advection = (
+            T = default_tracer_advection(),
+            S = default_tracer_advection(),
+            e = nothing,
+        ),
+        # Momentum advection
+        momentum_advection = default_momentum_advection(),
+        # Tracers
+        tracers = (:T, :S, :e),
+        # Free surface
+        free_surface_callable = free_surface_default,
+        free_surface_args = (grid,),
+        # Coriolis
+        coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
+        # Forcing
+        forcing_callable = forcing_varna,
+        forcing_args = (bottom_drag_coefficient, Nz),
+        # Boundary conditions
+        bc_callable = bc_varna,
+        bc_args = (grid, bottom_drag_coefficient),
+        ## Atmosphere
+        atmosphere_callable = atmosphere_JRA55,
+        atmosphere_args = (arch = grid_parameters.arch, backend = InMemory(), grid = grid),
+        radiation = Radiation(grid_parameters.arch),
+        ## Biogeochemistry
+        biogeochemistry_callable = nothing,
+        biogeochemistry_args = (nothing,),
+    )
+
+        return new(
+            grid_callable!,
+            grid_parameters,
+            grid,
+            buoyancy,
+            closure,
+            tracer_advection,
+            momentum_advection,
+            tracers,
+            free_surface_callable,
+            free_surface_args,
+            coriolis,
+            forcing_callable,
+            forcing_args,
+            bc_callable,
+            bc_args,
+            atmosphere_callable,
+            atmosphere_args,
+            radiation,
+            biogeochemistry_callable,
+            biogeochemistry_args,
+        )
+    end
+end
+
+setup_varna_3d() = SetupVarna()
+setup_varna_3d_Lobster() =
+    SetupVarna(biogeochemistry_callable = biogeochemistry_LOBSTER, biogeochemistry_args = (grid,))
+setup_varna_3d_OXYDEP() =
+    SetupVarna(biogeochemistry_callable = biogeochemistry_OXYDEP, biogeochemistry_args = (grid,))

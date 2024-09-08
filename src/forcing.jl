@@ -1,36 +1,54 @@
 using Oceananigans: Forcing
 
-function rivers_forcing(Nz)
-    ## River forcing
-    λ = 1 / (1minute)  # Relaxation timescale [s⁻¹].
+function forcing_bottom_drag(bottom_drag_coefficient)
+        Fu = Forcing(
+            u_immersed_bottom_drag,
+            discrete_form = true,
+            parameters = bottom_drag_coefficient,
+        )
+        Fv = Forcing(
+            v_immersed_bottom_drag,
+            discrete_form = true,
+            parameters = bottom_drag_coefficient,
+        )
+        return (u = Fu, v = Fv, )
+end
 
-    # Temperature and salinity of the meltwater outflow.
-    T_source = 15
-    S_source = 0
+function forcing_rivers_S(Nz)
+    λ = 1 / (30minutes)  # Relaxation timescale [s⁻¹].
 
-    # Index of the point source at the middle of the southern wall.
+    S_source = 0.1
+
     source_index = (1, 13, Nz)
-
-    # Point source
-
-    # @inline T_point_source(i, j, k, grid, time, U, C, p) =
-    #     @inbounds ifelse((i, j, k) == p.source_index, -p.λ * (C.T[i, j, k] - p.T_source), 0)
-
-    # @inline S_point_source(i, j, k, grid, time, U, C, p) =
-    #     @inbounds ifelse((i, j, k) == p.source_index, -p.λ * (C.S[i, j, k] - p.S_source), 0)
-
-    T_point_source(i, j, k, grid, clock, model_fields) =
-        @inbounds ifelse((i, j, k) == (1, 13, Nz), -λ * (model_fields.T[i, j, k] - T_source), 0)
 
     S_point_source(i, j, k, grid, clock, model_fields) =
         @inbounds ifelse((i, j, k) == (1, 13, Nz), -λ * (model_fields.S[i, j, k] - S_source), 0)
-
-    # params = (source_index=source_index, T_source=T_source, S_source=S_source, λ=λ)
-    params = (T_source = T_source, S_source = S_source, λ = λ)
-
-    # Tforcing = Forcing(T_point_source, parameters=params)
-    Tforcing = Forcing(T_point_source, field_dependencies = :T, discrete_form = true)
     Sforcing = Forcing(S_point_source, field_dependencies = :S, discrete_form = true)
 
-    return (T = Tforcing, S = Sforcing)
+    return (S = Sforcing, )
+end
+
+function forcing_rivers_NO₃(Nz)
+    λ = 1 / (30minutes)  # Relaxation timescale [s⁻¹].
+
+    S_source = 0.1
+    NO₃_source = 10
+
+    source_index = (1, 13, Nz)
+
+    S_point_source(i, j, k, grid, clock, model_fields) =
+        @inbounds ifelse((i, j, k) == (1, 13, Nz), -λ * (model_fields.S[i, j, k] - S_source), 0)
+    Sforcing = Forcing(S_point_source, field_dependencies = :S, discrete_form = true)
+
+    NO₃_point_source(i, j, k, grid, clock, model_fields) =
+        @inbounds ifelse((i, j, k) == (1, 13, Nz), -λ * (model_fields.NO₃[i, j, k] - NO₃_source), 0)
+    NO₃forcing = Forcing(NO₃_point_source, field_dependencies = :NO₃, discrete_form = true)
+
+    return (S = Sforcing, NO₃ = NO₃forcing, )
+end
+
+function forcing_varna(bottom_drag_coefficient, Nz)
+    forcing_bottom = forcing_bottom_drag(bottom_drag_coefficient)
+    forcing_rivers = forcing_rivers_S(Nz)
+    return merge(forcing_bottom, forcing_rivers) 
 end

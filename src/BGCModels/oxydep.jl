@@ -40,7 +40,8 @@ using OceanBioME.Light:
     update_TwoBandPhotosyntheticallyActiveRadiation!,
     default_surface_PAR,
     TwoBandPhotosyntheticallyActiveRadiation
-using OceanBioME.Boundaries.Sediments: sinking_flux
+using OceanBioME.Sediments: sinking_flux
+# using OceanBioME.Boundaries.Sediments: sinking_flux
 
 import Adapt: adapt_structure, adapt
 import Base: show, summary
@@ -51,8 +52,11 @@ import Oceananigans.Biogeochemistry:
     update_biogeochemical_state!
 import OceanBioME: redfield, conserved_tracers
 import OceanBioME: maximum_sinking_velocity
-import OceanBioME.Boundaries.Sediments:
-    nitrogen_flux, carbon_flux, remineralisation_receiver, sinking_tracers
+import OceanBioME.Sediments: #import OceanBioME.Boundaries.Sediments:
+    nitrogen_flux,
+    carbon_flux,
+    remineralisation_receiver,
+    sinking_tracers
 
 struct OXYDEP{FT,B,W} <: AbstractContinuousFormBiogeochemistry
     # PHY
@@ -128,7 +132,10 @@ function OXYDEP(;
         surface_PAR = surface_photosynthetically_active_radiation,
     ),
     sediment_model::S = nothing,
+    
     TS_forced::Bool = false,
+    Chemicals::Bool = false,
+
     sinking_speeds = (PHY = 0.15 / day, HET = 0.4 / day, POM = 10.0 / day),
     open_bottom::Bool = true,
     scale_negatives = false,
@@ -137,7 +144,7 @@ function OXYDEP(;
 ) where {FT,LA,S,P,M}
 
     sinking_velocities = setup_velocity_fields(sinking_speeds, grid, open_bottom)
-    optionals = Val(TS_forced)
+    optionals = Val((TS_forced, Chemicals))
 
     underlying_biogeochemistry = OXYDEP(
         initial_photosynthetic_slope,
@@ -168,7 +175,9 @@ function OXYDEP(;
         CtoN,
         NtoN,
         NtoB,
+
         optionals,
+        
         sinking_velocities,
     )
 
@@ -186,203 +195,19 @@ function OXYDEP(;
     )
 end
 
-required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{false},<:Any}) =
+required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(false, false)},<:Any}) =
     (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T)
-required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{true},<:Any}) =
+required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(true, false)},<:Any}) =
     (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
-required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{false},<:Any}) = (:PAR,)
-required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{true},<:Any}) = (:T, :PAR)
+required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(false, true)},<:Any}) =
+    (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T, :Ci_free, :Ci_PHY, :Ci_HET, :Ci_POM, :Ci_DOM)
+required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(true, true)},<:Any}) =
+    (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :Ci_free, :Ci_PHY, :Ci_HET, :Ci_POM, :Ci_DOM)
 
-# Limiting equations and switches
-@inline yy(value, consta) = consta^2 / (value^2 + consta^2)   #This is a squared Michaelis-Menten type of limiter
-@inline F_ox(conc, threshold) = (0.5 + 0.5 * tanh(conc - threshold))
-@inline F_subox(conc, threshold) = (0.5 - 0.5 * tanh(conc - threshold))
-
-# PHY
-@inline LimLight(PAR, Iopt) = PAR / Iopt * exp(1.0 - PAR / Iopt)  #!Dependence of PHY growth on Light (Steel)
-@inline LimN(Knut, NUT, PHY) = yy(Knut, NUT / max(0.0001, PHY)) #!Dependence of PHY growth on NUT
-@inline Q₁₀(T) = 1.88^(T / 10) # T in °C  # inital for NPZD
-#@inline LimT(T) = max(0., 2^((T-10.0)/10.) - 2^((T-32.)/3.)) # ERSEM
-# = q10^((T-t_upt_min)/10)-q10^((T-t_upt_max)/3):  q10=2. !Coefficient for uptake rate dependence on t
-# t_upt_min=10. !Low  t limit for uptake rate dependence on t; t_upt_max=32 !High t limit for uptake rate dependence on t
-@inline LimT(T) = exp(0.0663 * (T - 0.0)) #for Arctic (Moore et al.,2002; Jin et al.,2008) 
-# = exp(temp_aug_rate*(T-t_0)):  t_0= 0. !reference temperature temp_aug_rate = 0.0663 !temperature augmentation rate
-#@inline light_limitation(PAR, α, Max_uptake) = α * PAR / sqrt(Max_uptake ^ 2 + α ^ 2 * PAR ^ 2)
-
-#@inline GrowthPhy(Max_uptake,PAR,α,T,Knut,NUT,PHY,Iopt) = Max_uptake*LimT(T)*LimN(Knut,NUT,PHY)*light_limitation(PAR,α,Max_uptake)*PHY*Iopt/Iopt
-@inline GrowthPhy(Max_uptake, PAR, α, T, Knut, NUT, PHY, Iopt) =
-    Max_uptake * LimT(T) * LimN(Knut, NUT, PHY) * LimLight(PAR, Iopt) * α / α
-@inline RespPhy(r_phy_nut, PHY) = r_phy_nut * PHY
-@inline MortPhy(r_phy_pom, PHY) = r_phy_pom * PHY
-@inline ExcrPhy(r_phy_dom, PHY) = r_phy_dom * PHY
-
-# HET
-@inline GrazPhy(r_phy_het, Kphy, PHY, HET) =
-    r_phy_het * yy(Kphy, max(0.0, PHY - 0.01) / max(0.0001, HET)) * HET
-@inline GrazPOM(r_pom_het, Kpom, POM, HET) =
-    r_pom_het * yy(Kpom, max(0.0, POM - 0.01) / max(0.0001, HET)) * HET
-@inline RespHet(r_het_nut, HET) = r_het_nut * HET
-@inline MortHet(r_het_pom, HET, O₂, O2_suboxic) =
-    (r_het_pom + F_subox(O₂, O2_suboxic) * 0.01 * r_het_pom) * HET
-
-# POM
-@inline POM_decay_ox(r_pom_nut_oxy, POM) = r_pom_nut_oxy * POM
-@inline POM_decay_denitr(r_pom_nut_nut, POM, O₂, O2_suboxic, NUT) =
-    r_pom_nut_nut * POM * F_subox(O₂, O2_suboxic) * F_ox(NUT, 0.01)
-#! depends on NUT (NO3+NO2) and DOM (NH4+Urea+"real"DON) ! depends on T ! stops at NUT<0.01 
-@inline Autolys(r_pom_dom, POM) = r_pom_dom * POM
-
-# DOM
-@inline DOM_decay_ox(r_dom_nut_oxy, DOM) = r_dom_nut_oxy * DOM
-@inline DOM_decay_denitr(r_dom_nut_nut, DOM, O₂, O2_suboxic, NUT) =
-    r_dom_nut_nut * DOM * F_subox(O₂, O2_suboxic) * F_ox(NUT, 0.01)
-#! depends on NUT (NO3+NO2) and DOM (NH4+Urea+"real"DON) ! depends on T ! stops at NUT<0.01 
-
-# O₂
-
-# = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = 
-
-@inline function (bgc::OXYDEP)(::Val{:NUT}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
-    Max_uptake = bgc.Max_uptake
-    Knut = bgc.Knut
-    α = bgc.initial_photosynthetic_slope
-    r_phy_nut = bgc.r_phy_nut
-    r_het_nut = bgc.r_het_nut
-    r_pom_nut_oxy = bgc.r_pom_nut_oxy
-    r_dom_nut_oxy = bgc.r_dom_nut_oxy
-    NtoN = bgc.NtoN
-    r_pom_nut_nut = bgc.r_pom_nut_nut
-    O2_suboxic = bgc.O2_suboxic
-    r_dom_nut_nut = bgc.r_dom_nut_nut
-    Iopt = bgc.Iopt
-
-    #println(GrowthPhy(Max_uptake,PAR,α,T,Knut,NUT,PHY,Iopt))
-    #wait_for_key("press any key to continue")
-
-    return (
-        RespPhy(r_phy_nut, PHY) +
-        RespHet(r_het_nut, HET) +
-        DOM_decay_ox(r_dom_nut_oxy, DOM) +
-        POM_decay_ox(r_pom_nut_oxy, POM) - GrowthPhy(Max_uptake, PAR, α, T, Knut, NUT, PHY, Iopt) -
-        NtoN * (
-            POM_decay_denitr(r_pom_nut_nut, POM, O₂, O2_suboxic, NUT) +
-            DOM_decay_denitr(r_dom_nut_nut, DOM, O₂, O2_suboxic, NUT)
-        )
-    )
-    # Denitrification of POM and DOM leads to decrease of NUT (i.e. NOx)
-end
-
-@inline function (bgc::OXYDEP)(::Val{:PHY}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
-    Max_uptake = bgc.Max_uptake
-    Knut = bgc.Knut
-    α = bgc.initial_photosynthetic_slope
-    r_phy_het = bgc.r_phy_het
-    Kphy = bgc.Kphy
-    r_phy_nut = bgc.r_phy_nut
-    r_phy_pom = bgc.r_phy_pom
-    r_phy_dom = bgc.r_phy_dom
-    Iopt = bgc.Iopt
-
-    return (
-        GrowthPhy(Max_uptake, PAR, α, T, Knut, NUT, PHY, Iopt) -
-        GrazPhy(r_phy_het, Kphy, PHY, HET) - RespPhy(r_phy_nut, PHY) - MortPhy(r_phy_pom, PHY) -
-        ExcrPhy(r_phy_dom, PHY)
-    )
-end
-
-@inline function (bgc::OXYDEP)(::Val{:HET}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
-    r_phy_het = bgc.r_phy_het
-    Kphy = bgc.Kphy
-    r_pom_het = bgc.r_pom_het
-    Kpom = bgc.Kpom
-    r_het_nut = bgc.r_het_nut
-    r_het_pom = bgc.r_het_pom
-    Uz = bgc.Uz
-    O2_suboxic = bgc.O2_suboxic
-
-    return (
-        Uz * (GrazPhy(r_phy_het, Kphy, PHY, HET) + GrazPOM(r_pom_het, Kpom, POM, HET)) -
-        MortHet(r_het_pom, HET, O₂, O2_suboxic) - RespHet(r_het_nut, HET)
-    )
-end
-
-@inline function (bgc::OXYDEP)(::Val{:POM}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
-    r_phy_het = bgc.r_phy_het
-    Kphy = bgc.Kphy
-    r_pom_het = bgc.r_pom_het
-    Kpom = bgc.Kpom
-    Uz = bgc.Uz
-    Hz = bgc.Hz
-    r_phy_pom = bgc.r_phy_pom
-    r_het_pom = bgc.r_het_pom
-    r_pom_nut_oxy = bgc.r_pom_nut_oxy
-    r_pom_dom = bgc.r_pom_dom
-    r_pom_nut_nut = bgc.r_pom_nut_nut
-    O2_suboxic = bgc.O2_suboxic
-
-    return (
-        (1.0 - Uz) *
-        (1.0 - Hz) *
-        (GrazPhy(r_phy_het, Kphy, PHY, HET) + GrazPOM(r_pom_het, Kpom, POM, HET)) +
-        MortPhy(r_phy_pom, PHY) +
-        MortHet(r_het_pom, HET, O₂, O2_suboxic) - POM_decay_ox(r_pom_nut_oxy, POM) -
-        Autolys(r_pom_dom, POM) - GrazPOM(r_pom_het, Kpom, POM, HET) -
-        POM_decay_denitr(r_pom_nut_nut, POM, O₂, O2_suboxic, NUT)
-    )
-end
-
-@inline function (bgc::OXYDEP)(::Val{:DOM}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
-    r_phy_het = bgc.r_phy_het
-    Kphy = bgc.Kphy
-    r_pom_het = bgc.r_pom_het
-    Kpom = bgc.Kpom
-    Uz = bgc.Uz
-    Hz = bgc.Hz
-    r_phy_dom = bgc.r_phy_dom
-    r_dom_nut_oxy = bgc.r_dom_nut_oxy
-    r_pom_dom = bgc.r_pom_dom
-    r_pom_nut_nut = bgc.r_pom_nut_nut
-    O2_suboxic = bgc.O2_suboxic
-
-    return (
-        (1.0 - Uz) *
-        Hz *
-        (GrazPhy(r_phy_het, Kphy, PHY, HET) + GrazPOM(r_pom_het, Kpom, POM, HET)) +
-        ExcrPhy(r_phy_dom, PHY) - DOM_decay_ox(r_dom_nut_oxy, DOM) +
-        Autolys(r_pom_dom, POM) +
-        POM_decay_denitr(r_pom_nut_nut, POM, O₂, O2_suboxic, NUT)
-    )
-    # Denitrification of "real DOM" into NH4 (DOM_decay_denitr) will not change state variable DOM
-end
-
-@inline function (bgc::OXYDEP)(::Val{:O₂}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
-    Max_uptake = bgc.Max_uptake
-    Knut = bgc.Knut
-    α = bgc.initial_photosynthetic_slope
-    r_phy_nut = bgc.r_phy_nut
-    r_het_nut = bgc.r_het_nut
-    r_pom_nut_oxy = bgc.r_pom_nut_oxy
-    r_dom_nut_oxy = bgc.r_dom_nut_oxy
-    OtoN = bgc.OtoN
-    O2_suboxic = bgc.O2_suboxic
-    Iopt = bgc.Iopt
-
-    return (
-        -OtoN * (
-            RespPhy(r_phy_nut, PHY) +
-            RespHet(r_het_nut, HET) +
-            DOM_decay_ox(r_dom_nut_oxy, DOM) +
-            POM_decay_ox(r_pom_nut_oxy, POM) -
-            GrowthPhy(Max_uptake, PAR, α, T, Knut, NUT, PHY, Iopt) # due to OM production and decay in normoxia
-            +
-            DOM_decay_ox(r_dom_nut_oxy, DOM) * (F_subox(O₂, O2_suboxic))
-        )
-    )
-    # (POM_decay_denitr + DOM_decay_denitr) & !denitrification doesn't change oxygen
-    # (DOM_decay_ox(r_dom_nut_oxy,DOM)*(F_subox) !additional consumption of O₂ due to oxidation of reduced froms of S,Mn,Fe etc.
-    # in suboxic conditions (F_subox) equals consumption for NH4 oxidation (Yakushev et al, 2008)
-
-end
+required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(false, false)},<:Any}) = (:PAR,)
+required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, false)},<:Any}) = (:PAR, :T)
+required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(false, true)},<:Any}) = (:PAR,)
+required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, true)},<:Any}) = (:PAR, :T)
 
 @inline function biogeochemical_drift_velocity(bgc::OXYDEP, ::Val{tracer_name}) where {tracer_name}
     if tracer_name in keys(bgc.sinking_velocities)
@@ -391,17 +216,6 @@ end
         return (u = ZeroField(), v = ZeroField(), w = ZeroField())
     end
 end
-
-summary(::OXYDEP{FT,NamedTuple{K,V}}) where {FT,K,V} = string("OXYDEP{$FT} model, with $K sinking")
-show(io::IO, model::OXYDEP{FT}) where {FT} = print(
-    io,
-    string(
-        "OXYDEP{$FT} model \n",
-        "└── Sinking Velocities:",
-        "\n",
-        show_sinking_velocities(model.sinking_velocities),
-    ),
-)
 
 @inline maximum_sinking_velocity(bgc::OXYDEP) = maximum(abs, bgc.sinking_velocities.POM.w)
 
@@ -437,19 +251,22 @@ adapt_structure(to, oxydep::OXYDEP) = OXYDEP(
     adapt(to, oxydep.optionals),
     adapt(to, oxydep.sinking_velocities),
 )
+summary(::OXYDEP{FT, Val{B}, NamedTuple{K,V}}) where {FT, B, K, V} = string("OXYDEP{$FT} with TS $(B[1] ? :✅ : :❌), Chemicals $(B[2] ? :✅ : :❌) and $K sinking")
 
-@inline redfield(i, j, k, val_tracer_name, bgc::OXYDEP, tracers) = redfield(val_tracer_name, bgc)
-@inline redfield(::Union{Val{:NUT}}, bgc::OXYDEP) = 0
-@inline redfield(::Union{Val{:PHY},Val{:HET},Val{:POM},Val{:DOM}}, bgc::OXYDEP) = 6.56
+show(io::IO, model::OXYDEP{FT, Val{B}, W}) where {FT, B, W} = print(
+    io,
+    string("Oxyge Depletion (OxyDep) model \n",
+    "├── Optional components:", "\n",
+    "│   ├── TS $(B[1] ? :✅ : :❌) \n",
+    "│   ├── Chemicals $(B[2] ? :✅ : :❌) \n",
+    "└── Sinking Velocities:", "\n", show_sinking_velocities(model.sinking_velocities)))
+
+include("core.jl")
 
 @inline nitrogen_flux(i, j, k, grid, advection, bgc::OXYDEP, tracers) =
     sinking_flux(i, j, k, grid, advection, Val(:POM), bgc, tracers) +
     sinking_flux(i, j, k, grid, advection, Val(:PHY), bgc, tracers)
 
-@inline carbon_flux(i, j, k, grid, advection, bgc::OXYDEP, tracers) =
-    nitrogen_flux(i, j, k, grid, advection, bgc, tracers) * redfield(Val(:PHY), bgc)
-
-@inline remineralisation_receiver(::OXYDEP) = :NUT
-
 @inline conserved_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
 @inline sinking_tracers(bgc::OXYDEP) = keys(bgc.sinking_velocities)
+
