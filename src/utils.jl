@@ -17,6 +17,7 @@ function read_TSU_forcing(filename::String)
     temperature = reverse(ds["temp"][:, :], dims = 2)
     salinity = reverse(ds["salt"][:, :], dims = 2)
     velocity = reverse(ds["u"][:, :], dims = 2)
+    Kz = reverse(ds["Kz"][:, :], dims = 2)
 
     depth = reverse(ds["depth"][:])
     time = ds["oc_time"][:]
@@ -24,7 +25,7 @@ function read_TSU_forcing(filename::String)
     # Close the dataset
     close(ds)
 
-    return temperature, salinity, velocity, depth, time
+    return temperature, salinity, velocity, Kz, depth, time
 end
 
 """
