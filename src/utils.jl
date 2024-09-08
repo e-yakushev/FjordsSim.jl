@@ -12,18 +12,18 @@ function read_TSU_forcing(filename::String)
 
     # Open the NetCDF file
     ds = Dataset(filename, "r")
-    
+
     # Read the variables
-    temperature = reverse(ds["temp"][:,:], dims=2)
-    salinity = reverse(ds["salt"][:, :], dims=2)
-    velocity = reverse(ds["u"][:, :], dims=2)
+    temperature = reverse(ds["temp"][:, :], dims = 2)
+    salinity = reverse(ds["salt"][:, :], dims = 2)
+    velocity = reverse(ds["u"][:, :], dims = 2)
 
     depth = reverse(ds["depth"][:])
     time = ds["oc_time"][:]
-    
+
     # Close the dataset
     close(ds)
-    
+
     return temperature, salinity, velocity, depth, time
 end
 
@@ -66,20 +66,37 @@ end
 
 wall_time = [time_ns()]
 function progress(sim)
-     ocean = sim.model.ocean
-     u, v, w = ocean.model.velocities
-     T = ocean.model.tracers.T
+    ocean = sim.model.ocean
+    u, v, w = ocean.model.velocities
+    T = ocean.model.tracers.T
 
-     Tmax = maximum(interior(T))
-     Tmin = minimum(interior(T))
-     umax = maximum(abs, interior(u)), maximum(abs, interior(v)), maximum(abs, interior(w))
-     step_time = 1e-9 * (time_ns() - wall_time[1])
+    Tmax = maximum(interior(T))
+    Tmin = minimum(interior(T))
+    umax = maximum(abs, interior(u)), maximum(abs, interior(v)), maximum(abs, interior(w))
+    step_time = 1e-9 * (time_ns() - wall_time[1])
 
-     @info @sprintf("Time: %s, Iteration %d, Δt %s, max(vel): (%.2e, %.2e, %.2e), max(T): %.2f, min(T): %.2f, wtime: %s \n",
-          prettytime(ocean.model.clock.time),
-          ocean.model.clock.iteration,
-          prettytime(ocean.Δt),
-          umax..., Tmax, Tmin, prettytime(step_time))
+    @info @sprintf(
+        "Time: %s, Iteration %d, Δt %s, max(vel): (%.2e, %.2e, %.2e), max(T): %.2f, min(T): %.2f, wtime: %s \n",
+        prettytime(ocean.model.clock.time),
+        ocean.model.clock.iteration,
+        prettytime(ocean.Δt),
+        umax...,
+        Tmax,
+        Tmin,
+        prettytime(step_time)
+    )
 
-     wall_time[1] = time_ns()
+    wall_time[1] = time_ns()
+end
+
+function safe_execute(callable)
+    return function (args...)
+        if callable === nothing || args === nothing
+            return nothing
+        elseif isa(callable, Function)
+            return callable(args...)
+        else
+            return nothing
+        end
+    end
 end
