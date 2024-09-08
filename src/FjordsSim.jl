@@ -27,10 +27,11 @@ include("turbulence_closures.jl")
 include("boundary_conditions.jl")
 include("forcing.jl")
 include("simulations.jl")
+include("radiation.jl")
 
-# include("BGCModels/BGCModels.jl")
+include("BGCModels/BGCModels.jl")
 
-# using .BGCModels: OXYDEP
+using .BGCModels: OXYDEP
 
 # there is no a steprangelen method in oceananigans
 # but adding it here is type piracy

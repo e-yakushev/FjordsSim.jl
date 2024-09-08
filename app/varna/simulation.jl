@@ -24,7 +24,8 @@ using .FjordsSim: progress, safe_execute
 
 ## Model Setup
 # sim_setup = setup_varna_3d()
-sim_setup = setup_varna_3d_Lobster()
+# sim_setup = setup_varna_3d_Lobster()
+sim_setup = setup_varna_3d_OXYDEP()
 
 grid = sim_setup.grid_callable!(sim_setup)
 buoyancy = sim_setup.buoyancy
