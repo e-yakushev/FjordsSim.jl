@@ -35,7 +35,7 @@ include("setup.jl")
 using .FjordsSim: OXYDEP, read_TSU_forcing
 
 const year = 365days
-stoptime = 730days  # Set simulation stoptime here!
+stoptime = 1095days  # Set simulation stoptime here!
 
 ## Surface PAR and turbulent vertical diffusivity based on idealised mixed layer depth 
 @inline PAR⁰(x, y, t) =
@@ -53,17 +53,17 @@ grid = RectilinearGrid(
 )
 
 ## Model
+add_contaminants = false
+
 biogeochemistry = OXYDEP(;
     grid,
     args_oxydep...,
     surface_photosynthetically_active_radiation = PAR⁰,
     TS_forced = true,
-    Chemicals = false,
+    Chemicals = add_contaminants,
     scale_negatives = true,
 )
-
-# Chemicals = false,
-
+biogeochemistry
 ## Hydrophysics forcing
 filename = "../../data_Varna/Varna_brom.nc"
 
@@ -169,26 +169,31 @@ DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
 #- - - - - - - - - - - - - - - - - - - - - - 
 
 ## Model instantiation
-model = NonhydrostaticModel(;
-    grid,
-    clock,
-    #closure = VerticallyImplicitTimeDiscretization(), #SmagorinskyLilly(), 
-    closure = ScalarDiffusivity(ν = κ, κ = κ), #(ν = 1e-4, κ = 1e-4),
-    biogeochemistry,
-    boundary_conditions = (
-        O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom),
-        NUT = FieldBoundaryConditions(bottom = NUT_bottom),
-        DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
-        POM = FieldBoundaryConditions(bottom = POM_bottom),
-        PHY = FieldBoundaryConditions(bottom = PHY_bottom),
-        HET = FieldBoundaryConditions(bottom = HET_bottom),
-    ),
-    auxiliary_fields = (; S, T),
-    tracers = (:NUT, :PHY, :HET, :POM, :DOM, :O₂),
-)
+    model = NonhydrostaticModel(;
+        grid,
+        clock,
+        #closure = VerticallyImplicitTimeDiscretization(), #SmagorinskyLilly(), 
+        closure = ScalarDiffusivity(ν = κ, κ = κ), #(ν = 1e-4, κ = 1e-4),
+        biogeochemistry,
+        boundary_conditions = (
+            O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom),
+            NUT = FieldBoundaryConditions(bottom = NUT_bottom),
+            DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
+            POM = FieldBoundaryConditions(bottom = POM_bottom),
+            PHY = FieldBoundaryConditions(bottom = PHY_bottom),
+            HET = FieldBoundaryConditions(bottom = HET_bottom),
+        ),
+        auxiliary_fields = (; S, T),
+    )
+
+model
 
 ## Set model
-set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0)
+if add_contaminants == false
+    set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0)
+else
+    set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0, Ci_free = 0.123)
+end
 
 ## Simulation
 simulation = Simulation(model, Δt = 6minutes, stop_time = stoptime)
@@ -202,26 +207,41 @@ progress_message(sim) = @printf(
 
 simulation.callbacks[:progress] = Callback(progress_message, TimeInterval(10days))
 
-NUT, PHY, HET, POM, DOM, O₂ = model.tracers
+#add_contaminants ? (Ci_free, NUT, PHY, HET, POM, DOM, O₂ = model.tracers) : (NUT, PHY, HET, POM, DOM, O₂ = model.tracers)
+if add_contaminants == false
+    NUT, PHY, HET, POM, DOM, O₂ = model.tracers
+else
+    NUT, PHY, HET, POM, DOM, O₂, Ci_free, Ci_PHY, Ci_HET, Ci_POM, Ci_DOM = model.tracers
+end
 PAR = model.auxiliary_fields.PAR
 T = model.auxiliary_fields.T
 S = model.auxiliary_fields.S
 
 output_prefix = joinpath(homedir(), "data_Varna", "columney_snapshots")
 # output_prefix = joinpath("out")
-simulation.output_writers[:profiles] = JLD2OutputWriter(
-    model,
-    (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR, κ),
-    filename = "$output_prefix.jld2",
-    schedule = TimeInterval(1day),
-    overwrite_existing = true,
-)
-
+if add_contaminants == false
+    simulation.output_writers[:profiles] = JLD2OutputWriter(
+        model,
+        (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR, κ),
+        filename = "$output_prefix.jld2",
+        schedule = TimeInterval(1day),
+        overwrite_existing = true,
+    )
+else
+    simulation.output_writers[:profiles] = JLD2OutputWriter(
+        model,
+        (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR, κ, Ci_free, Ci_PHY, Ci_HET, Ci_POM, Ci_DOM),
+        filename = "$output_prefix.jld2",
+        schedule = TimeInterval(1day),
+        overwrite_existing = true,
+    )
+end
 ## Run!
 run!(simulation)
 
 ## Make plots.
+model 
+
 include("images.jl")
 
-println(" OCTAHOBKA: BCE HAPucOBAHO !")
-
+println(" BOT XPEHb, OCTAHOBKA...")

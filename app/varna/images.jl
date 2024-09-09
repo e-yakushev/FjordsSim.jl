@@ -15,18 +15,18 @@ T =   FieldTimeSeries("$filename.jld2", "T")
 S =   FieldTimeSeries("$filename.jld2", "S")
 PAR = FieldTimeSeries("$filename.jld2", "PAR")
 κ =   FieldTimeSeries("$filename.jld2", "κ")
-
+Ci_free =   FieldTimeSeries("$filename.jld2", "Ci_free")
 @info "Saved outputs loaded..."
 
 z = jldopen("$filename.jld2")["grid"]["zᵃᵃᶜ"]
 times = T.times
 #times = StepRangeLen(0.0, 1, (160 * 86400))
 # 2
-biogeochemistry =
-    OXYDEP(; grid, particles = nothing)
-model = NonhydrostaticModel(; grid,
-       biogeochemistry,
-)
+#biogeochemistry =
+#    OXYDEP(; grid, particles = nothing)
+#model = NonhydrostaticModel(; grid,
+#       biogeochemistry,
+#)
 #/2
 
 nitrogen_burying = zeros(length(times))

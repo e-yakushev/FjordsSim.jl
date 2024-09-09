@@ -194,7 +194,7 @@ end
 
 ############################################################
 
-
+"""
 @inline function (bgc::OXYDEP)(::Val{:Ch_free}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, Ch_free, PAR)
     Max_uptake = bgc.Max_uptake
     Knut = bgc.Knut
@@ -212,3 +212,4 @@ end
         ExcrPhy(r_phy_dom, PHY)
     )
 end
+"""
