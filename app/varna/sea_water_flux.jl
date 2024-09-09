@@ -46,7 +46,7 @@ end
 #- - - - - - - - - - - - - - - - - - - - - - 
 # Sc, Schmidt number for O2  following Wanninkhof 2014
 #- - - - - - - - - - - - - - - - - - - - - - 
-function OxygenSchmidtNumber(T::Float64)::Float64
+@inline function OxygenSchmidtNumber(T::Float64)::Float64
     return ((1920.4 - 135.6 * T + 5.2122 * T^2 - 0.10939 * T^3 + 0.00093777 * T^4))
     # can be replaced by PolynomialParameterisation{4}((a, b, c, d, e)) i.e.:
     #    a = 1953.4, b = - 128.0, c = 3.9918, d = -0.050091, e = 0.00093777  

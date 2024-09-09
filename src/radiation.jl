@@ -1,3 +1,5 @@
+const year = 365days
+
 ## Surface PAR and turbulent vertical diffusivity based on idealised mixed layer depth 
 @inline PAR⁰(x, y, t) =
     60 *

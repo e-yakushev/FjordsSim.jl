@@ -29,19 +29,12 @@ import Oceananigans.Biogeochemistry:
     required_biogeochemical_auxiliary_fields,
     biogeochemical_drift_velocity
 
-include("../../src/FjordsSim.jl")
 include("setup.jl")
 
 using .FjordsSim: OXYDEP, read_TSU_forcing
 
 const year = 365days
 stoptime = 1095days  # Set simulation stoptime here!
-
-## Surface PAR and turbulent vertical diffusivity based on idealised mixed layer depth 
-@inline PAR⁰(x, y, t) =
-    60 *
-    (1 - cos((t + 15days) * 2π / year)) *
-    (1 / (1 + 0.2 * exp(-((mod(t, year) - 200days) / 50days)^2))) + 2
 
 ## Grid
 #depth_extent = 100meters
@@ -169,22 +162,22 @@ DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
 #- - - - - - - - - - - - - - - - - - - - - - 
 
 ## Model instantiation
-    model = NonhydrostaticModel(;
-        grid,
-        clock,
-        #closure = VerticallyImplicitTimeDiscretization(), #SmagorinskyLilly(), 
-        closure = ScalarDiffusivity(ν = κ, κ = κ), #(ν = 1e-4, κ = 1e-4),
-        biogeochemistry,
-        boundary_conditions = (
-            O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom),
-            NUT = FieldBoundaryConditions(bottom = NUT_bottom),
-            DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
-            POM = FieldBoundaryConditions(bottom = POM_bottom),
-            PHY = FieldBoundaryConditions(bottom = PHY_bottom),
-            HET = FieldBoundaryConditions(bottom = HET_bottom),
-        ),
-        auxiliary_fields = (; S, T),
-    )
+model = NonhydrostaticModel(;
+    grid,
+    clock,
+    #closure = VerticallyImplicitTimeDiscretization(), #SmagorinskyLilly(), 
+    closure = ScalarDiffusivity(ν = κ, κ = κ), #(ν = 1e-4, κ = 1e-4),
+    biogeochemistry,
+    boundary_conditions = (
+        O₂ = FieldBoundaryConditions(top = OXY_top, bottom = OXY_bottom),
+        NUT = FieldBoundaryConditions(bottom = NUT_bottom),
+        DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
+        POM = FieldBoundaryConditions(bottom = POM_bottom),
+        PHY = FieldBoundaryConditions(bottom = PHY_bottom),
+        HET = FieldBoundaryConditions(bottom = HET_bottom),
+    ),
+    auxiliary_fields = (; S, T),
+)
 
 model
 
@@ -240,7 +233,7 @@ end
 run!(simulation)
 
 ## Make plots.
-model 
+model
 
 include("images.jl")
 
