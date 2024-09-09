@@ -3,15 +3,16 @@ using Oceananigans.Units
 using Oceananigans.BuoyancyModels: g_Earth
 using Oceananigans.Coriolis: Ω_Earth
 using Oceananigans.OutputReaders: InMemory
+using Oceananigans
 using ClimaOcean
+using OceanBioME
 using ClimaOcean.OceanSimulations:
     default_ocean_closure, default_momentum_advection, default_tracer_advection
 using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
-using OceanBioME
 
 include("../../src/FjordsSim.jl")
 
-using .FjordsSim: grid_from_bathymetry_file!, forcing_varna, bc_varna, OXYDEP, PAR⁰
+using .FjordsSim: grid_from_bathymetry_file!, grid_latitude_flat!, forcing_varna, bc_varna, OXYDEP, PAR⁰
 
 args_oxydep = (
     initial_photosynthetic_slope = 0.1953 / day, # 1/(W/m²)/s
@@ -58,17 +59,6 @@ biogeochemistry_OXYDEP(grid) = OXYDEP(;
 )
 
 # Grid
-Nz = 10
-grid_callable! = grid_from_bathymetry_file!
-grid_parameters = (
-    arch = GPU(),
-    Nz = Nz,
-    halo = (7, 7, 7),
-    datadir = joinpath(homedir(), "BadgerArtifacts"),
-    filename = "Varna_topo_channels.jld2",
-    latitude = (43.177, 43.214),
-    longitude = (27.640, 27.947),
-)
 grid = Ref{Any}(nothing)
 
 mutable struct SetupVarna
@@ -83,19 +73,30 @@ mutable struct SetupVarna
     free_surface_callable::Function
     free_surface_args::Tuple
     coriolis::Any
-    forcing_callable::Union{Nothing,Function}
-    forcing_args::Union{Tuple,NamedTuple}
-    bc_callable::Function
-    bc_args::Tuple
-    atmosphere_callable::Function
-    atmosphere_args::NamedTuple
+    forcing_callable::Any
+    forcing_args::Any
+    bc_callable::Any
+    bc_args::Any
+    atmosphere_callable::Any
+    atmosphere_args::Any
     radiation::Any
-    biogeochemistry_callable::Union{Nothing,Function}
-    biogeochemistry_args::Union{Tuple,NamedTuple}
+    biogeochemistry_callable::Any
+    biogeochemistry_args::Any
 
     function SetupVarna(;
         bottom_drag_coefficient = 0.003,
         reference_density = 1020,
+        # Grid
+        grid_callable! = grid_from_bathymetry_file!,
+        grid_parameters = (
+            arch = GPU(),
+            Nz = 10,
+            halo = (7, 7, 7),
+            datadir = joinpath(homedir(), "BadgerArtifacts"),
+            filename = "Varna_topo_channels.jld2",
+            latitude = (43.177, 43.214),
+            longitude = (27.640, 27.947),
+        ),
         # Buoyancy
         buoyancy = SeawaterBuoyancy(;
             gravitational_acceleration = g_Earth,
@@ -120,7 +121,7 @@ mutable struct SetupVarna
         coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
         # Forcing
         forcing_callable = forcing_varna,
-        forcing_args = (bottom_drag_coefficient, Nz),
+        forcing_args = (bottom_drag_coefficient, grid_parameters.Nz),
         # Boundary conditions
         bc_callable = bc_varna,
         bc_args = (grid, bottom_drag_coefficient),
@@ -163,3 +164,28 @@ setup_varna_3d_Lobster() =
     SetupVarna(biogeochemistry_callable = biogeochemistry_LOBSTER, biogeochemistry_args = (grid,))
 setup_varna_3d_OXYDEP() =
     SetupVarna(biogeochemistry_callable = biogeochemistry_OXYDEP, biogeochemistry_args = (grid,))
+setup_varna_2d() = SetupVarna(
+    grid_callable! = grid_latitude_flat!,
+    grid_parameters = (
+        arch = CPU(), 
+        Nx = 30, 
+        Ny = 1, 
+        Nz = 20, 
+        halo = (1, 1, 1),
+        latitude = (43.177, 43.214),
+        longitude = (27.640, 27.947),
+        depth = 20
+    ),
+    closure = ScalarDiffusivity(ν=1e-5),
+    tracer_advection = nothing,
+    momentum_advection = nothing,
+    tracers = (:T, :S),
+    # Coriolis
+    coriolis = nothing,
+    # Forcing
+    forcing_callable = NamedTuple,
+    forcing_args = (),
+    # Boundary conditions
+    bc_callable = NamedTuple,
+    bc_args = (),
+)

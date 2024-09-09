@@ -59,25 +59,6 @@ function SetupGridRegrid(;
     )
 end
 
-# function ImmersedBoundaryGrid(setup_grid::SetupGridRegrid)
-#     grid = LatitudeLongitudeGrid(
-#         setup_grid.arch;
-#         size = setup_grid.size,
-#         latitude = setup_grid.latitude,
-#         longitude = setup_grid.longitude,
-#         z = setup_grid.z,
-#         halo = setup_grid.halo,
-#     )
-#     h = regrid_bathymetry(
-#         grid;
-#         height_above_water = setup_grid.height_above_water,
-#         minimum_depth = setup_grid.minimum_depth,
-#         dir = setup_grid.datadir,
-#         filename = setup_grid.filename,
-#     )
-#     return ImmersedBoundaryGrid(grid, GridFittedBottom(h))
-# end
-
 function grid_from_bathymetry_file!(sim_setup)
     arch, Nz, halo, datadir, filename, latitude, longitude = sim_setup.grid_parameters
 
@@ -89,12 +70,28 @@ function grid_from_bathymetry_file!(sim_setup)
     underlying_grid = LatitudeLongitudeGrid(
         arch;
         size = (Nx, Ny, Nz),
-        halo = (7, 7, 7),
+        halo = halo,
         z = z_faces,
         latitude,
         longitude,
     )
     grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(depth); active_cells_map = true)
+    sim_setup.grid[] = grid
+    return grid
+end
+
+function grid_latitude_flat!(sim_setup)
+    arch, Nx, Ny, Nz, halo, latitude, longitude, depth = sim_setup.grid_parameters
+
+    z_faces = exponential_z_faces(; Nz = Nz, depth = depth, h = depth)
+    grid = LatitudeLongitudeGrid(
+        arch;
+        size = (Nx, Ny, Nz),
+        halo = halo,
+        z = z_faces,
+        latitude,
+        longitude,
+    )
     sim_setup.grid[] = grid
     return grid
 end

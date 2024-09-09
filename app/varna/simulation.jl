@@ -15,8 +15,6 @@
 using Printf
 using FileIO
 using JLD2
-using ClimaOcean
-using Oceananigans
 
 include("setup.jl")
 
@@ -25,7 +23,8 @@ using .FjordsSim: progress, safe_execute
 ## Model Setup
 # sim_setup = setup_varna_3d()
 # sim_setup = setup_varna_3d_Lobster()
-sim_setup = setup_varna_3d_OXYDEP()
+# sim_setup = setup_varna_3d_OXYDEP()
+sim_setup = setup_varna_2d()
 
 grid = sim_setup.grid_callable!(sim_setup)
 buoyancy = sim_setup.buoyancy
@@ -35,8 +34,8 @@ momentum_advection = sim_setup.momentum_advection
 tracers = sim_setup.tracers
 free_surface = sim_setup.free_surface_callable(sim_setup.free_surface_args...)
 coriolis = sim_setup.coriolis
-forcing = safe_execute(sim_setup.forcing_callable)(sim_setup.forcing_args...)
-boundary_conditions = safe_execute(sim_setup.bc_callable)(sim_setup.bc_args...)
+forcing = sim_setup.forcing_callable(sim_setup.forcing_args...)
+boundary_conditions = sim_setup.bc_callable(sim_setup.bc_args...)
 biogeochemistry = safe_execute(sim_setup.biogeochemistry_callable)(sim_setup.biogeochemistry_args...)
 
 ## Model
