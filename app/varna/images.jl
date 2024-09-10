@@ -15,7 +15,7 @@ T =   FieldTimeSeries("$filename.jld2", "T")
 S =   FieldTimeSeries("$filename.jld2", "S")
 PAR = FieldTimeSeries("$filename.jld2", "PAR")
 κ =   FieldTimeSeries("$filename.jld2", "κ")
-Ci_free =   FieldTimeSeries("$filename.jld2", "Ci_free")
+#Ci_free =   FieldTimeSeries("$filename.jld2", "Ci_free")
 @info "Saved outputs loaded..."
 
 z = jldopen("$filename.jld2")["grid"]["zᵃᵃᶜ"]
@@ -101,10 +101,6 @@ hmOXY = heatmap!(times / days, z, interior(O₂, 1, 1, :, :)', colormap = :turbo
 hmOXY = heatmap!(times / days, z, interior(O₂, 1, 1, :, :)', colormap = :turbo)
 Colorbar(fig[2, 2], hmOXY)
 
-#axPAR = Axis(fig[1, 5]; title = "PAR  μE⋅m-2⋅s-1", axis_kwargs...)
-#hmPAR = heatmap!(times / days, z, interior(PAR, 1, 1, :, :)', colormap = :grayC100) # :linear_grey_0_100_c0_n256)
-#Colorbar(fig[1, 6], hmPAR)
-
 axκ = Axis(fig[1, 5]; title = "κ  m³/s", axis_kwargs...)
 hmκ = heatmap!(times / days, z, interior(κ, 1, 1, :, :)', colormap = Reverse(:RdYlBu)) # :linear_grey_0_100_c0_n256)
 Colorbar(fig[1, 6], hmκ)
@@ -116,6 +112,10 @@ Colorbar(fig[2, 6], hmT)
 axS = Axis(fig[3, 5]; title = "S, psu", axis_kwargs...)
 hmS = heatmap!(times / days, z, interior(S, 1, 1, :, :)', colormap = Reverse(:RdYlBu))
 Colorbar(fig[3, 6], hmS)
+
+axPAR = Axis(fig[4, 1]; title = "PAR  μE⋅m-2⋅s-1", axis_kwargs...)
+hmPAR = heatmap!(times / days, z, interior(PAR, 1, 1, :, :)', colormap = :grayC100) # :linear_grey_0_100_c0_n256)
+Colorbar(fig[4, 2], hmPAR)
 
 @info "VARIABLES Z-Time plots made"
 

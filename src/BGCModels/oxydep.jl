@@ -218,10 +218,9 @@ required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(true, false)},<:Any}) =
         (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
 required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(true, true)},<:Any}) =    
     (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :Ci_free, :Ci_PHY, :Ci_HET, :Ci_POM, :Ci_DOM)
-required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, false)},<:Any}) = (:PAR, :T)
-required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, true)},<:Any}) = (:PAR, :T)
+required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, false)},<:Any}) = (:T, :PAR)
+required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, true)},<:Any}) = (:T, :PAR)
 
-#PHY
 @inline function biogeochemical_drift_velocity(bgc::OXYDEP, ::Val{tracer_name}) where {tracer_name}
     if tracer_name in keys(bgc.sinking_velocities)
         return (u = ZeroField(), v = ZeroField(), w = bgc.sinking_velocities[tracer_name])
@@ -274,8 +273,8 @@ show(io::IO, model::OXYDEP{FT, Val{B}, W}) where {FT, B, W} = print(
     "│   ├── Chemicals $(B[2] ? :✅ : :❌) \n",
     "└── Sinking Velocities:", "\n", show_sinking_velocities(model.sinking_velocities)))
 
-#include("core.jl")
-include("core_contaminants.jl")
+include("core.jl")
+#include("core_contaminants.jl")
 
 @inline nitrogen_flux(i, j, k, grid, advection, bgc::OXYDEP, tracers) =
     sinking_flux(i, j, k, grid, advection, Val(:POM), bgc, tracers) +
