@@ -50,7 +50,7 @@ OxyDep basic biogeochemical transformations between NUT, PHY, HET, DOM, POM, O2
 
 # = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = 
 
-@inline function (bgc::OXYDEP)(::Val{:NUT}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
+@inline function (bgc::OXYDEP)(::Val{:NUT}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, Ci_free, Ci_PHY, Ci_HET, Ci_POM, Ci_DOM, PAR, T)
     Max_uptake = bgc.Max_uptake
     Knut = bgc.Knut
     α = bgc.initial_photosynthetic_slope
@@ -80,7 +80,7 @@ OxyDep basic biogeochemical transformations between NUT, PHY, HET, DOM, POM, O2
     # Denitrification of POM and DOM leads to decrease of NUT (i.e. NOx)
 end
 
-@inline function (bgc::OXYDEP)(::Val{:PHY}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
+@inline function (bgc::OXYDEP)(::Val{:PHY}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, Ci_free, Ci_PHY, Ci_HET, Ci_POM, Ci_DOM, PAR, T)
     Max_uptake = bgc.Max_uptake
     Knut = bgc.Knut
     α = bgc.initial_photosynthetic_slope
@@ -98,7 +98,7 @@ end
     )
 end
 
-@inline function (bgc::OXYDEP)(::Val{:HET}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
+@inline function (bgc::OXYDEP)(::Val{:HET}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, Ci_free, Ci_PHY, Ci_HET, Ci_POM, Ci_DOM, PAR, T)
     r_phy_het = bgc.r_phy_het
     Kphy = bgc.Kphy
     r_pom_het = bgc.r_pom_het
@@ -114,7 +114,7 @@ end
     )
 end
 
-@inline function (bgc::OXYDEP)(::Val{:POM}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
+@inline function (bgc::OXYDEP)(::Val{:POM}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, Ci_free, Ci_PHY, Ci_HET, Ci_POM, Ci_DOM, PAR, T)
     r_phy_het = bgc.r_phy_het
     Kphy = bgc.Kphy
     r_pom_het = bgc.r_pom_het
@@ -139,7 +139,7 @@ end
     )
 end
 
-@inline function (bgc::OXYDEP)(::Val{:DOM}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
+@inline function (bgc::OXYDEP)(::Val{:DOM}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, Ci_free, Ci_PHY, Ci_HET, Ci_POM, Ci_DOM, PAR, T)
     r_phy_het = bgc.r_phy_het
     Kphy = bgc.Kphy
     r_pom_het = bgc.r_pom_het
@@ -163,7 +163,7 @@ end
     # Denitrification of "real DOM" into NH4 (DOM_decay_denitr) will not change state variable DOM
 end
 
-@inline function (bgc::OXYDEP)(::Val{:O₂}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, PAR)
+@inline function (bgc::OXYDEP)(::Val{:O₂}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, Ci_free, Ci_PHY, Ci_HET, Ci_POM, Ci_DOM, PAR, T)
     Max_uptake = bgc.Max_uptake
     Knut = bgc.Knut
     α = bgc.initial_photosynthetic_slope
@@ -191,3 +191,25 @@ end
     # in suboxic conditions (F_subox) equals consumption for NH4 oxidation (Yakushev et al, 2008)
 
 end
+
+############################################################
+
+"""
+@inline function (bgc::OXYDEP)(::Val{:Ch_free}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, Ch_free, PAR)
+    Max_uptake = bgc.Max_uptake
+    Knut = bgc.Knut
+    α = bgc.initial_photosynthetic_slope
+    r_phy_het = bgc.r_phy_het
+    Kphy = bgc.Kphy
+    r_phy_nut = bgc.r_phy_nut
+    r_phy_pom = bgc.r_phy_pom
+    r_phy_dom = bgc.r_phy_dom
+    Iopt = bgc.Iopt
+
+    return (
+        0.1 * GrowthPhy(Max_uptake, PAR, α, T, Knut, NUT, PHY, Iopt) -
+        GrazPhy(r_phy_het, Kphy, PHY, HET) - RespPhy(r_phy_nut, PHY) - MortPhy(r_phy_pom, PHY) -
+        ExcrPhy(r_phy_dom, PHY)
+    )
+end
+"""

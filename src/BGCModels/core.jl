@@ -191,3 +191,25 @@ end
     # in suboxic conditions (F_subox) equals consumption for NH4 oxidation (Yakushev et al, 2008)
 
 end
+
+############################################################
+
+"""
+@inline function (bgc::OXYDEP)(::Val{:Ch_free}, x, y, z, t, NUT, PHY, HET, POM, DOM, O₂, T, Ch_free, PAR)
+    Max_uptake = bgc.Max_uptake
+    Knut = bgc.Knut
+    α = bgc.initial_photosynthetic_slope
+    r_phy_het = bgc.r_phy_het
+    Kphy = bgc.Kphy
+    r_phy_nut = bgc.r_phy_nut
+    r_phy_pom = bgc.r_phy_pom
+    r_phy_dom = bgc.r_phy_dom
+    Iopt = bgc.Iopt
+
+    return (
+        0.1 * GrowthPhy(Max_uptake, PAR, α, T, Knut, NUT, PHY, Iopt) -
+        GrazPhy(r_phy_het, Kphy, PHY, HET) - RespPhy(r_phy_nut, PHY) - MortPhy(r_phy_pom, PHY) -
+        ExcrPhy(r_phy_dom, PHY)
+    )
+end
+"""
