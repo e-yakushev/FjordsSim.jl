@@ -12,7 +12,15 @@ using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 
 include("../../src/FjordsSim.jl")
 
-using .FjordsSim: grid_from_bathymetry_file!, grid_latitude_flat!, forcing_varna, bc_varna, OXYDEP, PAR⁰
+using .FjordsSim:
+    grid_from_bathymetry_file!,
+    grid_latitude_flat!,
+    grid_column!,
+    forcing_varna,
+    bc_varna,
+    bc_ocean,
+    OXYDEP,
+    PAR⁰
 
 args_oxydep = (
     initial_photosynthetic_slope = 0.1953 / day, # 1/(W/m²)/s
@@ -53,9 +61,9 @@ biogeochemistry_OXYDEP(grid) = OXYDEP(;
     grid = grid[],
     args_oxydep...,
     surface_photosynthetically_active_radiation = PAR⁰,
-    TS_forced = true,
+    TS_forced = false,
     Chemicals = false,
-    scale_negatives = true,
+    scale_negatives = false,
 )
 
 # Grid
@@ -70,6 +78,7 @@ mutable struct SetupVarna
     tracer_advection::Any
     momentum_advection::Any
     tracers::Tuple
+    initial_conditions::NamedTuple
     free_surface_callable::Function
     free_surface_args::Tuple
     coriolis::Any
@@ -114,6 +123,7 @@ mutable struct SetupVarna
         momentum_advection = default_momentum_advection(),
         # Tracers
         tracers = (:T, :S, :e),
+        initial_conditions = (T = 10, S = 15),
         # Free surface
         free_surface_callable = free_surface_default,
         free_surface_args = (grid,),
@@ -143,6 +153,7 @@ mutable struct SetupVarna
             tracer_advection,
             momentum_advection,
             tracers,
+            initial_conditions,
             free_surface_callable,
             free_surface_args,
             coriolis,
@@ -160,23 +171,43 @@ mutable struct SetupVarna
 end
 
 setup_varna_3d() = SetupVarna()
-setup_varna_3d_Lobster() =
-    SetupVarna(biogeochemistry_callable = biogeochemistry_LOBSTER, biogeochemistry_args = (grid,))
-setup_varna_3d_OXYDEP() =
-    SetupVarna(biogeochemistry_callable = biogeochemistry_OXYDEP, biogeochemistry_args = (grid,))
+setup_varna_3d_Lobster() = SetupVarna(
+    biogeochemistry_callable = biogeochemistry_LOBSTER,
+    biogeochemistry_args = (grid,),
+    tracers = (:T, :S, :e, :NO₃, :NH₄, :P, :Z, :sPOM, :bPOM, :DOM),
+    initial_conditions = (T = 10, S = 15, NO₃ = 10.0, NH₄ = 0.1, P = 0.1, Z = 0.01),
+    tracer_advection = (
+        T = default_tracer_advection(),
+        S = default_tracer_advection(),
+        e = nothing,
+        NO₃ = default_tracer_advection(),
+        NH₄ = default_tracer_advection(),
+        P = default_tracer_advection(),
+        Z = default_tracer_advection(),
+        sPOM = default_tracer_advection(),
+        bPOM = default_tracer_advection(),
+        DOM = default_tracer_advection(),
+    ),
+)
+setup_varna_3d_OXYDEP() = SetupVarna(
+    tracers = (:T, :S, :e, :NUT, :P, :HET, :POM, :DOM, :O₂),
+    initial_conditions = (T = 10, S = 15, NUT = 10.0, P = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0),
+    biogeochemistry_callable = biogeochemistry_OXYDEP,
+    biogeochemistry_args = (grid,),
+)
 setup_varna_2d() = SetupVarna(
     grid_callable! = grid_latitude_flat!,
     grid_parameters = (
-        arch = CPU(), 
-        Nx = 30, 
-        Ny = 1, 
-        Nz = 20, 
+        arch = GPU(),
+        Nx = 30,
+        Ny = 1,
+        Nz = 20,
         halo = (1, 1, 1),
         latitude = (43.177, 43.214),
         longitude = (27.640, 27.947),
-        depth = 20
+        depth = 20,
     ),
-    closure = ScalarDiffusivity(ν=1e-5),
+    closure = ScalarDiffusivity(ν = 1e-5),
     tracer_advection = nothing,
     momentum_advection = nothing,
     tracers = (:T, :S),
@@ -186,6 +217,30 @@ setup_varna_2d() = SetupVarna(
     forcing_callable = NamedTuple,
     forcing_args = (),
     # Boundary conditions
-    bc_callable = NamedTuple,
-    bc_args = (),
+    bc_callable = bc_ocean,
+    bc_args = (grid, 0),
+)
+setup_varna_column() = SetupVarna(
+    grid_callable! = grid_column!,
+    grid_parameters = (
+        arch = GPU(),
+        Nz = 20,
+        halo = (3, 3, 3),
+        latitude = 43.177,
+        longitude = 27.640,
+        depth = 20,
+        h = 20,
+    ),
+    closure = ScalarDiffusivity(ν = 1e-5),
+    tracer_advection = nothing,
+    momentum_advection = nothing,
+    tracers = (:T, :S),
+    # Coriolis
+    coriolis = FPlane(latitude = 43.177),
+    # Forcing
+    forcing_callable = NamedTuple,
+    forcing_args = (),
+    # Boundary conditions
+    bc_callable = bc_ocean,
+    bc_args = (grid, 0),
 )

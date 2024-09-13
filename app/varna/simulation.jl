@@ -24,7 +24,8 @@ using .FjordsSim: progress, safe_execute
 # sim_setup = setup_varna_3d()
 # sim_setup = setup_varna_3d_Lobster()
 # sim_setup = setup_varna_3d_OXYDEP()
-sim_setup = setup_varna_2d()
+# sim_setup = setup_varna_2d()
+sim_setup = setup_varna_column()
 
 grid = sim_setup.grid_callable!(sim_setup)
 buoyancy = sim_setup.buoyancy
@@ -58,7 +59,7 @@ ocean_model = HydrostaticFreeSurfaceModel(;
 ocean_sim = Simulation(ocean_model; Δt)
 
 ## Set initial conditions
-set!(ocean_model, T = 10, S = 15)
+set!(ocean_model; sim_setup.initial_conditions...)
 
 ## Coupled model / simulation
 sea_ice = nothing
@@ -81,12 +82,11 @@ ocean_sim.output_writers[:surface] = JLD2OutputWriter(
     array_type=Array{Float32}
 )
 
-profile_prefix = joinpath(homedir(), "data_Varna", "profile_snapshots")
+profile_prefix = joinpath(homedir(), "data_Varna", "snapshots")
 ocean_sim.output_writers[:profile] = JLD2OutputWriter(
     ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
-    schedule = TimeInterval(1hour),
+    schedule = TimeInterval(1day),
     filename = "$profile_prefix.jld2",
-    indices=(:, 18, :),
     overwrite_existing = true,
     array_type=Array{Float32}
 )
@@ -97,13 +97,11 @@ ocean_sim.stop_time = 10days
 coupled_simulation.stop_time = 10days
 conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=1.5minutes, max_change=1.01)
 run!(coupled_simulation)
-nothing #hide
 
 ## Running the simulation
 # This time, we set the CFL in the time_step_wizard to be 0.25 as this is the maximum recommended CFL to be
 # used in conjunction with Oceananigans' hydrostatic time-stepping algorithm ([two step Adams-Bashfort](https://en.wikipedia.org/wiki/Linear_multistep_method))
 ocean_sim.stop_time = 355days
 coupled_simulation.stop_time = 355days
-conjure_time_step_wizard!(ocean_sim; cfl=0.2, max_Δt=1.5minutes, max_change=1.01)
+conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=10minutes, max_change=1.01)
 run!(coupled_simulation)
-nothing #hide

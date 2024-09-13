@@ -185,7 +185,8 @@ function bgh_oxydep_boundary_conditions()
     return oxy_bcs, nut_bcs, dom_bcs, pom_bcs, phy_bcs, het_bcs
 end
 
-function ocean_boundary_conditions(grid, bottom_drag_coefficient)
+function bc_ocean(grid, bottom_drag_coefficient)
+    grid = grid[]
     # Set up boundary conditions using Field
     top_zonal_momentum_flux = τx = Field{Face,Center,Nothing}(grid)
     top_meridional_momentum_flux = τy = Field{Center,Face,Nothing}(grid)
@@ -203,13 +204,13 @@ function ocean_boundary_conditions(grid, bottom_drag_coefficient)
         parameters = bottom_drag_coefficient,
     )
 
-    ocean_boundary_conditions = (
+    bc_ocean = (
         u = FieldBoundaryConditions(top = FluxBoundaryCondition(τx), bottom = u_bot_bc),
         v = FieldBoundaryConditions(top = FluxBoundaryCondition(τy), bottom = v_bot_bc),
         T = FieldBoundaryConditions(top = FluxBoundaryCondition(Jᵀ)),
         S = FieldBoundaryConditions(top = FluxBoundaryCondition(Jˢ)),
     )
-    return ocean_boundary_conditions
+    return bc_ocean
 end
 
 function bc_varna(grid, bottom_drag_coefficient)

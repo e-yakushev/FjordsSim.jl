@@ -18,7 +18,7 @@ function hydrophysics_simulation(
     momentum_advection = default_momentum_advection(),
     tracer_advection = default_tracer_advection(),
     verbose = false,
-    boundary_conditions = ocean_boundary_conditions(grid, bottom_drag_coefficient),
+    boundary_conditions = bc_ocean(grid, bottom_drag_coefficient),
 )
 
     if grid isa ImmersedBoundaryGrid
@@ -85,7 +85,7 @@ function biogeochemical_simulation(
     tracer_advection = default_tracer_advection(),
     verbose = false,
 )
-    hydrophysics_boundary_conditions = ocean_boundary_conditions(grid, bottom_drag_coefficient)
+    hydrophysics_boundary_conditions = bc_ocean(grid, bottom_drag_coefficient)
 
     if grid isa ImmersedBoundaryGrid
         Fu = Forcing(

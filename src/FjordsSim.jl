@@ -4,9 +4,6 @@ using Oceananigans.Architectures
 using Oceananigans.BuoyancyModels: g_Earth
 using Oceananigans.Coriolis: Ω_Earth
 using OceanBioME
-using OceanBioME.Light:
-    update_TwoBandPhotosyntheticallyActiveRadiation!,
-    TwoBandPhotosyntheticallyActiveRadiation
 using ClimaOcean.OceanSimulations:
     default_free_surface,
     default_ocean_closure,
@@ -20,7 +17,6 @@ using Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities: CATKEVertic
 using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 
 import Oceananigans.Architectures: on_architecture
-import Oceananigans.Biogeochemistry: update_biogeochemical_state!
 
 include("utils.jl")
 include("bathymetry.jl")
@@ -35,22 +31,6 @@ include("radiation.jl")
 include("BGCModels/BGCModels.jl")
 
 using .BGCModels: OXYDEP
-
-function update_biogeochemical_state!(model, PAR::TwoBandPhotosyntheticallyActiveRadiation)
-    arch = architecture(model.grid)
-    launch!(
-        arch,
-        model.grid,
-        :xy,
-        update_TwoBandPhotosyntheticallyActiveRadiation!,
-        PAR.field,
-        model.grid,
-        model.tracers.PHY,
-        PAR.surface_PAR,
-        model.clock.time,
-        PAR,
-    )
-end
 
 # there is no a steprangelen method in oceananigans
 # but adding it here is type piracy

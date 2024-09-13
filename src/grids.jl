@@ -95,3 +95,21 @@ function grid_latitude_flat!(sim_setup)
     sim_setup.grid[] = grid
     return grid
 end
+
+function grid_column!(sim_setup)
+    arch, Nz, halo, latitude, longitude, depth, h = sim_setup.grid_parameters
+    longitude = longitude .+ (-0.03, 0.03)
+    latitude = latitude .+ (-0.03, 0.03)
+
+    z_faces = exponential_z_faces(; Nz, depth, h)
+    grid = LatitudeLongitudeGrid(
+        arch;
+        size = (3, 3, Nz),
+        halo = halo,
+        z = z_faces,
+        latitude,
+        longitude,
+    )
+    sim_setup.grid[] = grid
+    return grid
+end

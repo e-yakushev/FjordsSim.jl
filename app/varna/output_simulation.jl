@@ -4,12 +4,12 @@ using CairoMakie
 prefix = "surface"
 filepath = joinpath(homedir(), "data_Varna", "$(prefix)_snapshots.jld2")
 
-u = FieldTimeSeries(filepath, "u"; backend = OnDisk())
-v = FieldTimeSeries(filepath, "v"; backend = OnDisk())
-T = FieldTimeSeries(filepath, "T"; backend = OnDisk())
-S = FieldTimeSeries(filepath, "S"; backend = OnDisk())
-P = FieldTimeSeries(filepath, "P"; backend = OnDisk())
-NO₃ = FieldTimeSeries(filepath, "NO₃"; backend = OnDisk()) 
+u = FieldTimeSeries(filepath, "u"; backend = InMemory())
+v = FieldTimeSeries(filepath, "v"; backend = InMemory())
+T = FieldTimeSeries(filepath, "T"; backend = InMemory())
+S = FieldTimeSeries(filepath, "S"; backend = InMemory())
+P = FieldTimeSeries(filepath, "P"; backend = InMemory())
+NO₃ = FieldTimeSeries(filepath, "NUT"; backend = InMemory()) 
 
 times = u.times
 Nt = length(times)
@@ -25,7 +25,7 @@ si = @lift begin
      s
 end
 
-fig = Figure(size = (800, 400))
+fig = Figure(size = (400, 400))
 ax = Axis(fig[1, 1])
 hm = heatmap!(ax, si, colorrange = (0, 0.5), colormap = :deep)
 cb = Colorbar(fig[0, 1], hm, vertical = false, label = "$(prefix) speed (ms⁻¹)")
@@ -104,12 +104,11 @@ CairoMakie.record(fig, joinpath(homedir(), "data_Varna", "$(prefix)_NO3.mp4"), 1
 end
 
 ## Profile temperature
-prefix = "profile"
-filepath = joinpath(homedir(), "data_Varna", "$(prefix)_snapshots.jld2")
+filepath = joinpath(homedir(), "data_Varna", "snapshots.jld2")
 
-u = FieldTimeSeries(filepath, "u"; backend = OnDisk())
-v = FieldTimeSeries(filepath, "v"; backend = OnDisk())
-T = FieldTimeSeries(filepath, "T"; backend = OnDisk())
+# u = FieldTimeSeries(filepath, "u"; backend = OnDisk())
+# v = FieldTimeSeries(filepath, "v"; backend = OnDisk())
+T = FieldTimeSeries(filepath, "T"; backend = InMemory())
 
 times = u.times
 Nt = length(times)
