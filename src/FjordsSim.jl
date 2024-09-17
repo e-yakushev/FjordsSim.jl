@@ -27,6 +27,7 @@ include("boundary_conditions.jl")
 include("forcing.jl")
 include("simulations.jl")
 include("radiation.jl")
+include("output.jl")
 
 include("BGCModels/BGCModels.jl")
 
