@@ -18,66 +18,29 @@ using JLD2
 
 include("setup.jl")
 
-using .FjordsSim: progress, safe_execute
+using .FjordsSim: progress, coupled_hydrostatic_simulation
 
 ## Model Setup
 # sim_setup = setup_varna_3d()
 # sim_setup = setup_varna_3d_Lobster()
-# sim_setup = setup_varna_3d_OXYDEP()
+sim_setup = setup_varna_3d_OXYDEP()
 # sim_setup = setup_varna_2d()
-sim_setup = setup_varna_column()
+# sim_setup = setup_varna_column()
 
-grid = sim_setup.grid_callable!(sim_setup)
-buoyancy = sim_setup.buoyancy
-closure = sim_setup.closure
-tracer_advection = sim_setup.tracer_advection
-momentum_advection = sim_setup.momentum_advection
-tracers = sim_setup.tracers
-free_surface = sim_setup.free_surface_callable(sim_setup.free_surface_args...)
-coriolis = sim_setup.coriolis
-forcing = sim_setup.forcing_callable(sim_setup.forcing_args...)
-boundary_conditions = sim_setup.bc_callable(sim_setup.bc_args...)
-biogeochemistry = safe_execute(sim_setup.biogeochemistry_callable)(sim_setup.biogeochemistry_args...)
-
-## Model
-ocean_model = HydrostaticFreeSurfaceModel(;
-    grid,
-    buoyancy,
-    closure,
-    tracer_advection,
-    momentum_advection,
-    tracers,
-    free_surface,
-    coriolis,
-    forcing,
-    boundary_conditions,
-    biogeochemistry
-)
-
-## Simulation
-Δt = 1seconds
-ocean_sim = Simulation(ocean_model; Δt)
-
-## Set initial conditions
-set!(ocean_model; sim_setup.initial_conditions...)
-
-## Coupled model / simulation
-sea_ice = nothing
-atmosphere = safe_execute(sim_setup.atmosphere_callable)(sim_setup.atmosphere_args...)
-radiation = sim_setup.radiation
-coupled_model = OceanSeaIceModel(ocean_sim, sea_ice; atmosphere, radiation)
-coupled_simulation = Simulation(coupled_model; Δt)
+coupled_simulation = coupled_hydrostatic_simulation(sim_setup)
 
 ## Callbacks
 coupled_simulation.callbacks[:progress] = Callback(progress, IterationInterval(100))
 
 ## Set up output writers
+ocean_sim = coupled_simulation.model.ocean
+ocean_model = ocean_sim.model
 surface_prefix = joinpath(homedir(), "data_Varna", "surface_snapshots")
 ocean_sim.output_writers[:surface] = JLD2OutputWriter(
     ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
     schedule = TimeInterval(1hour),
     filename = "$surface_prefix.jld2",
-    indices=(:, :, grid.Nz),
+    indices=(:, :, grid[].Nz),
     overwrite_existing = true,
     array_type=Array{Float32}
 )

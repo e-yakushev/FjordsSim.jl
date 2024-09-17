@@ -1,9 +1,9 @@
+using Oceananigans
 using Oceananigans.Architectures
 using Oceananigans.Units
 using Oceananigans.BuoyancyModels: g_Earth
 using Oceananigans.Coriolis: Ω_Earth
 using Oceananigans.OutputReaders: InMemory
-using Oceananigans
 using ClimaOcean
 using OceanBioME
 using ClimaOcean.OceanSimulations:
@@ -13,14 +13,19 @@ using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 include("../../src/FjordsSim.jl")
 
 using .FjordsSim:
+    SetupHydrostaticFreeSurface,
     grid_from_bathymetry_file!,
     grid_latitude_flat!,
     grid_column!,
+    grid,
     forcing_varna,
     bc_varna,
     bc_ocean,
-    OXYDEP,
-    PAR⁰
+    PAR⁰,
+    free_surface_default,
+    atmosphere_JRA55,
+    biogeochemistry_LOBSTER,
+    biogeochemistry_OXYDEP
 
 args_oxydep = (
     initial_photosynthetic_slope = 0.1953 / day, # 1/(W/m²)/s
@@ -53,45 +58,6 @@ args_oxydep = (
     NtoB = 0.016, # (nd)
     sinking_speeds = (PHY = 0.15 / day, HET = 4.0 / day, POM = 10.0 / day),
 )
-
-free_surface_default(grid) = SplitExplicitFreeSurface(grid[]; cfl = 0.7)
-atmosphere_JRA55(arch, backend, grid) = JRA55_prescribed_atmosphere(arch; backend, grid = grid[])
-biogeochemistry_LOBSTER(grid) = LOBSTER(; grid = grid[], carbonates = false, open_bottom = false)
-biogeochemistry_OXYDEP(grid) = OXYDEP(;
-    grid = grid[],
-    args_oxydep...,
-    surface_photosynthetically_active_radiation = PAR⁰,
-    TS_forced = false,
-    Chemicals = false,
-    scale_negatives = false,
-)
-
-# Grid
-grid = Ref{Any}(nothing)
-
-mutable struct SetupHydrostaticFreeSurface
-    grid_callable!::Function
-    grid_parameters::NamedTuple
-    grid::Ref
-    buoyancy::Any
-    closure::Any
-    tracer_advection::Any
-    momentum_advection::Any
-    tracers::Tuple
-    initial_conditions::NamedTuple
-    free_surface_callable::Function
-    free_surface_args::Tuple
-    coriolis::Any
-    forcing_callable::Any
-    forcing_args::Any
-    bc_callable::Any
-    bc_args::Any
-    atmosphere_callable::Any
-    atmosphere_args::Any
-    radiation::Any
-    biogeochemistry_callable::Any
-    biogeochemistry_args::Any
-end
 
 function setup_varna(;
     bottom_drag_coefficient = 0.003,
@@ -170,7 +136,6 @@ function setup_varna(;
     )
 end
 
-
 setup_varna_3d() = setup_varna()
 setup_varna_3d_Lobster() = setup_varna(
     biogeochemistry_callable = biogeochemistry_LOBSTER,
@@ -194,7 +159,7 @@ setup_varna_3d_OXYDEP() = setup_varna(
     tracers = (:T, :S, :e, :NUT, :P, :HET, :POM, :DOM, :O₂),
     initial_conditions = (T = 10, S = 15, NUT = 10.0, P = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0),
     biogeochemistry_callable = biogeochemistry_OXYDEP,
-    biogeochemistry_args = (grid,),
+    biogeochemistry_args = (grid, args_oxydep),
 )
 setup_varna_2d() = setup_varna(
     grid_callable! = grid_latitude_flat!,
