@@ -69,7 +69,7 @@ biogeochemistry_OXYDEP(grid) = OXYDEP(;
 # Grid
 grid = Ref{Any}(nothing)
 
-mutable struct SetupVarna
+mutable struct SetupHydrostaticFreeSurface
     grid_callable!::Function
     grid_parameters::NamedTuple
     grid::Ref
@@ -91,87 +91,88 @@ mutable struct SetupVarna
     radiation::Any
     biogeochemistry_callable::Any
     biogeochemistry_args::Any
-
-    function SetupVarna(;
-        bottom_drag_coefficient = 0.003,
-        reference_density = 1020,
-        # Grid
-        grid_callable! = grid_from_bathymetry_file!,
-        grid_parameters = (
-            arch = GPU(),
-            Nz = 10,
-            halo = (7, 7, 7),
-            datadir = joinpath(homedir(), "BadgerArtifacts"),
-            filename = "Varna_topo_channels.jld2",
-            latitude = (43.177, 43.214),
-            longitude = (27.640, 27.947),
-        ),
-        # Buoyancy
-        buoyancy = SeawaterBuoyancy(;
-            gravitational_acceleration = g_Earth,
-            equation_of_state = TEOS10EquationOfState(; reference_density),
-        ),
-        # Closure
-        closure = default_ocean_closure(),
-        # Tracer advection
-        tracer_advection = (
-            T = default_tracer_advection(),
-            S = default_tracer_advection(),
-            e = nothing,
-        ),
-        # Momentum advection
-        momentum_advection = default_momentum_advection(),
-        # Tracers
-        tracers = (:T, :S, :e),
-        initial_conditions = (T = 10, S = 15),
-        # Free surface
-        free_surface_callable = free_surface_default,
-        free_surface_args = (grid,),
-        # Coriolis
-        coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
-        # Forcing
-        forcing_callable = forcing_varna,
-        forcing_args = (bottom_drag_coefficient, grid_parameters.Nz),
-        # Boundary conditions
-        bc_callable = bc_varna,
-        bc_args = (grid, bottom_drag_coefficient),
-        ## Atmosphere
-        atmosphere_callable = atmosphere_JRA55,
-        atmosphere_args = (arch = grid_parameters.arch, backend = InMemory(), grid = grid),
-        radiation = Radiation(grid_parameters.arch),
-        ## Biogeochemistry
-        biogeochemistry_callable = nothing,
-        biogeochemistry_args = (nothing,),
-    )
-
-        return new(
-            grid_callable!,
-            grid_parameters,
-            grid,
-            buoyancy,
-            closure,
-            tracer_advection,
-            momentum_advection,
-            tracers,
-            initial_conditions,
-            free_surface_callable,
-            free_surface_args,
-            coriolis,
-            forcing_callable,
-            forcing_args,
-            bc_callable,
-            bc_args,
-            atmosphere_callable,
-            atmosphere_args,
-            radiation,
-            biogeochemistry_callable,
-            biogeochemistry_args,
-        )
-    end
 end
 
-setup_varna_3d() = SetupVarna()
-setup_varna_3d_Lobster() = SetupVarna(
+function setup_varna(;
+    bottom_drag_coefficient = 0.003,
+    reference_density = 1020,
+    # Grid
+    grid_callable! = grid_from_bathymetry_file!,
+    grid_parameters = (
+        arch = GPU(),
+        Nz = 10,
+        halo = (7, 7, 7),
+        datadir = joinpath(homedir(), "BadgerArtifacts"),
+        filename = "Varna_topo_channels.jld2",
+        latitude = (43.177, 43.214),
+        longitude = (27.640, 27.947),
+    ),
+    # Buoyancy
+    buoyancy = SeawaterBuoyancy(;
+        gravitational_acceleration = g_Earth,
+        equation_of_state = TEOS10EquationOfState(; reference_density),
+    ),
+    # Closure
+    closure = default_ocean_closure(),
+    # Tracer advection
+    tracer_advection = (
+        T = default_tracer_advection(),
+        S = default_tracer_advection(),
+        e = nothing,
+    ),
+    # Momentum advection
+    momentum_advection = default_momentum_advection(),
+    # Tracers
+    tracers = (:T, :S, :e),
+    initial_conditions = (T = 10, S = 15),
+    # Free surface
+    free_surface_callable = free_surface_default,
+    free_surface_args = (grid,),
+    # Coriolis
+    coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
+    # Forcing
+    forcing_callable = forcing_varna,
+    forcing_args = (bottom_drag_coefficient, grid_parameters.Nz),
+    # Boundary conditions
+    bc_callable = bc_varna,
+    bc_args = (grid, bottom_drag_coefficient),
+    ## Atmosphere
+    atmosphere_callable = atmosphere_JRA55,
+    atmosphere_args = (arch = grid_parameters.arch, backend = InMemory(), grid = grid),
+    radiation = Radiation(grid_parameters.arch),
+    ## Biogeochemistry
+    biogeochemistry_callable = nothing,
+    biogeochemistry_args = (nothing,),
+)
+
+    return SetupHydrostaticFreeSurface(
+        grid_callable!,
+        grid_parameters,
+        grid,
+        buoyancy,
+        closure,
+        tracer_advection,
+        momentum_advection,
+        tracers,
+        initial_conditions,
+        free_surface_callable,
+        free_surface_args,
+        coriolis,
+        forcing_callable,
+        forcing_args,
+        bc_callable,
+        bc_args,
+        atmosphere_callable,
+        atmosphere_args,
+        radiation,
+        biogeochemistry_callable,
+        biogeochemistry_args,
+    )
+end
+
+
+setup_varna_3d() = setup_varna()
+setup_varna_3d_Lobster() = setup_varna(
     biogeochemistry_callable = biogeochemistry_LOBSTER,
     biogeochemistry_args = (grid,),
     tracers = (:T, :S, :e, :NO₃, :NH₄, :P, :Z, :sPOM, :bPOM, :DOM),
@@ -189,13 +190,13 @@ setup_varna_3d_Lobster() = SetupVarna(
         DOM = default_tracer_advection(),
     ),
 )
-setup_varna_3d_OXYDEP() = SetupVarna(
+setup_varna_3d_OXYDEP() = setup_varna(
     tracers = (:T, :S, :e, :NUT, :P, :HET, :POM, :DOM, :O₂),
     initial_conditions = (T = 10, S = 15, NUT = 10.0, P = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0),
     biogeochemistry_callable = biogeochemistry_OXYDEP,
     biogeochemistry_args = (grid,),
 )
-setup_varna_2d() = SetupVarna(
+setup_varna_2d() = setup_varna(
     grid_callable! = grid_latitude_flat!,
     grid_parameters = (
         arch = GPU(),
@@ -220,7 +221,7 @@ setup_varna_2d() = SetupVarna(
     bc_callable = bc_ocean,
     bc_args = (grid, 0),
 )
-setup_varna_column() = SetupVarna(
+setup_varna_column() = setup_varna(
     grid_callable! = grid_column!,
     grid_parameters = (
         arch = GPU(),
