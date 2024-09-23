@@ -47,7 +47,7 @@ function record_surface_speed(u, v, times, folder)
     end
 end
 
-function record_surface_tracer(tracer, times, folder, label)
+function record_surface_tracer(tracer, times, folder, name, label)
     Nt = length(times)
     iter = Observable(Nt)
 
@@ -63,7 +63,7 @@ function record_surface_tracer(tracer, times, folder, label)
     cb = Colorbar(fig[0, 1], hm, vertical = false, label)
     hidedecorations!(ax)
 
-    CairoMakie.record(fig, joinpath(homedir(), "data_Varna", "$(prefix)_T.mp4"), 1:Nt, framerate = 8) do i
+    CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = 8) do i
         iter[] = i
     end
 end

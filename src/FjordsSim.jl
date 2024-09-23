@@ -26,7 +26,6 @@ include("initial_conditions.jl")
 include("turbulence_closures.jl")
 include("boundary_conditions.jl")
 include("forcing.jl")
-include("simulations.jl")
 include("radiation.jl")
 include("output.jl")
 
