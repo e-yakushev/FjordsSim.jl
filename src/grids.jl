@@ -1,8 +1,9 @@
-using FileIO
-using JLD2
-using ClimaOcean
 using Oceananigans
 using Oceananigans.Architectures
+using ClimaOcean
+
+using FileIO
+using JLD2
 
 function grid_bathymetry_from_lat_lon(
     arch,
@@ -39,7 +40,7 @@ function grid_bathymetry_from_lat_lon(
         halo = halo,
     )
 
-    h = regrid_bathymetry(
+    h = regrid_bathymetry_regional(
         underlying_grid;
         height_above_water = height_above_water,
         minimum_depth = minimum_depth,

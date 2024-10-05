@@ -35,7 +35,7 @@ function setup_oslo(;
         Ny = 50,
         halo = (7, 7, 7),
         latitude = (59, 60),
-        longitude = (190, 191.25),
+        longitude = (10, 11.25),
         datadir = joinpath(homedir(), "FjordsSim_data"),
         filename = "ETOPO_2022_v1_15s_N60E000_surface.nc",
         depth = 500,
