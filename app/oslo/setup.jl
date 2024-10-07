@@ -30,11 +30,11 @@ function setup_oslo(;
     # Grid
     grid_callable! = grid_from_lat_lon!,
     grid_parameters = (
-        arch = CPU(),
+        arch = GPU(),
         Nx = 50,
         Ny = 50,
         halo = (7, 7, 7),
-        latitude = (59, 60),
+        latitude = (58.8, 59.8),
         longitude = (10, 11.25),
         datadir = joinpath(homedir(), "FjordsSim_data"),
         filename = "ETOPO_2022_v1_15s_N60E000_surface.nc",
