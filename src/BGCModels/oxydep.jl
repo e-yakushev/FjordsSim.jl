@@ -41,7 +41,6 @@ using OceanBioME.Light:
     default_surface_PAR,
     TwoBandPhotosyntheticallyActiveRadiation
 using OceanBioME.Sediments: sinking_flux
-# using OceanBioME.Boundaries.Sediments: sinking_flux
 
 import Adapt: adapt_structure, adapt
 import Base: show, summary
@@ -52,11 +51,7 @@ import Oceananigans.Biogeochemistry:
     update_biogeochemical_state!
 import OceanBioME: redfield, conserved_tracers
 import OceanBioME: maximum_sinking_velocity
-import OceanBioME.Sediments: #import OceanBioME.Boundaries.Sediments:
-    nitrogen_flux,
-    carbon_flux,
-    remineralisation_receiver,
-    sinking_tracers
+import OceanBioME.Sediments: nitrogen_flux, carbon_flux, remineralisation_receiver, sinking_tracers
 
 struct OXYDEP{FT,B,W} <: AbstractContinuousFormBiogeochemistry
     # PHY
@@ -132,11 +127,9 @@ function OXYDEP(;
         surface_PAR = surface_photosynthetically_active_radiation,
     ),
     sediment_model::S = nothing,
-    
     TS_forced::Bool = false,
     Chemicals::Bool = false,
-
-    sinking_speeds = (PHY = 0.15 / day, HET = 0.4 / day, POM = 10.0 / day),
+    sinking_speeds = (P = 0.15 / day, HET = 0.4 / day, POM = 10.0 / day),
     open_bottom::Bool = true,
     scale_negatives = false,
     particles::P = nothing,
@@ -175,22 +168,9 @@ function OXYDEP(;
         CtoN,
         NtoN,
         NtoB,
-
         optionals,
-        
         sinking_velocities,
     )
-
-#    if scale_negatives
-#        scaler = ScaleNegativeTracers(underlying_biogeochemistry, grid; invalid_fill_value)
-#        if isnothing(modifiers)
-#            modifiers = scaler
-#        elseif modifiers isa Tuple
-#            modifiers = (modifiers..., scaler)
-#        else
-#            modifiers = (modifiers, scaler)
-#        end
-#    end
 
     if scale_negatives
         scaler = ScaleNegativeTracers(underlying_biogeochemistry, grid)
@@ -206,20 +186,19 @@ function OXYDEP(;
     )
 end
 
-required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(false, false)},<:Any}) =
-    (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T)
-required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(false, true)},<:Any}) =
-    (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T, :Ci_free, :Ci_PHY, :Ci_HET, :Ci_POM, :Ci_DOM)
-required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(false, false)},<:Any}) = (:PAR,)
-required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(false, true)},<:Any}) = (:PAR,)
+@inline required_biogeochemical_tracers(::OXYDEP) = (:NUT, :P, :HET, :POM, :DOM, :O₂, :T)
+# required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(false, true)},<:Any}) =
+#     (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T, :Ci_free, :Ci_PHY, :Ci_HET, :Ci_POM, :Ci_DOM)
+required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR,)
+# required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(false, true)},<:Any}) = (:PAR,)
 
 # colomney.jl
-required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(true, false)},<:Any}) =
-        (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
-required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(true, true)},<:Any}) =    
-    (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :Ci_free, :Ci_PHY, :Ci_HET, :Ci_POM, :Ci_DOM)
-required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, false)},<:Any}) = (:T, :PAR)
-required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, true)},<:Any}) = (:T, :PAR)
+# required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(true, false)},<:Any}) =
+#     (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
+# required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(true, true)},<:Any}) =
+#     (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :Ci_free, :Ci_PHY, :Ci_HET, :Ci_POM, :Ci_DOM)
+# required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, false)},<:Any}) = (:T, :PAR)
+# required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, true)},<:Any}) = (:T, :PAR)
 
 @inline function biogeochemical_drift_velocity(bgc::OXYDEP, ::Val{tracer_name}) where {tracer_name}
     if tracer_name in keys(bgc.sinking_velocities)
@@ -228,6 +207,22 @@ required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, true)},<:An
         return (u = ZeroField(), v = ZeroField(), w = ZeroField())
     end
 end
+
+# function update_biogeochemical_state!(model, PAR::TwoBandPhotosyntheticallyActiveRadiation)
+#     arch = architecture(model.grid)
+#     launch!(
+#         arch,
+#         model.grid,
+#         :xy,
+#         update_TwoBandPhotosyntheticallyActiveRadiation!,
+#         PAR.field,
+#         model.grid,
+#         model.tracers.PHY,
+#         PAR.surface_PAR,
+#         model.clock.time,
+#         PAR,
+#     )
+# end
 
 @inline maximum_sinking_velocity(bgc::OXYDEP) = maximum(abs, bgc.sinking_velocities.POM.w)
 
@@ -263,22 +258,29 @@ adapt_structure(to, oxydep::OXYDEP) = OXYDEP(
     adapt(to, oxydep.optionals),
     adapt(to, oxydep.sinking_velocities),
 )
-summary(::OXYDEP{FT, Val{B}, NamedTuple{K,V}}) where {FT, B, K, V} = string("OXYDEP{$FT} with TS $(B[1] ? :✅ : :❌), Chemicals $(B[2] ? :✅ : :❌) and $K sinking")
+summary(::OXYDEP{FT,Val{B},NamedTuple{K,V}}) where {FT,B,K,V} =
+    string("OXYDEP{$FT} with TS $(B[1] ? :✅ : :❌), Chemicals $(B[2] ? :✅ : :❌) and $K sinking")
 
-show(io::IO, model::OXYDEP{FT, Val{B}, W}) where {FT, B, W} = print(
+show(io::IO, model::OXYDEP{FT,Val{B},W}) where {FT,B,W} = print(
     io,
-    string("Oxygen Depletion (OxyDep) model \n",
-    "├── Optional components:", "\n",
-    "│   ├── TS $(B[1] ? :✅ : :❌) \n",
-    "│   ├── Chemicals $(B[2] ? :✅ : :❌) \n",
-    "└── Sinking Velocities:", "\n", show_sinking_velocities(model.sinking_velocities)))
+    string(
+        "Oxygen Depletion (OxyDep) model \n",
+        "├── Optional components:",
+        "\n",
+        "│   ├── TS $(B[1] ? :✅ : :❌) \n",
+        "│   ├── Chemicals $(B[2] ? :✅ : :❌) \n",
+        "└── Sinking Velocities:",
+        "\n",
+        show_sinking_velocities(model.sinking_velocities),
+    ),
+)
 
 include("core.jl")
 #include("core_contaminants.jl")
 
 @inline nitrogen_flux(i, j, k, grid, advection, bgc::OXYDEP, tracers) =
     sinking_flux(i, j, k, grid, advection, Val(:POM), bgc, tracers) +
-    sinking_flux(i, j, k, grid, advection, Val(:PHY), bgc, tracers)
-@inline conserved_tracers(::OXYDEP) = (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
+    sinking_flux(i, j, k, grid, advection, Val(:P), bgc, tracers)
+@inline conserved_tracers(::OXYDEP) = (:NUT, :P, :HET, :POM, :DOM, :O₂)
 @inline sinking_tracers(bgc::OXYDEP) = keys(bgc.sinking_velocities)
 

@@ -1,11 +1,18 @@
 using Oceananigans
 using Oceananigans.Units: hour
-using GLMakie
 
-filepath = joinpath(homedir(), "fjords_data", "oslo_fjord_snapshots.jld2")
-filename = joinpath(homedir(), "fjords_data", "oslo_fjord_snapshots")
+include("../../src/FjordsSim.jl")
 
-time_series = FieldTimeSeries(filepath, "T")
+using .FjordsSim: record_surface_speed
+
+folder = joinpath(homedir(), "FjordsSim_results")
+filename = joinpath(folder, "oslo_surface_snapshots")
+u =   FieldTimeSeries("$filename.jld2", "u")
+v =   FieldTimeSeries("$filename.jld2", "v")
+times = u.times
+
+record_surface_speed(u, v, times, folder)
+
 x, y, z = nodes(time_series)
 
 # get a land mask
@@ -48,7 +55,7 @@ axis_kwargs_xz = (
 ax_xy = Axis(fig[1, 1]; axis_kwargs_xy...)
 ax_xz = Axis(fig[1, 3]; axis_kwargs_xz...)
 
-Tlims = (19, 20)
+Tlims = (3, 20)
 
 hm_xy = heatmap!(ax_xy, x, y, Txy; nan_color=:white, colormap = :thermal, colorrange = Tlims)
 Colorbar(fig[1, 2], hm_xy; label = "m")

@@ -1,23 +1,34 @@
-using GLMakie
-using Oceananigans
+# Copyright 2024 The FjordsSim Authors.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-include("../../src/FjordsSim.jl")
+using CairoMakie
+
 include("setup.jl")
 
-using .FjordsSim
+using .FjordsSim: grid_bathymetry_from_lat_lon
 
-setup_grid = SetupGridRegrid(;args_grid...)
-grid = ImmersedBoundaryGrid(setup_grid)
-λ, φ, z = nodes(grid.underlying_grid, Center(), Center(), Center())
+## Model Setup
+sim_setup = setup_oslo()
+underlying_grid, bottom_height = grid_bathymetry_from_lat_lon(sim_setup.grid_parameters...)
 
-h = interior(grid.immersed_boundary.bottom_height)
-land = h .>= 0
-h[land] .= NaN
-h = h[:, :, 1]
+# For plotting
+bottom_height.data[bottom_height.data .>= 0] .= NaN
 
-fig = Figure(; size=(900, 700))
-ax = Axis(fig[1, 1])
-hm = heatmap!(ax, λ, φ, h, nan_color=:white, colorrange=(-500, 0))
-Colorbar(fig[1, 2], hm; label = "m")
+fig = Figure(size = (400, 400))
+ax  = Axis(fig[1, 1])
+hm = heatmap!(ax, bottom_height, colormap = :deep, colorrange = (-600, 0))
+cb = Colorbar(fig[0, 1], hm, label = "Bottom height (m)", vertical = false)
+hidedecorations!(ax)
 
-display(fig)
+save(joinpath(homedir(), "FjordsSim_results", "bathymetry.png"), fig)

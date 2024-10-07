@@ -1,39 +1,25 @@
-using FileIO
-using JLD2
-using ClimaOcean
 using Oceananigans
 using Oceananigans.Architectures
+using ClimaOcean
 
-# import Oceananigans.ImmersedBoundaries: ImmersedBoundaryGrid
+using FileIO
+using JLD2
 
-struct SetupGridRegrid
-    arch::AbstractSerialArchitecture
-    size::Tuple
-    latitude::Tuple
-    longitude::Tuple
-    z::Any
-    halo::Tuple
-    datadir::String
-    filename::String
-    height_above_water::Any
-    minimum_depth::Number
-end
-
-function SetupGridRegrid(;
-    Nx::Integer,
-    Ny::Integer,
-    latitude::Tuple,
-    longitude::Tuple,
-    datadir::String = joinpath(homedir(), "data_fjords"),
-    filename::String,
+function grid_bathymetry_from_lat_lon(
+    arch,
+    Nx,
+    Ny,
+    halo,
+    latitude,
+    longitude,
+    datadir,
+    filename,
     depth,
     surface_layer_Δz,
     stretching_factor,
     surface_layer_height,
-    arch::AbstractSerialArchitecture = CPU(),
-    halo::Tuple = (4, 4, 4),
-    height_above_water = nothing,
-    minimum_depth::Number = 0,
+    height_above_water,
+    minimum_depth,
 )
 
     z_faces = stretched_vertical_faces(;
@@ -45,18 +31,63 @@ function SetupGridRegrid(;
 
     Nz = length(z_faces) - 1
 
-    return SetupGridRegrid(
+    underlying_grid = LatitudeLongitudeGrid(
+        arch;
+        size = (Nx, Ny, Nz),
+        latitude = latitude,
+        longitude = longitude,
+        z = z_faces,
+        halo = halo,
+    )
+
+    h = regrid_bathymetry_regional(
+        underlying_grid;
+        height_above_water = height_above_water,
+        minimum_depth = minimum_depth,
+        dir = datadir,
+        filename = filename,
+        interpolation_passes = 1,
+        major_basins = 1,
+    )
+    return underlying_grid, h
+end
+
+function grid_from_lat_lon!(sim_setup)
+    arch,
+    Nx,
+    Ny,
+    halo,
+    latitude,
+    longitude,
+    datadir,
+    filename,
+    depth,
+    surface_layer_Δz,
+    stretching_factor,
+    surface_layer_height,
+    height_above_water,
+    minimum_depth = sim_setup.grid_parameters
+
+    underlying_grid, h = grid_bathymetry_from_lat_lon(
         arch,
-        (Nx, Ny, Nz),
+        Nx,
+        Ny,
+        halo,
         latitude,
         longitude,
-        z_faces,
-        halo,
         datadir,
         filename,
+        depth,
+        surface_layer_Δz,
+        stretching_factor,
+        surface_layer_height,
         height_above_water,
         minimum_depth,
     )
+
+    grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(h))
+    sim_setup.grid[] = grid
+    return grid
 end
 
 function grid_from_bathymetry_file!(sim_setup)
@@ -87,6 +118,24 @@ function grid_latitude_flat!(sim_setup)
     grid = LatitudeLongitudeGrid(
         arch;
         size = (Nx, Ny, Nz),
+        halo = halo,
+        z = z_faces,
+        latitude,
+        longitude,
+    )
+    sim_setup.grid[] = grid
+    return grid
+end
+
+function grid_column!(sim_setup)
+    arch, Nz, halo, latitude, longitude, depth, h = sim_setup.grid_parameters
+    longitude = longitude .+ (-0.03, 0.03)
+    latitude = latitude .+ (-0.03, 0.03)
+
+    z_faces = exponential_z_faces(; Nz, depth, h)
+    grid = LatitudeLongitudeGrid(
+        arch;
+        size = (3, 3, Nz),
         halo = halo,
         z = z_faces,
         latitude,

@@ -101,3 +101,16 @@ function safe_execute(callable)
         end
     end
 end
+
+function extract_z_faces(grid)
+    bar = grid["zᵃᵃᶜ"]
+    zero_index = findfirst(x -> x > 0.0, bar)
+    n = grid["Nz"] + 1
+    if zero_index > 1
+        start_index = max(1, zero_index - n)
+        z = bar[start_index:zero_index-1]
+    else
+        z = []
+    end
+    return z
+end

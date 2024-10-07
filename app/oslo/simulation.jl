@@ -1,111 +1,66 @@
-## Packages and modules
-using Oceananigans
-using Oceananigans.Units: minute, minutes, days, hour
-using Printf
+# Copyright 2024 The FjordsSim Authors.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-include("../../src/FjordsSim.jl")
+using Printf
+using FileIO
+using JLD2
+
 include("setup.jl")
 
-using .FjordsSim
+using .FjordsSim: progress, coupled_hydrostatic_simulation
 
-## Setup
-setup_grid = SetupGridRegrid(;args_grid...)
-grid = ImmersedBoundaryGrid(setup_grid)
+## Model Setup
+sim_setup = setup_oslo()
 
-coriolis = HydrostaticSphericalCoriolis()
-closure = ScalarDiffusivity(ν=1e-4, κ=1e-4)
-buoyancy = SeawaterBuoyancy(equation_of_state=LinearEquationOfState(thermal_expansion = 2e-4,
-                                                                    haline_contraction = 8e-4))
+coupled_simulation = coupled_hydrostatic_simulation(sim_setup)
 
-## Boundary conditions
-Qʰ = 200.0  # W m⁻², surface _heat_ flux
-ρₒ = 1026.0 # kg m⁻³, average density at the surface of the world ocean
-cᴾ = 3991.0 # J K⁻¹ kg⁻¹, typical heat capacity for seawater
-Qᵀ = Qʰ / (ρₒ * cᴾ) # K m s⁻¹, surface _temperature_ flux
+## Callbacks
+coupled_simulation.callbacks[:progress] = Callback(progress, IterationInterval(100))
 
-dTdz = 1e-2 # K m⁻¹, temperature gradient
-T_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(Qᵀ),
-                                bottom = GradientBoundaryCondition(dTdz))
+## Set up output writers
+ocean_sim = coupled_simulation.model.ocean
+ocean_model = ocean_sim.model
+surface_prefix = joinpath(homedir(), "FjordsSim_results", "oslo_surface_snapshots")
+ocean_sim.output_writers[:surface] = JLD2OutputWriter(
+    ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
+    schedule = TimeInterval(1hour),
+    filename = "$surface_prefix.jld2",
+    indices=(:, :, grid[].Nz),
+    overwrite_existing = true,
+    array_type=Array{Float32}
+)
 
-u₁₀ = 10 # m s⁻¹, average wind velocity 10 meters above the ocean
-cᴰ = 2.5e-3 # dimensionless drag coefficient
-ρₐ = 1.225  # kg m⁻³, average density of air at sea-level
-Qᵘ = - ρₐ / ρₒ * cᴰ * u₁₀ * abs(u₁₀); # m² s⁻²
-# u_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(Qᵘ))
-vₛ = 1e-1
-v_bcs = FieldBoundaryConditions(south = OpenBoundaryCondition(vₛ))
+profile_prefix = joinpath(homedir(), "FjordsSim_results", "oslo_snapshots")
+ocean_sim.output_writers[:profile] = JLD2OutputWriter(
+    ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
+    schedule = TimeInterval(1day),
+    filename = "$profile_prefix.jld2",
+    overwrite_existing = true,
+    array_type=Array{Float32}
+)
 
-## Model
-model = HydrostaticFreeSurfaceModel(; coriolis, closure, grid, buoyancy,
-                                    momentum_advection = VectorInvariant(),
-                                    tracer_advection = WENO(grid.underlying_grid),
-                                    tracers = (:T, :S),
-                                    # boundary_conditions = (u=u_bcs, v=v_bcs, T=T_bcs)
-                                    boundary_conditions = (v=v_bcs, T=T_bcs)
-                                    )
+## Spinning up the simulation
+# We use an adaptive time step that maintains the [CFL condition](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition) equal to 0.1.
+ocean_sim.stop_time = 10days
+coupled_simulation.stop_time = 10days
+conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=1.5minutes, max_change=1.01)
+run!(coupled_simulation)
 
-## Set model, initial conditions
-# Random noise damped at top and bottom
-Ξ(z) = randn() * z / model.grid.Lz * (1 + z / model.grid.Lz) # noise
-# Temperature initial condition: a stable density gradient with random noise superposed.
-Tᵢ(x, y, z) = 20 + dTdz * z + dTdz * model.grid.Lz * 1e-3 * Ξ(z)
-# Velocity initial condition: random noise scaled by the friction velocity.
-uᵢ(x, y, z) = sqrt(abs(Qᵘ)) * 1e-3 * Ξ(z);
-# `set!` the `model` fields using functions or constants:
-set!(model, u=uᵢ, v=uᵢ, w=uᵢ, T=Tᵢ, S=35)
-
-## Setup a simulation
-Δt = 1minute
-simulation = Simulation(model; Δt, stop_iteration=1440) #stop_time=Nyears * years)
-
-## Setup output, callbacks
-start_time = [time_ns()]
-function progress(sim)
-    wall_time = (time_ns() - start_time[1]) * 1e-9
-
-    u = sim.model.velocities.u
-    w = sim.model.velocities.w
-
-    intw  = Array(interior(w))
-    max_w = findmax(intw)
-
-    mw = max_w[1]
-    iw = max_w[2]
-
-    @info @sprintf("Time: % 12s, iteration: %d, max(|u|): %.2e ms⁻¹, wmax: %.2e , loc: (%d, %d, %d), wall time: %s",
-                    prettytime(sim.model.clock.time),
-                    sim.model.clock.iteration, maximum(abs, u), mw, iw[1], iw[2], iw[3],
-                    prettytime(wall_time))
-
-    start_time[1] = time_ns()
-
-    return nothing
-end
-
-simulation.callbacks[:progress] = Callback(progress, IterationInterval(10))
-
-u, v, w = model.velocities
-T = model.tracers.T
-S = model.tracers.S
-
-output_prefix = joinpath(homedir(), "data_fjords", "oslo")
-pickup = false
-save_interval = 1hour;
-
-simulation.output_writers[:surface_fields] =
-    JLD2OutputWriter(model, (; u, v, w, T, S),
-                     schedule = TimeInterval(save_interval),
-                     filename = output_prefix * "_snapshots",
-                     # with_halos = true,
-                     overwrite_existing = true)
-
-## Run simulation
-@info "Running a simulation with Δt = $(prettytime(simulation.Δt))"
-
-run!(simulation; pickup)
-
-@info """
-    Simulation took $(prettytime(simulation.run_wall_time))
-    Free surface: $(typeof(model.free_surface).name.wrapper)
-    Time step: $(prettytime(Δt))
-"""
+## Running the simulation
+# This time, we set the CFL in the time_step_wizard to be 0.25 as this is the maximum recommended CFL to be
+# used in conjunction with Oceananigans' hydrostatic time-stepping algorithm ([two step Adams-Bashfort](https://en.wikipedia.org/wiki/Linear_multistep_method))
+ocean_sim.stop_time = 355days
+coupled_simulation.stop_time = 355days
+conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=10minutes, max_change=1.01)
+run!(coupled_simulation)
