@@ -68,7 +68,7 @@ function setup_varna(;
         arch = GPU(),
         Nz = 10,
         halo = (7, 7, 7),
-        datadir = joinpath(homedir(), "BadgerArtifacts"),
+        datadir = joinpath(homedir(), "FjordsSim_data"),
         filename = "Varna_topo_channels.jld2",
         latitude = (43.177, 43.214),
         longitude = (27.640, 27.947),

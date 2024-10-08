@@ -6,7 +6,7 @@ include("../../src/FjordsSim.jl")
 
 using .FjordsSim: plot_1d_phys, extract_z_faces
 
-folder = joinpath(homedir(), "data_Varna")
+folder = joinpath(homedir(), "FjordsSim_results")
 filename = joinpath(folder, "snapshots")
 T =   FieldTimeSeries("$filename.jld2", "T")
 S =   FieldTimeSeries("$filename.jld2", "S")
