@@ -55,7 +55,7 @@ biogeochemistry_OXYDEP(grid, args_oxydep) = OXYDEP(;
 # Grid
 grid = Ref{Any}(nothing)
 
-mutable struct SetupHydrostaticFreeSurface
+mutable struct SetupModel
     grid_callable!::Function
     grid_parameters::NamedTuple
     grid::Ref
@@ -79,7 +79,7 @@ mutable struct SetupHydrostaticFreeSurface
     biogeochemistry_args::Any
 end
 
-function coupled_hydrostatic_simulation(sim_setup::SetupHydrostaticFreeSurface)
+function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     grid = sim_setup.grid_callable!(sim_setup)
     buoyancy = sim_setup.buoyancy
     closure = sim_setup.closure
@@ -106,20 +106,26 @@ function coupled_hydrostatic_simulation(sim_setup::SetupHydrostaticFreeSurface)
         boundary_conditions,
         biogeochemistry
     )
+    println("Done compiling HydrostaticFreeSurfaceModel")
 
     ## Simulation
     Δt = 1seconds
     ocean_sim = Simulation(ocean_model; Δt)
+    println("Initialized simulation")
 
     ## Set initial conditions
     set!(ocean_model; sim_setup.initial_conditions...)
+    println("Set initial conditions")
 
     ## Coupled model / simulation
     sea_ice = nothing
     atmosphere = safe_execute(sim_setup.atmosphere_callable)(sim_setup.atmosphere_args...)
+    println("Initialized atmosphere")
     radiation = sim_setup.radiation
     coupled_model = OceanSeaIceModel(ocean_sim, sea_ice; atmosphere, radiation)
+    println("Initialized coupled model")
     coupled_simulation = Simulation(coupled_model; Δt)
+    println("Initialized coupled simulation")
     return coupled_simulation
 end
 

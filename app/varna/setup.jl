@@ -13,7 +13,7 @@ using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 include("../../src/FjordsSim.jl")
 
 using .FjordsSim:
-    SetupHydrostaticFreeSurface,
+    SetupModel,
     grid_from_bathymetry_file!,
     grid_latitude_flat!,
     grid_column!,
@@ -111,7 +111,7 @@ function setup_varna(;
     biogeochemistry_args = (nothing,),
 )
 
-    return SetupHydrostaticFreeSurface(
+    return SetupModel(
         grid_callable!,
         grid_parameters,
         grid,

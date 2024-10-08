@@ -21,9 +21,9 @@ include("setup.jl")
 using .FjordsSim: progress, coupled_hydrostatic_simulation
 
 ## Model Setup
-# sim_setup = setup_varna_3d()
+sim_setup = setup_varna_3d()
 # sim_setup = setup_varna_3d_Lobster()
-sim_setup = setup_varna_3d_OXYDEP()
+# sim_setup = setup_varna_3d_OXYDEP()
 # sim_setup = setup_varna_2d()
 # sim_setup = setup_varna_column()
 
