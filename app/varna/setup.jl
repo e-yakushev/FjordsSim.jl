@@ -100,7 +100,7 @@ function setup_varna(;
     forcing_callable = forcing_varna,
     forcing_args = (bottom_drag_coefficient, grid_parameters.Nz),
     # Boundary conditions
-    bc_callable = bc_varna,
+    bc_callable = bc_ocean,
     bc_args = (grid, bottom_drag_coefficient),
     ## Atmosphere
     atmosphere_callable = atmosphere_JRA55,

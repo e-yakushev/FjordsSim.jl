@@ -2,7 +2,7 @@ using Oceananigans
 using CairoMakie
 using Oceananigans.Units
 
-function plot_1d_phys(T, S, z, times, folder)
+function plot_1d_phys(T, S, z, times, folder, x, y)
     fig = Figure(size = (1000, 400), fontsize = 20)
 
     axis_kwargs = (
@@ -13,17 +13,17 @@ function plot_1d_phys(T, S, z, times, folder)
     )
 
     Axis(fig[1, 1]; title = "T, ⁰C", axis_kwargs...)
-    hmT = heatmap!(times / days, z, interior(T, 1, 1, :, :)', colormap = Reverse(:RdYlBu))
+    hmT = heatmap!(times / days, z, interior(T, x, y, :, :)', colormap = Reverse(:RdYlBu))
     Colorbar(fig[1, 2], hmT)
 
     Axis(fig[2, 1]; title = "S, psu", axis_kwargs...)
-    hmS = heatmap!(times / days, z, interior(S, 1, 1, :, :)', colormap = Reverse(:RdYlBu))
+    hmS = heatmap!(times / days, z, interior(S, x, y, :, :)', colormap = Reverse(:RdYlBu))
     Colorbar(fig[2, 2], hmS)
 
     save(joinpath(folder,"1d_phys.png"), fig)
 end
 
-function record_surface_speed(u, v, times, folder)
+function record_surface_speed(u, v, Nz, times, folder)
     Nt = length(times)
     iter = Observable(Nt)
 
@@ -31,7 +31,7 @@ function record_surface_speed(u, v, times, folder)
     si = @lift begin
          s = Field(sqrt(u[$iter]^2 + v[$iter]^2))
          compute!(s)
-         s = interior(s, :, :, 1)
+         s = interior(s, :, :, Nz)
          s[s .== 0] .= NaN
          s
     end
