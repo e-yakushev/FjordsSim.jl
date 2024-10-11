@@ -14,6 +14,18 @@ function forcing_bottom_drag(bottom_drag_coefficient)
         return (u = Fu, v = Fv, )
 end
 
+function forcing_QuasiOpenBoundary(Nx)
+    # test a-la tides
+    T₂ = 12.421hours
+    ω₂ = 2π / T₂ # radians/sec
+    @inline sin_forcing(x, y, z, t, u) = @inbounds ifelse(x == Nx, u + 1.0 * sin(ω₂ * t), 0)
+    sinFu = Forcing(
+        sin_forcing,
+        field_dependencies=(:u,)
+    )
+    return (u = sinFu,)
+end
+
 function forcing_rivers_S(Nz)
     λ = 1 / (30minutes)  # Relaxation timescale [s⁻¹].
 
@@ -47,8 +59,10 @@ function forcing_rivers_NO₃(Nz)
     return (S = Sforcing, NO₃ = NO₃forcing, )
 end
 
-function forcing_varna(bottom_drag_coefficient, Nz)
+function forcing_varna(bottom_drag_coefficient, Nz, grid)
+    Nx = grid[].Nx
     forcing_bottom = forcing_bottom_drag(bottom_drag_coefficient)
+    forcing_east_boundary = forcing_QuasiOpenBoundary(Nx)
     forcing_rivers = forcing_rivers_S(Nz)
-    return merge(forcing_bottom, forcing_rivers) 
+    return merge(forcing_bottom, forcing_east_boundary, forcing_rivers) 
 end
