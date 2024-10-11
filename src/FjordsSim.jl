@@ -92,6 +92,7 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     boundary_conditions = sim_setup.bc_callable(sim_setup.bc_args...)
     biogeochemistry = safe_execute(sim_setup.biogeochemistry_callable)(sim_setup.biogeochemistry_args...)
 
+    println("Start compiling HydrostaticFreeSurfaceModel")
     ## Model
     ocean_model = HydrostaticFreeSurfaceModel(;
         grid,
@@ -124,7 +125,14 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     radiation = sim_setup.radiation
     coupled_model = OceanSeaIceModel(ocean_sim, sea_ice; atmosphere, radiation)
     println("Initialized coupled model")
+
     coupled_simulation = Simulation(coupled_model; Δt)
+    # function atm_progress(sim)
+    #     atmosphere_message = @sprintf("max(Ta) = %.1f", maximum(sim.model.atmosphere.tracers.T))
+    #     @info atmosphere_message
+    #     return nothing
+    # end
+    # add_callback!(coupled_simulation, atm_progress, IterationInterval(100))
     println("Initialized coupled simulation")
     return coupled_simulation
 end
