@@ -58,7 +58,7 @@ function record_surface_tracer(
     iter = Observable(Nt)
 
     Ti = @lift begin
-         Ti = interior(T[$iter], :, :, Nz)
+         Ti = interior(tracer[$iter], :, :, Nz)
          Ti[Ti .== 0] .= NaN
          Ti
     end
@@ -66,7 +66,7 @@ function record_surface_tracer(
     fig = Figure(size = (1000, 400))
     ax = Axis(fig[1, 1])
     hm = heatmap!(ax, Ti, colorrange = colorrange, colormap = colormap)
-    cb = Colorbar(fig[0, 1], hm, vertical = false, label)
+    cb = Colorbar(fig[0, 1], hm, vertical = false)
     hidedecorations!(ax)
 
     CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = 8) do i

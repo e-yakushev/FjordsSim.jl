@@ -65,6 +65,16 @@ args_oxydep = (
     sinking_speeds = (P = 0.15 / day, HET = 4.0 / day, POM = 10.0 / day),
 )
 
+# Values on the open boundary
+external_values = (
+    T = 10.0,
+    S = 18.0,
+    NUT = 2.0,
+    O₂ = 300.0,
+    P = 0.001,
+    HET = 0.001,
+)
+
 function setup_varna(;
     # Grid
     grid_callable! = grid_from_bathymetry_file!,
@@ -83,8 +93,7 @@ function setup_varna(;
         equation_of_state = TEOS10EquationOfState(; reference_density),
     ),
     # Closure
-    # do we need convective_νz=1e-6?
-    closure = ConvectiveAdjustmentVerticalDiffusivity(convective_κz = 5e-5, background_κz=1e-5, convective_νz=1e-6),
+    closure = ConvectiveAdjustmentVerticalDiffusivity(convective_κz = 5e-5, background_κz=1e-5),
 
     # Tracer advection
     tracer_advection = (
@@ -104,7 +113,7 @@ function setup_varna(;
     coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
     # Forcing
     forcing_callable = forcing_varna,
-    forcing_args = (bottom_drag_coefficient, grid_parameters.Nz, grid),
+    forcing_args = (bottom_drag_coefficient, grid_parameters.Nz, grid, external_values),
     # Boundary conditions
     bc_callable = bc_varna,
     bc_args = (grid, bottom_drag_coefficient),
