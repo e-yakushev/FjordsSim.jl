@@ -31,7 +31,7 @@ using .FjordsSim:
     biogeochemistry_OXYDEP
 
 const bottom_drag_coefficient = 0.003
-const reference_density = 1020
+const reference_density = 1010  # T = 15 degC, S = 15 PSU
 
 args_oxydep = (
     initial_photosynthetic_slope = 0.1953 / day, # 1/(W/m²)/s
@@ -69,6 +69,7 @@ args_oxydep = (
 external_values = (
     T = 10.0,
     S = 18.0,
+    C = 0.0,  # C passive tracer, Contaminant
     NUT = 2.0,
     O₂ = 300.0,
     P = 0.001,
@@ -171,8 +172,8 @@ setup_varna_3d_Lobster() = setup_varna(
     ),
 )
 setup_varna_3d_OXYDEP() = setup_varna(
-    tracers = (:T, :S, :e, :NUT, :P, :HET, :POM, :DOM, :O₂),
-    initial_conditions = (T = 10, S = 15, NUT = 10.0, P = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0),
+    tracers = (:T, :S, :e, :C, :NUT, :P, :HET, :POM, :DOM, :O₂),
+    initial_conditions = (T = 10, S = 15, C = 0.0, NUT = 10.0, P = 0.05, HET = 0.01, O₂ = 350.0, DOM = 1.0),
     biogeochemistry_callable = biogeochemistry_OXYDEP,
     biogeochemistry_args = (grid, args_oxydep),
     bc_args = (grid, bottom_drag_coefficient, biogeochemistry_OXYDEP),
@@ -180,6 +181,7 @@ setup_varna_3d_OXYDEP() = setup_varna(
     tracer_advection = (
         T = WENO(),
         S = WENO(),
+        C = WENO(),
         e = nothing,
         NUT = WENO(),
         P = WENO(),

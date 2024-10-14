@@ -110,7 +110,7 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     println("Done compiling HydrostaticFreeSurfaceModel")
 
     ## Simulation
-    Δt = 20seconds
+    Δt = 25seconds
     ocean_sim = Simulation(ocean_model; Δt)
     println("Initialized simulation")
 
