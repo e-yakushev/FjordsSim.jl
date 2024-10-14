@@ -6,6 +6,8 @@ using Oceananigans.Operators: Δzᵃᵃᶜ, ℑxyᶜᶠᵃ, ℑxyᶠᶜᵃ
 using Oceananigans.Units
 using Oceananigans.Architectures
 using OceanBioME: GasExchange
+import Oceananigans.Biogeochemistry:
+    biogeochemical_drift_velocity
 
 const twelve_months = 12
 const thirty_days = 30days
@@ -205,20 +207,33 @@ function physics_boundary_conditions(arch, Nx, Ny)
     return u_bcs, v_bcs
 end
 
-# BGC boundary conditions
-function bgh_oxydep_boundary_conditions()
-    O2_suboxic = 30.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
-    Trel = 10000.0     # Relaxation time for exchange with the sediments (s/m)
-    b_ox = 15.0        # difference of OXY in the sediment and water, 
-    b_NUT = 15.0       # NUT in the sediment, (mmol/m3)  
-    b_DOM_ox = 10.0    # OM in the sediment (oxic conditions), (mmol/m3) 
-    b_DOM_anox = 20.0  # OM in the sediment (anoxic conditions), (mmol/m3)  
-    bu = 0.7           # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
+# OXYDEP constants
+const O2_suboxic = 30.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
+const Trel = 10000.0     # Relaxation time for exchange with the sediments (s/m)
+const b_ox = 15.0        # difference of OXY in the sediment and water, 
+const b_NUT = 10.0       # NUT in the sediment, (mmol/m3)  
+const b_DOM_ox = 6.0     # OM in the sediment (oxic conditions), (mmol/m3) 
+const b_DOM_anox = 20.0  # OM in the sediment (anoxic conditions), (mmol/m3)  
+const bu = 0.85          # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
+const windspeed = 5.0    # wind speed 10 m, (m/s)
 
+# BGC boundary conditions
+function bgh_oxydep_boundary_conditions(biogeochemistry, Nz)
+    
+    Oxy_top_cond(i, j, grid, clock, fields) = @inbounds (OxygenSeaWaterFlux(
+            fields.T[i, j, Nz],
+            fields.S[i, j, Nz],
+            0.0,                # sea surface pressure
+            fields.O₂[i, j, Nz],
+            windspeed,
+    ))
+
+    OXY_top = FluxBoundaryCondition(Oxy_top_cond; discrete_form = true)
+
+    # oxic - suboxic switches
     @inline F_ox(conc, threshold) = (0.5 + 0.5 * tanh(conc - threshold))
     @inline F_subox(conc, threshold) = (0.5 - 0.5 * tanh(conc - threshold))
 
-    OXY_top = GasExchange(; gas = :O₂)
     @inline OXY_bottom_cond(i, j, grid, clock, fields) = @inbounds -(
         F_ox(fields.O₂[i, j, 1], O2_suboxic) * b_ox +
         F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.O₂[i, j, 1])
@@ -231,9 +246,9 @@ function bgh_oxydep_boundary_conditions()
     ) / Trel
     NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond, discrete_form = true) #ValueBoundaryCondition(10.0)
 
-    w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:PHY)).w[1, 1, 1]
-    @inline PHY_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_PHY * fields.PHY[i, j, 1]
-    PHY_bottom = FluxBoundaryCondition(PHY_bottom_cond, discrete_form = true)
+    w_P = biogeochemical_drift_velocity(biogeochemistry, Val(:P)).w[1, 1, 1]
+    @inline P_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_P * fields.P[i, j, 1]
+    P_bottom = FluxBoundaryCondition(P_bottom_cond, discrete_form = true)
 
     w_HET = biogeochemical_drift_velocity(biogeochemistry, Val(:HET)).w[1, 1, 1]
     @inline HET_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_HET * fields.HET[i, j, 1]
@@ -254,10 +269,19 @@ function bgh_oxydep_boundary_conditions()
     nut_bcs = FieldBoundaryConditions(bottom = NUT_bottom)
     dom_bcs = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom)
     pom_bcs = FieldBoundaryConditions(bottom = POM_bottom)
-    phy_bcs = FieldBoundaryConditions(bottom = PHY_bottom)
+    phy_bcs = FieldBoundaryConditions(bottom = P_bottom)
     het_bcs = FieldBoundaryConditions(bottom = HET_bottom)
 
-    return oxy_bcs, nut_bcs, dom_bcs, pom_bcs, phy_bcs, het_bcs
+    bc_oxydep = (
+        O₂ = oxy_bcs,
+        NUT = nut_bcs,
+        DOM = dom_bcs,
+        POM = pom_bcs,
+        P = phy_bcs,
+        HET = het_bcs,
+    )
+    
+    return bc_oxydep
 end
 
 function bc_ocean(grid, bottom_drag_coefficient)
@@ -307,14 +331,24 @@ function bc_varna(grid, bottom_drag_coefficient)
     )
 
     # 42 is length of y ax
-    sin_flux(y, z, t) = @inbounds ifelse(z == grid.Nz, 0.05 * sin((2 * 3.14 / 42) * y) , 0)
-    u_bc = BoundaryCondition(Open, sin_flux)
+    # sin_flux(y, z, t) = @inbounds ifelse(z == grid.Nz, 0.05 * sin((2 * 3.14 / 42) * y) , 0)
+    # u_bc = BoundaryCondition(Open, sin_flux)
 
     bc = (
-        u = FieldBoundaryConditions(top = FluxBoundaryCondition(τx), bottom = u_bot_bc, east = u_bc),
+        u = FieldBoundaryConditions(top = FluxBoundaryCondition(τx), bottom = u_bot_bc),
+        # u = FieldBoundaryConditions(top = FluxBoundaryCondition(τx), bottom = u_bot_bc, east = u_bc),
         v = FieldBoundaryConditions(top = FluxBoundaryCondition(τy), bottom = v_bot_bc),
         T = FieldBoundaryConditions(top = FluxBoundaryCondition(Jᵀ)),
         S = FieldBoundaryConditions(top = FluxBoundaryCondition(Jˢ)),
     )
     return bc
 end
+
+function bc_varna_bgh_oxydep(grid, bottom_drag_coefficient, bgc_model)
+    Nz = grid[].Nz
+    bc_varna_tuple = bc_varna(grid, bottom_drag_coefficient)
+    bc_bgh_oxydep_tuple = bgh_oxydep_boundary_conditions(bgc_model, Nz)
+
+    return merge(bc_varna_tuple, bc_bgh_oxydep_tuple)
+end
+

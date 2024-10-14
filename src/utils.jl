@@ -1,5 +1,6 @@
 using NCDatasets
 using Printf
+using JLD2
 
 """
 # Example usage
@@ -114,3 +115,27 @@ function extract_z_faces(grid)
     end
     return z
 end
+
+
+function netcdf_to_jld2(netcdf_file::String, jld2_file::String)
+    # Open the NetCDF file in read-only mode
+    ds = Dataset(netcdf_file, "r")
+
+    # Create a dictionary to store the variables from the NetCDF file
+    data_dict = Dict()
+
+    # Loop through all variables in the NetCDF file and store them in the dictionary
+    for varname in keys(ds)
+        data_dict[varname] = convert(Array, ds[varname])  #syntax to keep the dimensions
+        print(size(convert(Array, ds[varname])))
+    end
+
+    # Save the data to a JLD2 file
+    @save jld2_file data_dict
+
+    # Close the NetCDF dataset
+    close(ds)
+
+    println("Conversion completed: NetCDF to JLD2")
+end
+

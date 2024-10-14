@@ -9,16 +9,19 @@ using OceanBioME
 using ClimaOcean.OceanSimulations:
     default_ocean_closure, default_momentum_advection, default_tracer_advection
 using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
+using Oceananigans.TurbulenceClosures: ConvectiveAdjustmentVerticalDiffusivity
 
 include("../../src/FjordsSim.jl")
 
 using .FjordsSim:
-    SetupHydrostaticFreeSurface,
+    SetupModel,
     grid_from_bathymetry_file!,
     grid_latitude_flat!,
     grid_column!,
     grid,
     forcing_varna,
+    bc_varna_bgh_oxydep,
+    bgh_oxydep_boundary_conditions,
     bc_varna,
     bc_ocean,
     PAR⁰,
@@ -26,6 +29,9 @@ using .FjordsSim:
     atmosphere_JRA55,
     biogeochemistry_LOBSTER,
     biogeochemistry_OXYDEP
+
+const bottom_drag_coefficient = 0.003
+const reference_density = 1020
 
 args_oxydep = (
     initial_photosynthetic_slope = 0.1953 / day, # 1/(W/m²)/s
@@ -56,12 +62,20 @@ args_oxydep = (
     CtoN = 6.625, # (nd)
     NtoN = 5.3,   # (nd)
     NtoB = 0.016, # (nd)
-    sinking_speeds = (PHY = 0.15 / day, HET = 4.0 / day, POM = 10.0 / day),
+    sinking_speeds = (P = 0.15 / day, HET = 4.0 / day, POM = 10.0 / day),
+)
+
+# Values on the open boundary
+external_values = (
+    T = 10.0,
+    S = 18.0,
+    NUT = 2.0,
+    O₂ = 300.0,
+    P = 0.001,
+    HET = 0.001,
 )
 
 function setup_varna(;
-    bottom_drag_coefficient = 0.003,
-    reference_density = 1020,
     # Grid
     grid_callable! = grid_from_bathymetry_file!,
     grid_parameters = (
@@ -79,11 +93,12 @@ function setup_varna(;
         equation_of_state = TEOS10EquationOfState(; reference_density),
     ),
     # Closure
-    closure = default_ocean_closure(),
+    closure = ConvectiveAdjustmentVerticalDiffusivity(convective_κz = 5e-5, background_κz=1e-5),
+
     # Tracer advection
     tracer_advection = (
-        T = default_tracer_advection(),
-        S = default_tracer_advection(),
+        T = WENO(),
+        S = WENO(),
         e = nothing,
     ),
     # Momentum advection
@@ -98,7 +113,7 @@ function setup_varna(;
     coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
     # Forcing
     forcing_callable = forcing_varna,
-    forcing_args = (bottom_drag_coefficient, grid_parameters.Nz),
+    forcing_args = (bottom_drag_coefficient, grid_parameters.Nz, grid, external_values),
     # Boundary conditions
     bc_callable = bc_ocean,
     bc_args = (grid, bottom_drag_coefficient),
@@ -111,7 +126,7 @@ function setup_varna(;
     biogeochemistry_args = (nothing,),
 )
 
-    return SetupHydrostaticFreeSurface(
+    return SetupModel(
         grid_callable!,
         grid_parameters,
         grid,
@@ -160,6 +175,19 @@ setup_varna_3d_OXYDEP() = setup_varna(
     initial_conditions = (T = 10, S = 15, NUT = 10.0, P = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0),
     biogeochemistry_callable = biogeochemistry_OXYDEP,
     biogeochemistry_args = (grid, args_oxydep),
+    bc_args = (grid, bottom_drag_coefficient, biogeochemistry_OXYDEP),
+    bc_callable = bc_varna_bgh_oxydep,
+    tracer_advection = (
+        T = WENO(),
+        S = WENO(),
+        e = nothing,
+        NUT = WENO(),
+        P = WENO(),
+        HET = WENO(),
+        POM = WENO(),
+        DOM = WENO(),
+        O₂ = WENO(),
+    ),
 )
 setup_varna_2d() = setup_varna(
     grid_callable! = grid_latitude_flat!,

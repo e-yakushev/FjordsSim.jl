@@ -23,7 +23,10 @@ function plot_1d_phys(T, S, z, times, folder, x, y)
     save(joinpath(folder,"1d_phys.png"), fig)
 end
 
-function record_surface_speed(u, v, Nz, times, folder)
+function record_surface_speed(
+    u, v, Nz, times, folder;
+    colorrange = (0, 0.5), colormap = :deep,
+    )
     Nt = length(times)
     iter = Observable(Nt)
 
@@ -36,9 +39,9 @@ function record_surface_speed(u, v, Nz, times, folder)
          s
     end
 
-    fig = Figure(size = (400, 400))
+    fig = Figure(size = (1000, 400))
     ax = Axis(fig[1, 1])
-    hm = heatmap!(ax, si, colorrange = (0, 0.5), colormap = :deep)
+    hm = heatmap!(ax, si, colorrange = colorrange, colormap = colormap)
     cb = Colorbar(fig[0, 1], hm, vertical = false, label = "Surface speed (ms⁻¹)")
     hidedecorations!(ax)
 
@@ -47,20 +50,47 @@ function record_surface_speed(u, v, Nz, times, folder)
     end
 end
 
-function record_surface_tracer(tracer, times, folder, name, label)
+function record_surface_tracer(
+    tracer, Nz, times, folder, name, label;
+    colorrange=(-1, 30), colormap=:magma,
+    )
     Nt = length(times)
     iter = Observable(Nt)
 
     Ti = @lift begin
-         Ti = interior(T[$iter], :, :, 1)
+         Ti = interior(tracer[$iter], :, :, Nz)
          Ti[Ti .== 0] .= NaN
          Ti
     end
      
-    fig = Figure(size = (400, 400))
+    fig = Figure(size = (1000, 400))
     ax = Axis(fig[1, 1])
-    hm = heatmap!(ax, Ti, colorrange = (-1, 30), colormap = :magma)
-    cb = Colorbar(fig[0, 1], hm, vertical = false, label)
+    hm = heatmap!(ax, Ti, colorrange = colorrange, colormap = colormap)
+    cb = Colorbar(fig[0, 1], hm, vertical = false)
+    hidedecorations!(ax)
+
+    CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = 8) do i
+        iter[] = i
+    end
+end
+
+function record_vertical_tracer(
+    tracer, iy, times, folder, name, label;
+    colorrange=(-1, 30), colormap=:magma,
+    )
+    Nt = length(times)
+    iter = Observable(Nt)
+
+    Ti = @lift begin
+         Ti = interior(tracer[$iter], :, iy, :)
+         Ti[Ti .== 0] .= NaN
+         Ti
+    end
+     
+    fig = Figure(size = (1000, 400))
+    ax = Axis(fig[1, 1])
+    hm = heatmap!(ax, Ti, colorrange = colorrange, colormap = colormap)
+    cb = Colorbar(fig[0, 1], hm, vertical = false)
     hidedecorations!(ax)
 
     CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = 8) do i
