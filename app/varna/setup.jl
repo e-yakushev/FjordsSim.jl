@@ -31,7 +31,7 @@ using .FjordsSim:
     biogeochemistry_OXYDEP
 
 const bottom_drag_coefficient = 0.003
-const reference_density = 1010  # T = 15 degC, S = 15 PSU
+const reference_density = 1020  # T = 15 degC, S = 15 PSU
 
 args_oxydep = (
     initial_photosynthetic_slope = 0.1953 / day, # 1/(W/m²)/s
@@ -94,7 +94,7 @@ function setup_varna(;
         equation_of_state = TEOS10EquationOfState(; reference_density),
     ),
     # Closure
-    closure = ConvectiveAdjustmentVerticalDiffusivity(convective_κz = 5e-5, background_κz=1e-5),
+    closure = ConvectiveAdjustmentVerticalDiffusivity(convective_κz = 5e-4, background_κz=1e-4),
 
     # Tracer advection
     tracer_advection = (

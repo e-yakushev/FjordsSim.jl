@@ -353,11 +353,11 @@ end
 function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
     Nx = grid[].Nx            # eastern open boundary index
     λRiver = 1 / (30minutes)  # Relaxation timescale [s⁻¹] River
-    λOpen = 1 / (2days)       # Relaxation timescale [s⁻¹] River
+    λOpen = 1 / (1days)       # Relaxation timescale [s⁻¹] Open boundary
     
     # values in the river, CAN BE MOVED TO SETUP
     # src_loc = (1, 13, Nz) # river  # (i, j, k)
-    src_loc = (42, 110, Nz)   # factory
+    src_loc = (42, 111, Nz)   # factory
     Tsrc = 10.0
     Ssrc = 0.1
     NUTsrc = 10.0
@@ -370,27 +370,27 @@ function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
     # U, V, T, S, z, tᶠ = forcing_fields_from_file(user_z=user_z, Nz_model=Nz)
 
     TForcing = Forcing(combined_forcing_func_T,
-            field_dependencies = :T, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=Tsrc, src_loc=src_loc, external_value=external_values.T),
+            field_dependencies = :T, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=Tsrc, src_loc=src_loc, external_value=external_values.T),
             discrete_form = true)
     SForcing = Forcing(combined_forcing_func_S,
-            field_dependencies = :S, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=Ssrc, src_loc=src_loc, external_value=external_values.S),
+            field_dependencies = :S, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=Ssrc, src_loc=src_loc, external_value=external_values.S),
             discrete_form = true)
     NUTForcing = Forcing(combined_forcing_func_NUT,
-            field_dependencies = :NUT, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=NUTsrc, src_loc=src_loc, external_value=external_values.NUT),
+            field_dependencies = :NUT, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=NUTsrc, src_loc=src_loc, external_value=external_values.NUT),
             discrete_form = true)
     O2Forcing = Forcing(combined_forcing_func_O2,
-            field_dependencies = :O₂, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=O2src, src_loc=src_loc, external_value=external_values.O₂),
+            field_dependencies = :O₂, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=O2src, src_loc=src_loc, external_value=external_values.O₂),
             discrete_form = true)
     PForcing = Forcing(combined_forcing_func_P,
-            field_dependencies = :P, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=Psrc, src_loc=src_loc, external_value=external_values.P),
+            field_dependencies = :P, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=Psrc, src_loc=src_loc, external_value=external_values.P),
             discrete_form = true)
     HETForcing = Forcing(combined_forcing_func_HET,
-            field_dependencies = :HET, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=HETsrc, src_loc=src_loc, external_value=external_values.HET),
+            field_dependencies = :HET, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=HETsrc, src_loc=src_loc, external_value=external_values.HET),
             discrete_form = true)
     
     CForcing = Forcing(combined_forcing_func_C,
-    field_dependencies = :C, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=Csrc, src_loc=src_loc, external_value=external_values.C),
-    discrete_form = true)
+            field_dependencies = :C, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=Csrc, src_loc=src_loc, external_value=external_values.C),
+            discrete_form = true)
             
     # n_reference, tᶠ, F, λOpen, Nx = params
     # TForcing = Forcing(interp_forcing_T, field_dependencies = :T,
