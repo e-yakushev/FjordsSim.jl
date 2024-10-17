@@ -357,14 +357,14 @@ function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
     
     # values in the river, CAN BE MOVED TO SETUP
     # src_loc = (1, 13, Nz) # river  # (i, j, k)
-    src_loc = (42, 111, Nz)   # factory
+    src_loc = (111, 42, Nz)   # factory
     Tsrc = 10.0
     Ssrc = 0.1
     NUTsrc = 10.0
     O2src = 300.0
     Psrc = 0.001
     HETsrc = 0.001
-    Csrc = 100
+    Csrc = 100.0
 
     # CUDA.@allowscalar user_z = Array(znodes(grid[], Center()))
     # U, V, T, S, z, tᶠ = forcing_fields_from_file(user_z=user_z, Nz_model=Nz)
@@ -373,10 +373,10 @@ function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
             field_dependencies = :T, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=Tsrc, src_loc=src_loc, external_value=external_values.T),
             discrete_form = true)
     SForcing = Forcing(combined_forcing_func_S,
-            field_dependencies = :S, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=Ssrc, src_loc=src_loc, external_value=external_values.S),
+            field_dependencies = :S, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=Ssrc, src_loc=(1, 13, Nz), external_value=external_values.S),
             discrete_form = true)
     NUTForcing = Forcing(combined_forcing_func_NUT,
-            field_dependencies = :NUT, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=NUTsrc, src_loc=src_loc, external_value=external_values.NUT),
+            field_dependencies = :NUT, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=NUTsrc, src_loc=(1, 13, Nz), external_value=external_values.NUT),
             discrete_form = true)
     O2Forcing = Forcing(combined_forcing_func_O2,
             field_dependencies = :O₂, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=O2src, src_loc=src_loc, external_value=external_values.O₂),
@@ -388,7 +388,8 @@ function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
             field_dependencies = :HET, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=HETsrc, src_loc=src_loc, external_value=external_values.HET),
             discrete_form = true)
     
-    CForcing = Forcing(combined_forcing_func_C,
+    # -λRiver here, because the poin source is on the upper boundary and should point down
+    ContForcing = Forcing(combined_forcing_func_C,
             field_dependencies = :C, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=Csrc, src_loc=src_loc, external_value=external_values.C),
             discrete_form = true)
             
@@ -402,11 +403,11 @@ function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
     final_forcing = merge(forcing_bottom,
     (T = TForcing,
     S = SForcing,
+    C = ContForcing,
     NUT = NUTForcing,
     O₂ = O2Forcing,
     P = PForcing,
     HET = HETForcing,
-    C = CForcing,
     ))
 
     return final_forcing 

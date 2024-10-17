@@ -94,7 +94,7 @@ function setup_varna(;
         equation_of_state = TEOS10EquationOfState(; reference_density),
     ),
     # Closure
-    closure = ConvectiveAdjustmentVerticalDiffusivity(convective_κz = 5e-4, background_κz=1e-4),
+    closure = ConvectiveAdjustmentVerticalDiffusivity(convective_κz = 5e-4, background_κz=1e-5),
 
     # Tracer advection
     tracer_advection = (
