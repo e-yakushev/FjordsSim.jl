@@ -83,7 +83,7 @@ function setup_varna(;
         arch = GPU(),
         Nz = 10,
         halo = (7, 7, 7),
-        datadir = joinpath(homedir(), "BadgerArtifacts"),
+        datadir = joinpath(homedir(), "FjordsSim_data"),
         filename = "Varna_topo_channels.jld2",
         latitude = (43.177, 43.214),
         longitude = (27.640, 27.947),
@@ -116,7 +116,7 @@ function setup_varna(;
     forcing_callable = forcing_varna,
     forcing_args = (bottom_drag_coefficient, grid_parameters.Nz, grid, external_values),
     # Boundary conditions
-    bc_callable = bc_varna,
+    bc_callable = bc_ocean,
     bc_args = (grid, bottom_drag_coefficient),
     ## Atmosphere
     atmosphere_callable = atmosphere_JRA55,

@@ -21,9 +21,9 @@ include("setup.jl")
 using .FjordsSim: progress, coupled_hydrostatic_simulation
 
 ## Model Setup
-# sim_setup = setup_varna_3d()
+sim_setup = setup_varna_3d()
 # sim_setup = setup_varna_3d_Lobster()
-sim_setup = setup_varna_3d_OXYDEP()
+# sim_setup = setup_varna_3d_OXYDEP()
 # sim_setup = setup_varna_2d()
 # sim_setup = setup_varna_column()
 
@@ -38,7 +38,7 @@ coupled_simulation.callbacks[:progress] = Callback(progress, IterationInterval(1
 ## Set up output writers
 ocean_sim = coupled_simulation.model.ocean
 ocean_model = ocean_sim.model
-# surface_prefix = joinpath(homedir(), "data_Varna", "surface_snapshots")
+# surface_prefix = joinpath(homedir(), "FjordsSim_results", "varna_surface_snapshots")
 # ocean_sim.output_writers[:surface] = JLD2OutputWriter(
 #     ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
 #     schedule = TimeInterval(6hours),
@@ -48,7 +48,7 @@ ocean_model = ocean_sim.model
 #     array_type=Array{Float32}
 # )
 
-profile_prefix = joinpath(homedir(), "data_Varna", "snapshots")
+profile_prefix = joinpath(homedir(), "FjordsSim_results", "varna_snapshots")
 ocean_sim.output_writers[:profile] = JLD2OutputWriter(
     ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
     schedule = TimeInterval(6hours),
