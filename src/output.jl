@@ -1,6 +1,7 @@
 using Oceananigans
 using CairoMakie
 using Oceananigans.Units
+import Dates
 
 function plot_1d_phys(T, S, z, times, folder, x, y)
     fig = Figure(size = (1000, 400), fontsize = 20)
@@ -23,6 +24,16 @@ function plot_1d_phys(T, S, z, times, folder, x, y)
     save(joinpath(folder,"1d_phys.png"), fig)
 end
 
+map_axis_kwargs = (
+        xlabel = "Grid points, eastward direction",
+        ylabel = "Grid points, northward direction",   
+    )
+
+transect_axis_kwargs = (
+        xlabel = "Grid points, eastward direction",
+        ylabel = "z (m)",   
+    )
+
 function record_surface_speed(
     u, v, Nz, times, folder;
     colorrange = (0, 0.5), colormap = :deep,
@@ -42,12 +53,12 @@ function record_surface_speed(
     fig = Figure(size = (1000, 400))
 
     title = @lift "Surface speed at " * prettytime(times[$iter]) 
-    ax = Axis(fig[1, 1], title = title)
+    ax = Axis(fig[1, 1]; title = title, map_axis_kwargs...)
     hm = heatmap!(ax, si, colorrange = colorrange, colormap = colormap)
     cb = Colorbar(fig[0, 1], hm, vertical = false, label = "Surface speed (ms⁻¹)")
-    hidedecorations!(ax)
+    # hidedecorations!(ax)
 
-    CairoMakie.record(fig, joinpath(folder, "surface_speed.mp4"), 1:Nt, framerate = 8) do i
+    CairoMakie.record(fig, joinpath(folder, "surface_speed.mp4"), 1:Nt, framerate = 24) do i
         iter[] = i
     end
 end
@@ -67,21 +78,23 @@ function record_horizontal_tracer(
 
     title = @lift label * " at " * prettytime(times[$iter]) 
     fig = Figure(size = (1000, 400))
-    ax = Axis(fig[1, 1], title=title)
+    ax = Axis(fig[1, 1]; title=title, map_axis_kwargs...)
     hm = heatmap!(ax, Ti, colorrange = colorrange, colormap = colormap)
-    cb = Colorbar(fig[0, 1], hm, vertical = false)
-    hidedecorations!(ax)
+    cb = Colorbar(fig[0, 1], hm, vertical = false, label = label)
+    # hidedecorations!(ax)
 
-    CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = 8) do i
+    CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = 24) do i
         iter[] = i
     end
 end
 
 
 function record_vertical_tracer(
-    tracer, iy, times, folder, name, label;
+    tracer, depth, iy, times, folder, name, label;
     colorrange=(-1, 30), colormap=:magma,
     )
+
+    xs = 1:size(tracer)[1] # get x-values for x-axis
     Nt = length(times)
     iter = Observable(Nt)
 
@@ -94,12 +107,12 @@ function record_vertical_tracer(
     fig = Figure(size = (1000, 400))
 
     title = @lift label * " at " * prettytime(times[$iter]) 
-    ax = Axis(fig[1, 1], title = title)
-    hm = heatmap!(ax, Ti, colorrange = colorrange, colormap = colormap)
-    cb = Colorbar(fig[0, 1], hm, vertical = false)
-    hidedecorations!(ax)
+    ax = Axis(fig[1, 1]; title = title, transect_axis_kwargs...)
+    hm = heatmap!(ax, xs, depth, Ti, colorrange = colorrange, colormap = colormap)
+    cb = Colorbar(fig[0, 1], hm, vertical = false, label = label)
+    # hidedecorations!(ax)
 
-    CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = 8) do i
+    CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = 24) do i
         iter[] = i
     end
 end
