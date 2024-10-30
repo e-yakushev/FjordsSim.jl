@@ -31,11 +31,11 @@ using .FjordsSim:
     biogeochemistry_OXYDEP
 
 const bottom_drag_coefficient = 0.003
-const reference_density = 1020  # T = 15 degC, S = 15 PSU
+const reference_density = 1010  # T = 15 degC, S = 15 PSU
 
 args_oxydep = (
     initial_photosynthetic_slope = 0.1953 / day, # 1/(W/m²)/s
-    Iopt = 50.0,     # (W/m2)
+    Iopt = 80., # 50.0,     # (W/m2)
     alphaI = 1.8,   # [d-1/(W/m2)]
     betaI = 5.2e-4, # [d-1/(W/m2)]
     gammaD = 0.71,  # (-)
@@ -71,6 +71,7 @@ external_values = (
     S = 18.0,
     C = 0.0,  # C passive tracer, Contaminant
     NUT = 2.0,
+    DOM = 1.0,
     O₂ = 300.0,
     P = 0.001,
     HET = 0.001,
@@ -121,7 +122,9 @@ function setup_varna(;
     ## Atmosphere
     atmosphere_callable = atmosphere_JRA55,
     atmosphere_args = (arch = grid_parameters.arch, backend = InMemory(), grid = grid),
-    radiation = Radiation(grid_parameters.arch),
+    # Ocean emissivity from https://link.springer.com/article/10.1007/BF02233853
+    # With suspended matter 0.96 https://www.sciencedirect.com/science/article/abs/pii/0034425787900095
+    radiation = Radiation(grid_parameters.arch; ocean_emissivity = 0.96,),  
     ## Biogeochemistry
     biogeochemistry_callable = nothing,
     biogeochemistry_args = (nothing,),
