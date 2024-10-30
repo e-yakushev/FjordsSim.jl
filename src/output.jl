@@ -52,15 +52,15 @@ function record_surface_speed(
     end
 end
 
-function record_surface_tracer(
-    tracer, Nz, times, folder, name, label;
-    colorrange=(-1, 30), colormap=:magma,
+function record_horizontal_tracer(
+    tracer, times, folder, name, label;
+    colorrange=(-1, 30), colormap=:magma, iz=10,
     )
     Nt = length(times)
     iter = Observable(Nt)
 
     Ti = @lift begin
-         Ti = interior(tracer[$iter], :, :, Nz)
+         Ti = interior(tracer[$iter], :, :, iz)
          Ti[Ti .== 0] .= NaN
          Ti
     end
@@ -76,6 +76,7 @@ function record_surface_tracer(
         iter[] = i
     end
 end
+
 
 function record_vertical_tracer(
     tracer, iy, times, folder, name, label;
