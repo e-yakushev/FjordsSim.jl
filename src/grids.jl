@@ -4,6 +4,7 @@ using ClimaOcean
 
 using FileIO
 using JLD2
+using Interpolations
 
 function grid_bathymetry_from_lat_lon(
     arch,
@@ -90,12 +91,39 @@ function grid_from_lat_lon!(sim_setup)
     return grid
 end
 
+
+function resample(depth, Nx_new, Ny_new)
+    Nx, Ny = size(depth)  # Original grid size
+    
+    # Define the range of original grid points
+    x_orig = LinRange(1, Nx, Nx)
+    y_orig = LinRange(1, Ny, Ny)
+    
+    # Create the interpolation object with boundary values fixed
+    itp = interpolate(depth, BSpline(Linear()), OnGrid())
+    depth_itp = scale(itp, x_orig, y_orig)
+    
+    # Define the new grid points for the target size
+    x_new = LinRange(1, Nx, Nx_new)
+    y_new = LinRange(1, Ny, Ny_new)
+    
+    # Resample on the new grid
+    depth_resampled = [depth_itp(x, y) for y in y_new, x in x_new]
+    return depth_resampled
+end
+
 function grid_from_bathymetry_file!(sim_setup)
-    arch, Nz, halo, datadir, filename, latitude, longitude = sim_setup.grid_parameters
+    arch, Nx, Ny, Nz, halo, datadir, filename, latitude, longitude = sim_setup.grid_parameters
 
     filepath_topo = joinpath(datadir, filename)
     @load filepath_topo depth
-    Nx, Ny = size(depth)
+
+    if isnothing(Nx)
+        Nx, Ny = size(depth)
+    else
+        depth = resample(depth, Nx, Ny)
+    end
+    
     depth_max = abs(minimum(depth))
     z_faces = exponential_z_faces(; Nz = Nz, depth = depth_max, h = depth_max)
     underlying_grid = LatitudeLongitudeGrid(

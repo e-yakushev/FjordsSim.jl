@@ -21,9 +21,9 @@ include("setup.jl")
 using .FjordsSim: progress, coupled_hydrostatic_simulation
 
 ## Model Setup
-sim_setup = setup_varna_3d()
+# sim_setup = setup_varna_3d()
 # sim_setup = setup_varna_3d_Lobster()
-# sim_setup = setup_varna_3d_OXYDEP()
+sim_setup = setup_varna_3d_OXYDEP()
 # sim_setup = setup_varna_2d()
 # sim_setup = setup_varna_column()
 
@@ -64,11 +64,14 @@ ocean_sim.output_writers[:profile] = JLD2OutputWriter(
 ## Spinning up the simulation
 # We use an adaptive time step that maintains the [CFL condition](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition) equal to 0.1.
 ocean_sim.stop_time = 10days
-ocean_sim.Δt = 10seconds
+ocean_sim.Δt = 5seconds
 coupled_simulation.stop_time = 10days
 
 # coupled_simulation.callbacks[:update_time_index] = update_time_index
 
+wizard = TimeStepWizard(; cfl = 0.1, max_Δt = 1.5minutes, max_change = 1.01)
+
+ocean_sim.callbacks[:wizard] = Callback(wizard, IterationInterval(10))
 # conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=1.5minutes, max_change=1.01)
 run!(coupled_simulation)
 
@@ -76,7 +79,10 @@ run!(coupled_simulation)
 # This time, we set the CFL in the time_step_wizard to be 0.25 as this is the maximum recommended CFL to be
 # used in conjunction with Oceananigans' hydrostatic time-stepping algorithm ([two step Adams-Bashfort](https://en.wikipedia.org/wiki/Linear_multistep_method))
 ocean_sim.stop_time = 355days
-ocean_sim.Δt = 35seconds
+ocean_sim.Δt = 10seconds
 coupled_simulation.stop_time = 355days
+
+wizard = TimeStepWizard(; cfl = 0.25, max_Δt = 1.5minutes, max_change = 1.01)
+ocean_sim.callbacks[:wizard] = Callback(wizard, IterationInterval(10))
 # conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=10minutes, max_change=1.01)
 run!(coupled_simulation)
