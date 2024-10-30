@@ -329,6 +329,25 @@ function combined_forcing_func_HET(i, j, k, grid, clock, model_fields, parameter
     )
 end
 
+# DOM
+function combined_forcing_func_DOM(i, j, k, grid, clock, model_fields, parameters)
+    # First condition (from Tradiation)
+    condition1 = (i == parameters.Nx)
+    
+    # Second condition (from T_point_source)
+    condition2 = ((i, j, k) == parameters.src_loc)
+    
+    # Calculate the two possible forcing terms
+    radiation_term = -parameters.λOpen * (model_fields.DOM[i, j, k] - parameters.external_value)
+    point_source_term = -parameters.λRiver * (model_fields.DOM[i, j, k] - parameters.Vsrc)
+
+    # Apply logic: Combine both terms if both conditions are true
+    return @inbounds ifelse(condition1 || condition2,
+        (condition1 ? radiation_term : 0) + (condition2 ? point_source_term : 0),
+        0
+    )
+end
+
 # Contaminant
 function combined_forcing_func_C(i, j, k, grid, clock, model_fields, parameters)
     # First condition (from Tradiation)
@@ -353,7 +372,7 @@ end
 function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
     Nx = grid[].Nx            # eastern open boundary index
     λRiver = 1 / (30minutes)  # Relaxation timescale [s⁻¹] River
-    λOpen = 1 / (1days)       # Relaxation timescale [s⁻¹] Open boundary
+    λOpen = 1 / (12hours)       # Relaxation timescale [s⁻¹] Open boundary
     
     # values in the river, CAN BE MOVED TO SETUP
     # src_loc = (1, 13, Nz) # river  # (i, j, k)
@@ -361,6 +380,7 @@ function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
     Tsrc = 10.0
     Ssrc = 0.1
     NUTsrc = 10.0
+    DOMsrc = 5.0
     O2src = 300.0
     Psrc = 0.001
     HETsrc = 0.001
@@ -377,6 +397,9 @@ function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
             discrete_form = true)
     NUTForcing = Forcing(combined_forcing_func_NUT,
             field_dependencies = :NUT, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=NUTsrc, src_loc=(1, 13, Nz), external_value=external_values.NUT),
+            discrete_form = true)
+    DOMForcing = Forcing(combined_forcing_func_DOM,
+            field_dependencies = :DOM, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=DOMsrc, src_loc=src_loc, external_value=external_values.DOM),
             discrete_form = true)
     O2Forcing = Forcing(combined_forcing_func_O2,
             field_dependencies = :O₂, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=O2src, src_loc=src_loc, external_value=external_values.O₂),
@@ -405,6 +428,7 @@ function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
     S = SForcing,
     C = ContForcing,
     NUT = NUTForcing,
+    DOM = DOMForcing,
     O₂ = O2Forcing,
     P = PForcing,
     HET = HETForcing,
