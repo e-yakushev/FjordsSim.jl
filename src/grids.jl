@@ -108,7 +108,8 @@ function resample(depth, Nx_new, Ny_new)
     y_new = LinRange(1, Ny, Ny_new)
     
     # Resample on the new grid
-    depth_resampled = [depth_itp(x, y) for y in y_new, x in x_new]
+    depth_resampled = [depth_itp(x, y) for x in x_new, y in y_new]
+    @info "size of the new grid: " * string(size(depth_resampled))
     return depth_resampled
 end
 
