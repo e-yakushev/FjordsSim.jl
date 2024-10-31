@@ -7,10 +7,10 @@ include("../../src/FjordsSim.jl")
 
 using .FjordsSim: plot_1d_phys, extract_z_faces, record_vertical_tracer, record_surface_speed, record_horizontal_tracer, plot_ztime
 
-Nz = 10
+Nz = 12
 
 folder = joinpath(homedir(), "FjordsSim_results")
-filename = joinpath(folder, "varna_snapshots270days")
+filename = joinpath(folder, "varna_snapshots30daysRIVER")
 T =   FieldTimeSeries("$filename.jld2", "T")
 S =   FieldTimeSeries("$filename.jld2", "S")
 u =   FieldTimeSeries("$filename.jld2", "u")
@@ -31,7 +31,7 @@ println(grid["underlying_grid"]["Δyᶠᶜᵃ"])
 
 # stupid, but I cannot find a right way with znodes
 # znodes(grid["underlying_grid"], with_halos=false)
-z = grid["underlying_grid"]["zᵃᵃᶜ"][8:17]
+z = grid["underlying_grid"]["zᵃᵃᶜ"][8:19]
 
 # z = extract_z_faces(grid)
 
@@ -40,7 +40,7 @@ plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
 # HORIZONTAL
 # plot_1d_phys(T, S, z, times, folder)
 
-record_surface_speed(u, v, 10, times, folder)
+record_surface_speed(u, v, Nz, times, folder)
 
 record_horizontal_tracer(
     C, times, folder, "Contsurf", "Contaminant (% of max. concentration)",
@@ -109,6 +109,6 @@ record_vertical_tracer(
         )
 
 record_vertical_tracer(
-    O₂, z, 18, times, folder, "O2profile", "Dissolved Oxygen (μM N)",
+    O₂, z, 18, times, folder, "O2profile", "Dissolved Oxygen (μM)",
     colorrange=(100, 350), colormap=:turbo,
         )

@@ -375,8 +375,8 @@ function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
     λOpen = 1 / (12hours)       # Relaxation timescale [s⁻¹] Open boundary
     
     # values in the river, CAN BE MOVED TO SETUP
-    # src_loc = (1, 13, Nz) # river  # (i, j, k)
-    src_loc = (111, 42, Nz)   # factory
+    src_loc = (1, 13, Nz) # river  # (i, j, k)
+    # src_loc = (111, 42, Nz)   # factory
     Tsrc = 10.0
     Ssrc = 0.1
     NUTsrc = 10.0

@@ -82,8 +82,8 @@ function setup_varna(;
     grid_callable! = grid_from_bathymetry_file!,
     grid_parameters = (
         arch = GPU(),
-        Nx = 200,
-        Ny = 50,
+        Nx = nothing,
+        Ny = nothing,
         Nz = 12,
         halo = (7, 7, 7),
         datadir = joinpath(homedir(), "FjordsSim_data"),

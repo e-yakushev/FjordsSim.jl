@@ -34,6 +34,8 @@ transect_axis_kwargs = (
         ylabel = "z (m)",   
     )
 
+framerate = 12
+
 function record_surface_speed(
     u, v, Nz, times, folder;
     colorrange = (0, 0.5), colormap = :deep,
@@ -58,7 +60,7 @@ function record_surface_speed(
     cb = Colorbar(fig[0, 1], hm, vertical = false, label = "Surface speed (ms⁻¹)")
     # hidedecorations!(ax)
 
-    CairoMakie.record(fig, joinpath(folder, "surface_speed.mp4"), 1:Nt, framerate = 24) do i
+    CairoMakie.record(fig, joinpath(folder, "surface_speed.mp4"), 1:Nt, framerate = framerate) do i
         iter[] = i
     end
 end
@@ -83,7 +85,7 @@ function record_horizontal_tracer(
     cb = Colorbar(fig[0, 1], hm, vertical = false, label = label)
     # hidedecorations!(ax)
 
-    CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = 24) do i
+    CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = framerate) do i
         iter[] = i
     end
 end
@@ -112,7 +114,7 @@ function record_vertical_tracer(
     cb = Colorbar(fig[0, 1], hm, vertical = false, label = label)
     # hidedecorations!(ax)
 
-    CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = 24) do i
+    CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = framerate) do i
         iter[] = i
     end
 end
