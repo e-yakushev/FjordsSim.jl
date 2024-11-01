@@ -42,8 +42,8 @@ end
 
 free_surface_default(grid) = SplitExplicitFreeSurface(grid[]; cfl = 0.7)
 
-# Day 140 - Day 350, 3h JRA55 forcing
-atmosphere_JRA55(arch, backend, grid) = JRA55_prescribed_atmosphere(arch, 1000:2800; backend, grid = grid[])
+
+atmosphere_JRA55(arch, backend, grid, start, stop) = JRA55_prescribed_atmosphere(arch, start:stop; backend, grid = grid[])
 biogeochemistry_LOBSTER(grid) = LOBSTER(; grid = grid[], carbonates = false, open_bottom = false)
 biogeochemistry_OXYDEP(grid, args_oxydep) = OXYDEP(;
     grid = grid[],
