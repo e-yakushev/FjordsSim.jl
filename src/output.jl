@@ -1,7 +1,6 @@
 using Oceananigans
 using CairoMakie
 using Oceananigans.Units
-import Dates
 
 function plot_1d_phys(T, S, z, times, folder, x, y)
     fig = Figure(size = (1000, 400), fontsize = 20)
