@@ -5,6 +5,12 @@ using Oceananigans.Architectures
 using Oceananigans.BuoyancyModels: g_Earth
 using Oceananigans.Coriolis: Ω_Earth
 using Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities: CATKEVerticalDiffusivity
+using Oceananigans.OutputReaders: extract_field_time_series, update_field_time_series!
+using Oceananigans.Models: update_model_field_time_series!
+using Oceananigans.TimeSteppers: tick!
+using ClimaOcean
+using ClimaOcean.OceanSeaIceModels: MinimumTemperatureSeaIce
+using ClimaOcean.OceanSeaIceModels.CrossRealmFluxes: compute_atmosphere_ocean_fluxes!
 using ClimaOcean.OceanSimulations:
     default_free_surface,
     default_ocean_closure,
@@ -18,6 +24,8 @@ using OceanBioME
 using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 
 import Oceananigans.Architectures: on_architecture
+import ClimaOcean.OceanSeaIceModels.CrossRealmFluxes: compute_sea_ice_ocean_fluxes!
+import Oceananigans.TimeSteppers: time_step!, update_state!
 
 include("utils.jl")
 include("bathymetry.jl")
@@ -33,6 +41,11 @@ include("BGCModels/BGCModels.jl")
 
 using .BGCModels: OXYDEP
 
+const OceanOnlyModel = OceanSeaIceModel{Nothing}
+const OceanSimplifiedSeaIceModel = OceanSeaIceModel{<:MinimumTemperatureSeaIce}
+
+const NoSeaIceModel = Union{OceanOnlyModel,OceanSimplifiedSeaIceModel}
+
 # there is no a steprangelen method in oceananigans
 # but adding it here is type piracy
 # we need this when loading atmospheric forcing to the video memory
@@ -42,8 +55,8 @@ end
 
 free_surface_default(grid) = SplitExplicitFreeSurface(grid[]; cfl = 0.7)
 
-
-atmosphere_JRA55(arch, backend, grid, start, stop) = JRA55_prescribed_atmosphere(arch, start:stop; backend, grid = grid[])
+atmosphere_JRA55(arch, backend, grid, start, stop) =
+    JRA55_prescribed_atmosphere(arch, start:stop; backend, grid = grid[])
 biogeochemistry_LOBSTER(grid) = LOBSTER(; grid = grid[], carbonates = false, open_bottom = false)
 biogeochemistry_OXYDEP(grid, args_oxydep) = OXYDEP(;
     grid = grid[],
@@ -92,7 +105,8 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     coriolis = sim_setup.coriolis
     forcing = sim_setup.forcing_callable(sim_setup.forcing_args...)
     boundary_conditions = sim_setup.bc_callable(sim_setup.bc_args...)
-    biogeochemistry = safe_execute(sim_setup.biogeochemistry_callable)(sim_setup.biogeochemistry_args...)
+    biogeochemistry =
+        safe_execute(sim_setup.biogeochemistry_callable)(sim_setup.biogeochemistry_args...)
 
     println("Start compiling HydrostaticFreeSurfaceModel")
     ## Model
@@ -107,7 +121,7 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
         coriolis,
         forcing,
         boundary_conditions,
-        biogeochemistry
+        biogeochemistry,
     )
     println("Done compiling HydrostaticFreeSurfaceModel")
 
@@ -137,6 +151,29 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     # add_callback!(coupled_simulation, atm_progress, IterationInterval(100))
     println("Initialized coupled simulation")
     return coupled_simulation
+end
+
+compute_sea_ice_ocean_fluxes!(::NoSeaIceModel) = nothing
+
+function time_step!(coupled_model::NoSeaIceModel, Δt; callbacks = [], compute_tendencies = true)
+    ocean = coupled_model.ocean
+
+    # Be paranoid and update state at iteration 0
+    coupled_model.clock.iteration == 0 && update_state!(coupled_model, callbacks)
+
+    time_step!(ocean)
+
+    tick!(coupled_model.clock, ocean.Δt) # An Ocean-only model advances with the ocean time-step!
+    update_state!(coupled_model, callbacks; compute_tendencies)
+
+    return nothing
+end
+
+function update_state!(coupled_model::NoSeaIceModel, callbacks = []; compute_tendencies = false)
+    time = Time(coupled_model.clock.time)
+    update_model_field_time_series!(coupled_model.atmosphere, time)
+    compute_atmosphere_ocean_fluxes!(coupled_model)
+    return nothing
 end
 
 end # module FjordsSim

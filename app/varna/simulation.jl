@@ -57,7 +57,7 @@ ocean_sim.output_writers[:profile] = JLD2OutputWriter(
     array_type=Array{Float32}
 )
 
-# # checkpointer doesn't work with timestepper?
+# checkpointer doesn't work with timestepper?
 # checkpoint_prefix = joinpath(homedir(), "data_Varna", "model_checkpoint")
 # coupled_simulation.output_writers[:checkpointer] = Checkpointer(coupled_model, schedule=IterationInterval(100000), prefix=checkpoint_prefix)
 
@@ -67,12 +67,7 @@ ocean_sim.stop_time = 10days
 ocean_sim.Δt = 5seconds
 coupled_simulation.stop_time = 10days
 
-# coupled_simulation.callbacks[:update_time_index] = update_time_index
-
-wizard = TimeStepWizard(; cfl = 0.1, max_Δt = 1.5minutes, max_change = 1.01)
-
-ocean_sim.callbacks[:wizard] = Callback(wizard, IterationInterval(10))
-# conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=1.5minutes, max_change=1.01)
+conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=1.5minutes, max_change=1.01)
 run!(coupled_simulation)
 
 ## Running the simulation
@@ -82,7 +77,5 @@ ocean_sim.stop_time = 355days
 ocean_sim.Δt = 10seconds
 coupled_simulation.stop_time = 355days
 
-wizard = TimeStepWizard(; cfl = 0.25, max_Δt = 1.5minutes, max_change = 1.01)
-ocean_sim.callbacks[:wizard] = Callback(wizard, IterationInterval(10))
-# conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=10minutes, max_change=1.01)
+conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=10minutes, max_change=1.01)
 run!(coupled_simulation)
