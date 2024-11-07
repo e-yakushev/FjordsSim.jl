@@ -38,17 +38,18 @@ coupled_simulation.callbacks[:progress] = Callback(progress, IterationInterval(1
 ## Set up output writers
 ocean_sim = coupled_simulation.model.ocean
 ocean_model = ocean_sim.model
-# surface_prefix = joinpath(homedir(), "FjordsSim_results", "varna_surface_snapshots")
+
+# surface_prefix = joinpath(sim_setup.results_dir, "varna_surface_snapshots")
 # ocean_sim.output_writers[:surface] = JLD2OutputWriter(
 #     ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
-#     schedule = TimeInterval(6hours),
+#     schedule = TimeInterval(1hours),
 #     filename = "$surface_prefix.jld2",
 #     indices=(:, :, grid[].Nz),
 #     overwrite_existing = true,
 #     array_type=Array{Float32}
 # )
 
-profile_prefix = joinpath(homedir(), "FjordsSim_results", "varna_snapshots")
+profile_prefix = joinpath(sim_setup.results_dir, "varna_snapshots")
 ocean_sim.output_writers[:profile] = JLD2OutputWriter(
     ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
     schedule = TimeInterval(6hours),

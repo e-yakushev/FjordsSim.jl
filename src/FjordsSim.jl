@@ -92,7 +92,62 @@ mutable struct SetupModel
     radiation::Any
     biogeochemistry_callable::Any
     biogeochemistry_args::Any
+    results_dir::String
 end
+
+function SetupModel(
+    grid_callable!,
+    grid_parameters,
+    grid,
+    buoyance,
+    closure,
+    tracer_advection,
+    momentum_advection,
+    tracers,
+    initial_conditions,
+    free_surface_callable,
+    free_surface_args,
+    coriolis,
+    forcing_callable,
+    forcing_args,
+    bc_callable,
+    bc_args,
+    atmosphere_callable,
+    atmosphere_args,
+    radiation,
+    biogeochemistry_callable,
+    biogeochemistry_args;
+    results_dir = joinpath(homedir(), "FjordsSim_results"),
+)
+
+    !isdir(results_dir) && mkdir(results_dir)
+
+    SetupModel(
+        grid_callable!,
+        grid_parameters,
+        grid,
+        buoyance,
+        closure,
+        tracer_advection,
+        momentum_advection,
+        tracers,
+        initial_conditions,
+        free_surface_callable,
+        free_surface_args,
+        coriolis,
+        forcing_callable,
+        forcing_args,
+        bc_callable,
+        bc_args,
+        atmosphere_callable,
+        atmosphere_args,
+        radiation,
+        biogeochemistry_callable,
+        biogeochemistry_args,
+        results_dir,
+    )
+end
+
 
 function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     grid = sim_setup.grid_callable!(sim_setup)
