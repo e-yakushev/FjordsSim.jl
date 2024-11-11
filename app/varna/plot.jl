@@ -10,7 +10,7 @@ using .FjordsSim: plot_1d_phys, extract_z_faces, record_vertical_tracer, record_
 Nz = 12
 
 folder = joinpath(homedir(), "FjordsSim_results")
-filename = joinpath(folder, "varna_snapshots30daysRIVER")
+filename = joinpath(folder, "varna_snapshots")
 T =   FieldTimeSeries("$filename.jld2", "T")
 S =   FieldTimeSeries("$filename.jld2", "S")
 u =   FieldTimeSeries("$filename.jld2", "u")

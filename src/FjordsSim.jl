@@ -24,8 +24,9 @@ using OceanBioME
 using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 
 import Oceananigans.Architectures: on_architecture
-import ClimaOcean.OceanSeaIceModels.CrossRealmFluxes: compute_sea_ice_ocean_fluxes!
 import Oceananigans.TimeSteppers: time_step!, update_state!
+import ClimaOcean.OceanSeaIceModels.CrossRealmFluxes: compute_sea_ice_ocean_fluxes!
+import ClimaOcean: SimilarityTheoryTurbulentFluxes
 
 include("utils.jl")
 include("bathymetry.jl")
@@ -66,6 +67,7 @@ biogeochemistry_OXYDEP(grid, args_oxydep) = OXYDEP(;
     Chemicals = false,
     scale_negatives = false,
 )
+SimilarityTheoryTurbulentFluxes(;grid::Ref, kw...) = SimilarityTheoryTurbulentFluxes(grid[]; kw...)
 
 # Grid
 grid = Ref{Any}(nothing)
@@ -90,6 +92,8 @@ mutable struct SetupModel
     atmosphere_callable::Any
     atmosphere_args::Any
     radiation::Any
+    similarity_theory_callable::Any
+    similarity_theory_args::Any
     biogeochemistry_callable::Any
     biogeochemistry_args::Any
     results_dir::String
@@ -115,6 +119,8 @@ function SetupModel(
     atmosphere_callable,
     atmosphere_args,
     radiation,
+    similarity_theory_callable,
+    similarity_theory_args,
     biogeochemistry_callable,
     biogeochemistry_args;
     results_dir = joinpath(homedir(), "FjordsSim_results"),
@@ -142,6 +148,8 @@ function SetupModel(
         atmosphere_callable,
         atmosphere_args,
         radiation,
+        similarity_theory_callable,
+        similarity_theory_args,
         biogeochemistry_callable,
         biogeochemistry_args,
         results_dir,
@@ -181,7 +189,7 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     println("Done compiling HydrostaticFreeSurfaceModel")
 
     ## Simulation
-    Δt = 20seconds
+    Δt = 1second
     ocean_sim = Simulation(ocean_model; Δt)
     println("Initialized simulation")
 
@@ -194,7 +202,8 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     atmosphere = safe_execute(sim_setup.atmosphere_callable)(sim_setup.atmosphere_args...)
     println("Initialized atmosphere")
     radiation = sim_setup.radiation
-    coupled_model = OceanSeaIceModel(ocean_sim, sea_ice; atmosphere, radiation)
+    similarity_theory = sim_setup.similarity_theory_callable(;sim_setup.similarity_theory_args...)
+    coupled_model = OceanSeaIceModel(ocean_sim, sea_ice; atmosphere, radiation)  # , similarity_theory)
     println("Initialized coupled model")
 
     coupled_simulation = Simulation(coupled_model; Δt)
