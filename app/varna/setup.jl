@@ -120,13 +120,13 @@ function setup_varna(;
     bc_args = (grid, bottom_drag_coefficient),
     # Atmosphere
     atmosphere_callable = atmosphere_JRA55,
-    # 4*365 - 1 year, 3H JRA55 frocing
+    # 8*365 - 1 year, 3H JRA55 frocing
     atmosphere_args = (
         arch = grid_parameters.arch,
         backend = InMemory(),
         grid = grid,
         start = 1,
-        stop = 4 * 365,
+        stop = 8 * 365,
     ),
     # Ocean emissivity from https://link.springer.com/article/10.1007/BF02233853
     # With suspended matter 0.96 https://www.sciencedirect.com/science/article/abs/pii/0034425787900095

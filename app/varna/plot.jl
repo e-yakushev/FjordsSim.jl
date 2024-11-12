@@ -49,7 +49,7 @@ record_horizontal_tracer(
 
 record_horizontal_tracer(
     T, times, folder, "Tsurf", "Temperature (°C)",
-    colorrange=(5, 21), colormap=Reverse(:RdYlBu), iz=Nz,
+    colorrange=(5, 40), colormap=Reverse(:RdYlBu), iz=Nz,
     )
 
 record_horizontal_tracer(
@@ -75,7 +75,7 @@ record_horizontal_tracer(
 # VERTICAL
 record_vertical_tracer(
     T, z, 18, times, folder, "Tprofile", "Temperature (°C)",
-    colorrange=(5, 21), colormap=Reverse(:RdYlBu),
+    colorrange=(5, 40), colormap=Reverse(:RdYlBu),
     )
 
 record_vertical_tracer(
