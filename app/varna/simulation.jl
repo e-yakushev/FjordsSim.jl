@@ -67,15 +67,6 @@ ocean_sim.output_writers[:fluxes] = JLD2OutputWriter(
 )
 
 
-ocean_sim.output_writers[:fluxes] = JLD2OutputWriter(
-    ocean_model, coupled_simulation.model.fluxes.turbulent;
-    schedule = TimeInterval(6hours),
-    filename = "$profile_prefix.jld2",
-    overwrite_existing = true,
-    array_type=Array{Float32}
-)
-
-
 # checkpointer doesn't work with timestepper?
 # checkpoint_prefix = joinpath(homedir(), "data_Varna", "model_checkpoint")
 # coupled_simulation.output_writers[:checkpointer] = Checkpointer(coupled_model, schedule=IterationInterval(100000), prefix=checkpoint_prefix)
