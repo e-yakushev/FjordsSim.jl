@@ -24,7 +24,7 @@ using .FjordsSim:
     biogeochemistry_LOBSTER,
     biogeochemistry_OXYDEP
 
-function setup_oslo(;
+function setup_region(;
     bottom_drag_coefficient = 0.003,
     reference_density = 1020,
     # Grid
@@ -36,7 +36,7 @@ function setup_oslo(;
         halo = (7, 7, 7),
         latitude = (58.8, 59.8),
         longitude = (10, 11.25),
-        datadir = joinpath(homedir(), "FjordsSim_data"),
+        datadir = joinpath(homedir(), "FjordsSim_data", "oslo"),
         filename = "ETOPO_2022_v1_15s_N60E000_surface.nc",
         depth = 500,
         surface_layer_Δz = 3,  # it shouldn't be 1

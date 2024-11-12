@@ -21,11 +21,11 @@ include("setup.jl")
 using .FjordsSim: progress, coupled_hydrostatic_simulation
 
 ## Model Setup
-# sim_setup = setup_varna_3d()
-# sim_setup = setup_varna_3d_Lobster()
-sim_setup = setup_varna_3d_OXYDEP()
-# sim_setup = setup_varna_2d()
-# sim_setup = setup_varna_column()
+# sim_setup = setup_region_3d()
+# sim_setup = setup_region_3d_Lobster()
+sim_setup = setup_region_3d_OXYDEP()
+# sim_setup = setup_region_2d()
+# sim_setup = setup_region_column()
 
 # getfield(sim_setup, :tracers)
 # update_time_index
@@ -48,7 +48,7 @@ ocean_model = ocean_sim.model
 #     array_type=Array{Float32}
 # )
 
-profile_prefix = joinpath(homedir(), "FjordsSim_results", "varna_snapshots")
+profile_prefix = joinpath(homedir(), "FjordsSim_results", "varna", "varna_snapshots")
 ocean_sim.output_writers[:profile] = JLD2OutputWriter(
     ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
     schedule = TimeInterval(6hours),
@@ -57,15 +57,24 @@ ocean_sim.output_writers[:profile] = JLD2OutputWriter(
     array_type=Array{Float32}
 )
 
+ocean_sim.output_writers[:fluxes] = JLD2OutputWriter(
+    ocean_model, coupled_simulation.model.fluxes.turbulent;
+    schedule = TimeInterval(6hours),
+    filename = "$profile_prefix.jld2",
+    overwrite_existing = true,
+    array_type=Array{Float32}
+)
+
+
 # # checkpointer doesn't work with timestepper?
 # checkpoint_prefix = joinpath(homedir(), "data_Varna", "model_checkpoint")
 # coupled_simulation.output_writers[:checkpointer] = Checkpointer(coupled_model, schedule=IterationInterval(100000), prefix=checkpoint_prefix)
 
 ## Spinning up the simulation
 # We use an adaptive time step that maintains the [CFL condition](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition) equal to 0.1.
-ocean_sim.stop_time = 10days
+ocean_sim.stop_time = 1hours
 ocean_sim.Δt = 5seconds
-coupled_simulation.stop_time = 10days
+coupled_simulation.stop_time = 1hours
 
 # coupled_simulation.callbacks[:update_time_index] = update_time_index
 

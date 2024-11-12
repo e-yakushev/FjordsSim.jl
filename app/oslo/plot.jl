@@ -5,7 +5,7 @@ include("../../src/FjordsSim.jl")
 
 using .FjordsSim: record_surface_speed
 
-folder = joinpath(homedir(), "FjordsSim_results")
+folder = joinpath(homedir(), "FjordsSim_results", "oslo")
 filename = joinpath(folder, "oslo_surface_snapshots")
 u =   FieldTimeSeries("$filename.jld2", "u")
 v =   FieldTimeSeries("$filename.jld2", "v")

@@ -7,10 +7,10 @@ include("../../src/FjordsSim.jl")
 
 using .FjordsSim: plot_1d_phys, extract_z_faces, record_vertical_tracer, record_surface_speed, record_horizontal_tracer, plot_ztime
 
-Nz = 12
+Nz = 10
 
-folder = joinpath(homedir(), "FjordsSim_results")
-filename = joinpath(folder, "varna_snapshots30daysRIVER")
+folder = joinpath(homedir(), "FjordsSim_results", "varna")
+filename = joinpath(folder, "varna_snapshots270days")
 T =   FieldTimeSeries("$filename.jld2", "T")
 S =   FieldTimeSeries("$filename.jld2", "S")
 u =   FieldTimeSeries("$filename.jld2", "u")
@@ -21,7 +21,7 @@ PHY =  FieldTimeSeries("$filename.jld2", "P")
 HET =  FieldTimeSeries("$filename.jld2", "HET")
 DOM =  FieldTimeSeries("$filename.jld2", "DOM")
 POM =  FieldTimeSeries("$filename.jld2", "POM")
-C =  FieldTimeSeries("$filename.jld2", "C")       
+# C =  FieldTimeSeries("$filename.jld2", "C")       
 times = T.times
 
 grid = jldopen("$filename.jld2")["grid"]
@@ -31,25 +31,25 @@ println(grid["underlying_grid"]["Δyᶠᶜᵃ"])
 
 # stupid, but I cannot find a right way with znodes
 # znodes(grid["underlying_grid"], with_halos=false)
-z = grid["underlying_grid"]["zᵃᵃᶜ"][8:19]
+z = grid["underlying_grid"]["zᵃᵃᶜ"][8:Nz-1]
 
 # z = extract_z_faces(grid)
 
-plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
+# plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
 
 # HORIZONTAL
 # plot_1d_phys(T, S, z, times, folder)
 
 record_surface_speed(u, v, Nz, times, folder)
 
-record_horizontal_tracer(
-    C, times, folder, "Contsurf", "Contaminant (% of max. concentration)",
-    colorrange=(0, 100), colormap=:matter, iz=Nz,
-    )
+# record_horizontal_tracer(
+#     C, times, folder, "Contsurf", "Contaminant (% of max. concentration)",
+#     colorrange=(0, 100), colormap=:matter, iz=Nz,
+#     )
 
 record_horizontal_tracer(
     T, times, folder, "Tsurf", "Temperature (°C)",
-    colorrange=(5, 21), colormap=Reverse(:RdYlBu), iz=Nz,
+    colorrange=(5, 40), colormap=Reverse(:RdYlBu), iz=Nz,
     )
 
 record_horizontal_tracer(
@@ -75,7 +75,7 @@ record_horizontal_tracer(
 # VERTICAL
 record_vertical_tracer(
     T, z, 18, times, folder, "Tprofile", "Temperature (°C)",
-    colorrange=(5, 21), colormap=Reverse(:RdYlBu),
+    colorrange=(5, 40), colormap=Reverse(:RdYlBu),
     )
 
 record_vertical_tracer(

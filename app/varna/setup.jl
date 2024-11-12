@@ -77,7 +77,7 @@ external_values = (
     HET = 0.001,
 )
 
-function setup_varna(;
+function setup_region(;
     # Grid
     grid_callable! = grid_from_bathymetry_file!,
     grid_parameters = (
@@ -86,7 +86,7 @@ function setup_varna(;
         Ny = nothing,
         Nz = 12,
         halo = (7, 7, 7),
-        datadir = joinpath(homedir(), "FjordsSim_data"),
+        datadir = joinpath(homedir(), "FjordsSim_data", "varna"),
         filename = "Varna_topo_channels.jld2",
         latitude = (43.177, 43.214),
         longitude = (27.640, 27.947),
@@ -158,8 +158,8 @@ function setup_varna(;
     )
 end
 
-setup_varna_3d() = setup_varna()
-setup_varna_3d_Lobster() = setup_varna(
+setup_region_3d() = setup_region()
+setup_region_3d_Lobster() = setup_region(
     biogeochemistry_callable = biogeochemistry_LOBSTER,
     biogeochemistry_args = (grid,),
     tracers = (:T, :S, :e, :NO₃, :NH₄, :P, :Z, :sPOM, :bPOM, :DOM),
@@ -177,7 +177,7 @@ setup_varna_3d_Lobster() = setup_varna(
         DOM = default_tracer_advection(),
     ),
 )
-setup_varna_3d_OXYDEP() = setup_varna(
+setup_region_3d_OXYDEP() = setup_region(
     tracers = (:T, :S, :e, :C, :NUT, :P, :HET, :POM, :DOM, :O₂),
     initial_conditions = (T = 10, S = 15, C = 0.0, NUT = 10.0, P = 0.05, HET = 0.01, O₂ = 350.0, DOM = 1.0),
     biogeochemistry_callable = biogeochemistry_OXYDEP,
@@ -197,7 +197,7 @@ setup_varna_3d_OXYDEP() = setup_varna(
         O₂ = WENO(),
     ),
 )
-setup_varna_2d() = setup_varna(
+setup_region_2d() = setup_region(
     grid_callable! = grid_latitude_flat!,
     grid_parameters = (
         arch = GPU(),
@@ -222,7 +222,7 @@ setup_varna_2d() = setup_varna(
     bc_callable = bc_ocean,
     bc_args = (grid, 0),
 )
-setup_varna_column() = setup_varna(
+setup_region_column() = setup_region(
     grid_callable! = grid_column!,
     grid_parameters = (
         arch = GPU(),
