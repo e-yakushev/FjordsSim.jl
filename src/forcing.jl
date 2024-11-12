@@ -369,6 +369,64 @@ end
 
 #### FINAL FORCING ####
 
+function forcing_sognefjord(bottom_drag_coefficient, Nz, grid, external_values)
+    Nx = grid[].Nx            # eastern open boundary index
+    λRiver = 1 / (30minutes)  # Relaxation timescale [s⁻¹] River
+    λOpen = 1 / (12hours)       # Relaxation timescale [s⁻¹] Open boundary
+    
+    # values in the river, CAN BE MOVED TO SETUP
+    src_loc = (1, 13, Nz) # river  # (i, j, k)
+    # src_loc = (111, 42, Nz)   # factory
+    Tsrc = 10.0
+    Ssrc = 0.1
+    NUTsrc = 10.0
+    DOMsrc = 5.0
+    O2src = 300.0
+    Psrc = 0.001
+    HETsrc = 0.001
+    Csrc = 100.0
+
+    # # CUDA.@allowscalar user_z = Array(znodes(grid[], Center()))
+    # # U, V, T, S, z, tᶠ = forcing_fields_from_file(user_z=user_z, Nz_model=Nz)
+
+    # TForcing = Forcing(combined_forcing_func_T,
+    #         field_dependencies = :T, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=Tsrc, src_loc=src_loc, external_value=external_values.T),
+    #         discrete_form = true)
+    # SForcing = Forcing(combined_forcing_func_S,
+    #         field_dependencies = :S, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=Ssrc, src_loc=(1, 13, Nz), external_value=external_values.S),
+    #         discrete_form = true)
+    # NUTForcing = Forcing(combined_forcing_func_NUT,
+    #         field_dependencies = :NUT, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=NUTsrc, src_loc=(1, 13, Nz), external_value=external_values.NUT),
+    #         discrete_form = true)
+    # DOMForcing = Forcing(combined_forcing_func_DOM,
+    #         field_dependencies = :DOM, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=DOMsrc, src_loc=src_loc, external_value=external_values.DOM),
+    #         discrete_form = true)
+    # O2Forcing = Forcing(combined_forcing_func_O2,
+    #         field_dependencies = :O₂, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=O2src, src_loc=src_loc, external_value=external_values.O₂),
+    #         discrete_form = true)
+    # PForcing = Forcing(combined_forcing_func_P,
+    #         field_dependencies = :P, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=Psrc, src_loc=src_loc, external_value=external_values.P),
+    #         discrete_form = true)
+    # HETForcing = Forcing(combined_forcing_func_HET,
+    #         field_dependencies = :HET, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=HETsrc, src_loc=src_loc, external_value=external_values.HET),
+    #         discrete_form = true)
+    
+    # ContForcing = Forcing(combined_forcing_func_C,
+    #         field_dependencies = :C, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=Csrc, src_loc=src_loc, external_value=external_values.C),
+    #         discrete_form = true)
+            
+    # n_reference, tᶠ, F, λOpen, Nx = params
+    # TForcing = Forcing(interp_forcing_T, field_dependencies = :T,
+    #                     parameters=(n_reference = n, tᶠ = tᶠ, F=T, λOpen = λOpen, Nx = Nx),
+    #                     discrete_form = true)
+    forcing_bottom = forcing_bottom_drag(bottom_drag_coefficient)
+
+    # forcing_rivers = forcing_rivers_S(Nz)
+    final_forcing = forcing_bottom
+
+    return final_forcing 
+end
+
 function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
     Nx = grid[].Nx            # eastern open boundary index
     λRiver = 1 / (30minutes)  # Relaxation timescale [s⁻¹] River

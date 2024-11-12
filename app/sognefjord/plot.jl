@@ -7,10 +7,10 @@ include("../../src/FjordsSim.jl")
 
 using .FjordsSim: plot_1d_phys, extract_z_faces, record_vertical_tracer, record_surface_speed, record_horizontal_tracer, plot_ztime
 
-Nz = 12
+Nz = 20
 
 folder = joinpath(homedir(), "FjordsSim_results", "sognefjord")
-filename = joinpath(folder, "varna_snapshotsRIVER")
+filename = joinpath(folder, "sogn_snapshots12")
 T =   FieldTimeSeries("$filename.jld2", "T")
 S =   FieldTimeSeries("$filename.jld2", "S")
 u =   FieldTimeSeries("$filename.jld2", "u")
@@ -31,11 +31,11 @@ println(grid["underlying_grid"]["Δyᶠᶜᵃ"])
 
 # stupid, but I cannot find a right way with znodes
 # znodes(grid["underlying_grid"], with_halos=false)
-z = grid["underlying_grid"]["zᵃᵃᶜ"][8:19]
+z = grid["underlying_grid"]["zᵃᵃᶜ"][8:Nz+7]
 
 # z = extract_z_faces(grid)
 
-plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
+# plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
 
 # HORIZONTAL
 # plot_1d_phys(T, S, z, times, folder)

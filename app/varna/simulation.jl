@@ -49,7 +49,7 @@ ocean_model = ocean_sim.model
 #     array_type=Array{Float32}
 # )
 
-profile_prefix = joinpath(sim_setup.results_dir, "varna_snapshots")
+profile_prefix = joinpath(sim_setup.results_dir, "varna", "varna_snapshots")
 ocean_sim.output_writers[:profile] = JLD2OutputWriter(
     ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
     schedule = TimeInterval(6hours),
@@ -58,13 +58,13 @@ ocean_sim.output_writers[:profile] = JLD2OutputWriter(
     array_type=Array{Float32}
 )
 
-ocean_sim.output_writers[:fluxes] = JLD2OutputWriter(
-    ocean_model, coupled_simulation.model.fluxes.turbulent;
-    schedule = TimeInterval(6hours),
-    filename = "$profile_prefix.jld2",
-    overwrite_existing = true,
-    array_type=Array{Float32}
-)
+# ocean_sim.output_writers[:fluxes] = JLD2OutputWriter(
+#     ocean_model, coupled_simulation.model.fluxes.turbulent;
+#     schedule = TimeInterval(6hours),
+#     filename = "$profile_prefix.jld2",
+#     overwrite_existing = true,
+#     array_type=Array{Float32}
+# )
 
 
 # checkpointer doesn't work with timestepper?
@@ -73,7 +73,7 @@ ocean_sim.output_writers[:fluxes] = JLD2OutputWriter(
 
 ## Spinning up the simulation
 # We use an adaptive time step that maintains the [CFL condition](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition) equal to 0.1.
-ocean_sim.stop_time = 1hours
+ocean_sim.stop_time = 10days
 ocean_sim.Δt = 5seconds
 coupled_simulation.stop_time = 10days
 

@@ -28,14 +28,15 @@ using .FjordsSim:
     free_surface_default,
     atmosphere_JRA55,
     biogeochemistry_LOBSTER,
-    biogeochemistry_OXYDEP
+    biogeochemistry_OXYDEP,
+    SimilarityTheoryTurbulentFluxes
 
 const bottom_drag_coefficient = 0.003
 const reference_density = 1010  # T = 15 degC, S = 15 PSU
 
 args_oxydep = (
     initial_photosynthetic_slope = 0.1953 / day, # 1/(W/m²)/s
-    Iopt = 80., # 50.0,     # (W/m2)
+    Iopt = 80.0, # 50.0,     # (W/m2)
     alphaI = 1.8,   # [d-1/(W/m2)]
     betaI = 5.2e-4, # [d-1/(W/m2)]
     gammaD = 0.71,  # (-)
@@ -82,14 +83,14 @@ function setup_region(;
     grid_callable! = grid_from_bathymetry_file!,
     grid_parameters = (
         arch = GPU(),
-        Nx = nothing,
-        Ny = nothing,
-        Nz = 12,
+        Nx = nothing,  # nothing to get NX from bathymetry
+        Ny = nothing,   # nothing to get NY from bathymetry
+        Nz = 20,
         halo = (7, 7, 7),
         datadir = joinpath(homedir(), "FjordsSim_data", "sognefjord"),
-        filename = "Varna_topo_channels.jld2",
-        latitude = (43.177, 43.214),
-        longitude = (27.640, 27.947),
+        filename = "Sogn_topo.jld2",
+        latitude = (60.6315, 61.5),
+        longitude = (4.186, 7.72),
     ),
     # Buoyancy
     buoyancy = SeawaterBuoyancy(;
@@ -109,26 +110,39 @@ function setup_region(;
     momentum_advection = default_momentum_advection(),
     # Tracers
     tracers = (:T, :S, :e),
-    initial_conditions = (T = 10, S = 15),
+    initial_conditions = (T = 5, S = 33),
     # Free surface
     free_surface_callable = free_surface_default,
     free_surface_args = (grid,),
     # Coriolis
     coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
     # Forcing
-    forcing_callable = forcing_varna,
+    forcing_callable = forcing_sognefjord,
     forcing_args = (bottom_drag_coefficient, grid_parameters.Nz, grid, external_values),
     # Boundary conditions
     bc_callable = bc_ocean,
     bc_args = (grid, bottom_drag_coefficient),
-    ## Atmosphere
+    # Atmosphere
     atmosphere_callable = atmosphere_JRA55,
-    # 4*365 - 1 year, 3H JRA55 frocing
-    atmosphere_args = (arch = grid_parameters.arch, backend = InMemory(), grid = grid, start=1, stop=4*365),
+    # 8*365 - 1 year, 3H JRA55 frocing
+    atmosphere_args = (
+        arch = grid_parameters.arch,
+        backend = InMemory(),
+        grid = grid,
+        start = 1,
+        stop = 8 * 365,
+    ),
     # Ocean emissivity from https://link.springer.com/article/10.1007/BF02233853
     # With suspended matter 0.96 https://www.sciencedirect.com/science/article/abs/pii/0034425787900095
-    radiation = Radiation(grid_parameters.arch; ocean_emissivity = 0.96,),  
-    ## Biogeochemistry
+    radiation = Radiation(grid_parameters.arch; ocean_emissivity = 0.96),
+    # Similarity theory
+    similarity_theory_callable = SimilarityTheoryTurbulentFluxes,
+    similarity_theory_args = (
+        grid = grid,
+        gravitational_acceleration = g_Earth,
+        turbulent_prandtl_number = 0.85,
+    ),
+    # Biogeochemistry
     biogeochemistry_callable = nothing,
     biogeochemistry_args = (nothing,),
 )
@@ -153,6 +167,8 @@ function setup_region(;
         atmosphere_callable,
         atmosphere_args,
         radiation,
+        similarity_theory_callable,
+        similarity_theory_args,
         biogeochemistry_callable,
         biogeochemistry_args,
     )
@@ -179,7 +195,16 @@ setup_region_3d_Lobster() = setup_region(
 )
 setup_region_3d_OXYDEP() = setup_region(
     tracers = (:T, :S, :e, :C, :NUT, :P, :HET, :POM, :DOM, :O₂),
-    initial_conditions = (T = 10, S = 15, C = 0.0, NUT = 10.0, P = 0.05, HET = 0.01, O₂ = 350.0, DOM = 1.0),
+    initial_conditions = (
+        T = 5,
+        S = 33,
+        C = 0.0,
+        NUT = 10.0,
+        P = 0.05,
+        HET = 0.01,
+        O₂ = 350.0,
+        DOM = 1.0,
+    ),
     biogeochemistry_callable = biogeochemistry_OXYDEP,
     biogeochemistry_args = (grid, args_oxydep),
     bc_args = (grid, bottom_drag_coefficient, biogeochemistry_OXYDEP),
