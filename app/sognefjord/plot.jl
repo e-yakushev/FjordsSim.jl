@@ -10,18 +10,21 @@ using .FjordsSim: plot_1d_phys, extract_z_faces, record_vertical_tracer, record_
 Nz = 20
 
 folder = joinpath(homedir(), "FjordsSim_results", "sognefjord")
-filename = joinpath(folder, "sogn_snapshots12")
-T =   FieldTimeSeries("$filename.jld2", "T")
-S =   FieldTimeSeries("$filename.jld2", "S")
-u =   FieldTimeSeries("$filename.jld2", "u")
-v =   FieldTimeSeries("$filename.jld2", "v")
-O₂ =  FieldTimeSeries("$filename.jld2", "O₂")
-NUT =  FieldTimeSeries("$filename.jld2", "NUT")
-PHY =  FieldTimeSeries("$filename.jld2", "P")
-HET =  FieldTimeSeries("$filename.jld2", "HET")
-DOM =  FieldTimeSeries("$filename.jld2", "DOM")
-POM =  FieldTimeSeries("$filename.jld2", "POM")
-C =  FieldTimeSeries("$filename.jld2", "C")       
+filename = raw"D:\sogn_snapshots"
+i = 50
+j = 14
+
+T =   FieldTimeSeries("$filename.jld2", "T"; backend = OnDisk())
+S =   FieldTimeSeries("$filename.jld2", "S"; backend = OnDisk())
+u =   FieldTimeSeries("$filename.jld2", "u"; backend = OnDisk())
+v =   FieldTimeSeries("$filename.jld2", "v"; backend = OnDisk())
+O₂ =  FieldTimeSeries("$filename.jld2", "O₂"; backend = OnDisk())
+NUT =  FieldTimeSeries("$filename.jld2", "NUT"; backend = OnDisk())
+PHY =  FieldTimeSeries("$filename.jld2", "P"; backend = OnDisk())
+HET =  FieldTimeSeries("$filename.jld2", "HET"; backend = OnDisk())
+DOM =  FieldTimeSeries("$filename.jld2", "DOM"; backend = OnDisk())
+POM =  FieldTimeSeries("$filename.jld2", "POM"; backend = OnDisk())
+C =  FieldTimeSeries("$filename.jld2", "C"; backend = OnDisk())       
 times = T.times
 
 grid = jldopen("$filename.jld2")["grid"]
@@ -35,7 +38,8 @@ z = grid["underlying_grid"]["zᵃᵃᶜ"][8:Nz+7]
 
 # z = extract_z_faces(grid)
 
-# plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
+# doesnt work with OnDisk
+# plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, i, j, times, z, folder)
 
 # HORIZONTAL
 # plot_1d_phys(T, S, z, times, folder)
@@ -49,7 +53,7 @@ record_horizontal_tracer(
 
 record_horizontal_tracer(
     T, times, folder, "Tsurf", "Temperature (°C)",
-    colorrange=(5, 21), colormap=Reverse(:RdYlBu), iz=Nz,
+    colorrange=(-1, 10), colormap=Reverse(:RdYlBu), iz=Nz,
     )
 
 record_horizontal_tracer(
@@ -69,7 +73,7 @@ record_horizontal_tracer(
 
 record_horizontal_tracer(
     PHY, times, folder, "PHYsurf", "Phytoplankton (μM N)",
-    colorrange=(0, 2), colormap=Reverse(:cubehelix), iz=Nz,
+    colorrange=(0, 0.5), colormap=Reverse(:cubehelix), iz=Nz,
     )
 
 # VERTICAL
