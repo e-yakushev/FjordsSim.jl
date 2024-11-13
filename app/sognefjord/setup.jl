@@ -19,7 +19,7 @@ using .FjordsSim:
     grid_latitude_flat!,
     grid_column!,
     grid,
-    forcing_varna,
+    forcing_sognefjord,
     bc_varna_bgh_oxydep,
     bgh_oxydep_boundary_conditions,
     bc_varna,
