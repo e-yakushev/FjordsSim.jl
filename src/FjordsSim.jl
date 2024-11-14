@@ -67,7 +67,7 @@ biogeochemistry_OXYDEP(grid, args_oxydep) = OXYDEP(;
     Chemicals = false,
     scale_negatives = false,
 )
-SimilarityTheoryTurbulentFluxes(;grid::Ref, kw...) = SimilarityTheoryTurbulentFluxes(grid[]; kw...)
+SimilarityTheoryTurbulentFluxes(; grid::Ref, kw...) = SimilarityTheoryTurbulentFluxes(grid[]; kw...)
 
 # Grid
 grid = Ref{Any}(nothing)
@@ -202,7 +202,7 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     atmosphere = safe_execute(sim_setup.atmosphere_callable)(sim_setup.atmosphere_args...)
     println("Initialized atmosphere")
     radiation = sim_setup.radiation
-    similarity_theory = sim_setup.similarity_theory_callable(;sim_setup.similarity_theory_args...)
+    similarity_theory = sim_setup.similarity_theory_callable(; sim_setup.similarity_theory_args...)
     coupled_model = OceanSeaIceModel(ocean_sim, sea_ice; atmosphere, radiation)  # , similarity_theory)
     println("Initialized coupled model")
 

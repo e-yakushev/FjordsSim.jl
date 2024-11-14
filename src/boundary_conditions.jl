@@ -6,8 +6,7 @@ using Oceananigans.Operators: Δzᵃᵃᶜ, ℑxyᶜᶠᵃ, ℑxyᶠᶜᵃ
 using Oceananigans.Units
 using Oceananigans.Architectures
 using OceanBioME: GasExchange
-import Oceananigans.Biogeochemistry:
-    biogeochemical_drift_velocity
+import Oceananigans.Biogeochemistry: biogeochemical_drift_velocity
 
 const twelve_months = 12
 const thirty_days = 30days
@@ -114,10 +113,8 @@ function wind_data_hardcoded(::GPU, Nx, Ny)
     return cu(τˣ), cu(τʸ)
 end
 
-current_time_index(time, tot_months) =
-    mod(unsafe_trunc(Int32, time / thirty_days), tot_months) + 1
-next_time_index(time, tot_months) =
-    mod(unsafe_trunc(Int32, time / thirty_days) + 1, tot_months) + 1
+current_time_index(time, tot_months) = mod(unsafe_trunc(Int32, time / thirty_days), tot_months) + 1
+next_time_index(time, tot_months) = mod(unsafe_trunc(Int32, time / thirty_days) + 1, tot_months) + 1
 cyclic_interpolate(u₁::Number, u₂, time) = u₁ + mod(time / thirty_days, 1) * (u₂ - u₁)
 
 function surface_wind_stress(i, j, grid, clock, fields, τ)
@@ -219,13 +216,13 @@ const windspeed = 5.0    # wind speed 10 m, (m/s)
 
 # BGC boundary conditions
 function bgh_oxydep_boundary_conditions(biogeochemistry, Nz)
-    
+
     Oxy_top_cond(i, j, grid, clock, fields) = @inbounds (OxygenSeaWaterFlux(
-            fields.T[i, j, Nz],
-            fields.S[i, j, Nz],
-            0.0,                # sea surface pressure
-            fields.O₂[i, j, Nz],
-            windspeed,
+        fields.T[i, j, Nz],
+        fields.S[i, j, Nz],
+        0.0,                # sea surface pressure
+        fields.O₂[i, j, Nz],
+        windspeed,
     ))
 
     OXY_top = FluxBoundaryCondition(Oxy_top_cond; discrete_form = true)
@@ -272,15 +269,9 @@ function bgh_oxydep_boundary_conditions(biogeochemistry, Nz)
     phy_bcs = FieldBoundaryConditions(bottom = P_bottom)
     het_bcs = FieldBoundaryConditions(bottom = HET_bottom)
 
-    bc_oxydep = (
-        O₂ = oxy_bcs,
-        NUT = nut_bcs,
-        DOM = dom_bcs,
-        POM = pom_bcs,
-        P = phy_bcs,
-        HET = het_bcs,
-    )
-    
+    bc_oxydep =
+        (O₂ = oxy_bcs, NUT = nut_bcs, DOM = dom_bcs, POM = pom_bcs, P = phy_bcs, HET = het_bcs)
+
     return bc_oxydep
 end
 

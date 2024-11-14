@@ -44,9 +44,9 @@ using CUDA
 
     # First condition (from radiation)
     condition1 = (i == Nx)
-    
+
     # Calculate the forcing terms
-    radiation_term = @inbounds ifelse(condition1, -λOpen * (model_fields.T[i, j, k] - F), 0) 
+    radiation_term = @inbounds ifelse(condition1, -λOpen * (model_fields.T[i, j, k] - F), 0)
 
     # Apply logic: Combine both terms if both conditions are true
     return @inbounds radiation_term
@@ -54,11 +54,13 @@ end
 
 # adapted from https://github.com/glwagner/TropicalTurbulantics.jl/blob/main/tropical_turbulence_setup.jl
 # tropical_turbulence_setup
-function forcing_fields_from_file(arch = GPU();
+function forcing_fields_from_file(
+    arch = GPU();
     user_z = -[19, 15, 10, 5, 0],  # Load the "original" model z-grid
     Nz_model = 5,
-    datapath = joinpath(homedir(), "BadgerArtifacts", "Varna_BRY.jld2"))
-        
+    datapath = joinpath(homedir(), "BadgerArtifacts", "Varna_BRY.jld2"),
+)
+
     # Load data
     file = jldopen(datapath)
 
@@ -75,7 +77,7 @@ function forcing_fields_from_file(arch = GPU();
     zforc = vcat(zforc[1] - 5, zforc)
 
     @info string("First cell interface is now z[1] = ", zforc[1])
-    
+
     # what is assert?
     # enforce a condition at runtime, primarily for debugging and validation purposes.
     # If the condition in the @assert statement evaluates to false, Julia raises an AssertionError and stops the program.
@@ -92,7 +94,7 @@ function forcing_fields_from_file(arch = GPU();
     T = file["data_dict"]["thetao"]
     S = file["data_dict"]["so"]
 
-    println(size(T)) 
+    println(size(T))
     close(file)
 
     # regrid if necessary
@@ -100,8 +102,10 @@ function forcing_fields_from_file(arch = GPU();
         Nz_forc = length(zforc) - 1
         Nz_model = length(user_z) - 1
 
-        original_vertical_grid = RectilinearGrid(size=Nz_forc; z=zforc, topology=(Flat, Flat, Bounded))
-        new_vertical_grid      = RectilinearGrid(size=Nz_model; z=user_z, topology=(Flat, Flat, Bounded))
+        original_vertical_grid =
+            RectilinearGrid(size = Nz_forc; z = zforc, topology = (Flat, Flat, Bounded))
+        new_vertical_grid =
+            RectilinearGrid(size = Nz_model; z = user_z, topology = (Flat, Flat, Bounded))
 
         orig_field = CenterField(original_vertical_grid)
         new_field = CenterField(new_vertical_grid)
@@ -112,25 +116,21 @@ function forcing_fields_from_file(arch = GPU();
         new_T = zeros(Nz_model, Nt)
         new_S = zeros(Nz_model, Nt)
 
-        for (new, orig) in [
-                            (new_U,  U),
-                            (new_V,  V),
-                            (new_T,  T),
-                            (new_S,  S)]
+        for (new, orig) in [(new_U, U), (new_V, V), (new_T, T), (new_S, S)]
 
-        for n = 1:Nt
-            orig_field .= reshape(orig[:, n], 1, 1, Nz_forc)
-            regrid!(new_field, orig_field)
-            new[:, n] .= interior(new_field, :)
+            for n = 1:Nt
+                orig_field .= reshape(orig[:, n], 1, 1, Nz_forc)
+                regrid!(new_field, orig_field)
+                new[:, n] .= interior(new_field, :)
+            end
         end
-    end
 
-    # Just pretend nothing happened
-    U  = on_architecture(arch, new_U) 
-    V  = on_architecture(arch, new_V) 
-    T  = on_architecture(arch, new_T)   
-    S  = on_architecture(arch, new_S) 
-    z  = znodes(new_vertical_grid, Face())
+        # Just pretend nothing happened
+        U = on_architecture(arch, new_U)
+        V = on_architecture(arch, new_V)
+        T = on_architecture(arch, new_T)
+        S = on_architecture(arch, new_S)
+        z = znodes(new_vertical_grid, Face())
     end
 
     # Convert CPU arrays to GPU arrays if necessary:
@@ -145,17 +145,9 @@ end
 
 #### BOTTOM DRAG ####
 function forcing_bottom_drag(bottom_drag_coefficient)
-        Fu = Forcing(
-            u_immersed_bottom_drag,
-            discrete_form = true,
-            parameters = bottom_drag_coefficient,
-        )
-        Fv = Forcing(
-            v_immersed_bottom_drag,
-            discrete_form = true,
-            parameters = bottom_drag_coefficient,
-        )
-        return (u = Fu, v = Fv, )
+    Fu = Forcing(u_immersed_bottom_drag, discrete_form = true, parameters = bottom_drag_coefficient)
+    Fv = Forcing(v_immersed_bottom_drag, discrete_form = true, parameters = bottom_drag_coefficient)
+    return (u = Fu, v = Fv)
 end
 
 #### radiation QuasiOpenBoundary ONLY ####
@@ -188,7 +180,7 @@ function forcing_rivers_S(Nz)
         @inbounds ifelse((i, j, k) == (1, 13, Nz), -λ * (model_fields.S[i, j, k] - S_source), 0)
     Sforcing = Forcing(S_point_source, field_dependencies = :S, discrete_form = true)
 
-    return (S = Sforcing, )
+    return (S = Sforcing,)
 end
 
 function forcing_rivers_NO₃(Nz)
@@ -207,7 +199,7 @@ function forcing_rivers_NO₃(Nz)
         @inbounds ifelse((i, j, k) == (1, 13, Nz), -λ * (model_fields.NO₃[i, j, k] - NO₃_source), 0)
     NO₃forcing = Forcing(NO₃_point_source, field_dependencies = :NO₃, discrete_form = true)
 
-    return (S = Sforcing, NO₃ = NO₃forcing, )
+    return (S = Sforcing, NO₃ = NO₃forcing)
 end
 
 #### COMBINED FOR EACH TRACER ####
@@ -218,18 +210,19 @@ end
 function combined_forcing_func_T(i, j, k, grid, clock, model_fields, parameters)
     # First condition (from Tradiation)
     condition1 = (i == parameters.Nx)
-    
+
     # Second condition (from T_point_source)
     condition2 = ((i, j, k) == parameters.src_loc)
-    
+
     # Calculate the two possible forcing terms
     radiation_term = -parameters.λOpen * (model_fields.T[i, j, k] - parameters.external_value)
     point_source_term = -parameters.λRiver * (model_fields.T[i, j, k] - parameters.Vsrc)
 
     # Apply logic: Combine both terms if both conditions are true
-    return @inbounds ifelse(condition1 || condition2,
+    return @inbounds ifelse(
+        condition1 || condition2,
         (condition1 ? radiation_term : 0) + (condition2 ? point_source_term : 0),
-        0
+        0,
     )
 end
 
@@ -237,18 +230,19 @@ end
 function combined_forcing_func_S(i, j, k, grid, clock, model_fields, parameters)
     # First condition (from Tradiation)
     condition1 = (i == parameters.Nx)
-    
+
     # Second condition (from T_point_source)
     condition2 = ((i, j, k) == parameters.src_loc)
-    
+
     # Calculate the two possible forcing terms
     radiation_term = -parameters.λOpen * (model_fields.S[i, j, k] - parameters.external_value)
     point_source_term = -parameters.λRiver * (model_fields.S[i, j, k] - parameters.Vsrc)
 
     # Apply logic: Combine both terms if both conditions are true
-    return @inbounds ifelse(condition1 || condition2,
+    return @inbounds ifelse(
+        condition1 || condition2,
         (condition1 ? radiation_term : 0) + (condition2 ? point_source_term : 0),
-        0
+        0,
     )
 end
 
@@ -257,18 +251,19 @@ end
 function combined_forcing_func_NUT(i, j, k, grid, clock, model_fields, parameters)
     # First condition (from Tradiation)
     condition1 = (i == parameters.Nx)
-    
+
     # Second condition (from T_point_source)
     condition2 = ((i, j, k) == parameters.src_loc)
-    
+
     # Calculate the two possible forcing terms
     radiation_term = -parameters.λOpen * (model_fields.NUT[i, j, k] - parameters.external_value)
     point_source_term = -parameters.λRiver * (model_fields.NUT[i, j, k] - parameters.Vsrc)
 
     # Apply logic: Combine both terms if both conditions are true
-    return @inbounds ifelse(condition1 || condition2,
+    return @inbounds ifelse(
+        condition1 || condition2,
         (condition1 ? radiation_term : 0) + (condition2 ? point_source_term : 0),
-        0
+        0,
     )
 end
 
@@ -276,18 +271,19 @@ end
 function combined_forcing_func_O2(i, j, k, grid, clock, model_fields, parameters)
     # First condition (from Tradiation)
     condition1 = (i == parameters.Nx)
-    
+
     # Second condition (from T_point_source)
     condition2 = ((i, j, k) == parameters.src_loc)
-    
+
     # Calculate the two possible forcing terms
     radiation_term = -parameters.λOpen * (model_fields.O₂[i, j, k] - parameters.external_value)
     point_source_term = -parameters.λRiver * (model_fields.O₂[i, j, k] - parameters.Vsrc)
 
     # Apply logic: Combine both terms if both conditions are true
-    return @inbounds ifelse(condition1 || condition2,
+    return @inbounds ifelse(
+        condition1 || condition2,
         (condition1 ? radiation_term : 0) + (condition2 ? point_source_term : 0),
-        0
+        0,
     )
 end
 
@@ -295,18 +291,19 @@ end
 function combined_forcing_func_P(i, j, k, grid, clock, model_fields, parameters)
     # First condition (from Tradiation)
     condition1 = (i == parameters.Nx)
-    
+
     # Second condition (from T_point_source)
     condition2 = ((i, j, k) == parameters.src_loc)
-    
+
     # Calculate the two possible forcing terms
     radiation_term = -parameters.λOpen * (model_fields.P[i, j, k] - parameters.external_value)
     point_source_term = -parameters.λRiver * (model_fields.P[i, j, k] - parameters.Vsrc)
 
     # Apply logic: Combine both terms if both conditions are true
-    return @inbounds ifelse(condition1 || condition2,
+    return @inbounds ifelse(
+        condition1 || condition2,
         (condition1 ? radiation_term : 0) + (condition2 ? point_source_term : 0),
-        0
+        0,
     )
 end
 
@@ -314,18 +311,19 @@ end
 function combined_forcing_func_HET(i, j, k, grid, clock, model_fields, parameters)
     # First condition (from Tradiation)
     condition1 = (i == parameters.Nx)
-    
+
     # Second condition (from T_point_source)
     condition2 = ((i, j, k) == parameters.src_loc)
-    
+
     # Calculate the two possible forcing terms
     radiation_term = -parameters.λOpen * (model_fields.HET[i, j, k] - parameters.external_value)
     point_source_term = -parameters.λRiver * (model_fields.HET[i, j, k] - parameters.Vsrc)
 
     # Apply logic: Combine both terms if both conditions are true
-    return @inbounds ifelse(condition1 || condition2,
+    return @inbounds ifelse(
+        condition1 || condition2,
         (condition1 ? radiation_term : 0) + (condition2 ? point_source_term : 0),
-        0
+        0,
     )
 end
 
@@ -333,18 +331,19 @@ end
 function combined_forcing_func_DOM(i, j, k, grid, clock, model_fields, parameters)
     # First condition (from Tradiation)
     condition1 = (i == parameters.Nx)
-    
+
     # Second condition (from T_point_source)
     condition2 = ((i, j, k) == parameters.src_loc)
-    
+
     # Calculate the two possible forcing terms
     radiation_term = -parameters.λOpen * (model_fields.DOM[i, j, k] - parameters.external_value)
     point_source_term = -parameters.λRiver * (model_fields.DOM[i, j, k] - parameters.Vsrc)
 
     # Apply logic: Combine both terms if both conditions are true
-    return @inbounds ifelse(condition1 || condition2,
+    return @inbounds ifelse(
+        condition1 || condition2,
         (condition1 ? radiation_term : 0) + (condition2 ? point_source_term : 0),
-        0
+        0,
     )
 end
 
@@ -352,18 +351,19 @@ end
 function combined_forcing_func_C(i, j, k, grid, clock, model_fields, parameters)
     # First condition (from Tradiation)
     condition1 = (i == parameters.Nx)
-    
+
     # Second condition (from T_point_source)
     condition2 = ((i, j, k) == parameters.src_loc)
-    
+
     # Calculate the two possible forcing terms
     radiation_term = -parameters.λOpen * (model_fields.C[i, j, k] - parameters.external_value)
     point_source_term = -parameters.λRiver * (model_fields.C[i, j, k] - parameters.Vsrc)
 
     # Apply logic: Combine both terms if both conditions are true
-    return @inbounds ifelse(condition1 || condition2,
+    return @inbounds ifelse(
+        condition1 || condition2,
         (condition1 ? radiation_term : 0) + (condition2 ? point_source_term : 0),
-        0
+        0,
     )
 end
 
@@ -373,7 +373,7 @@ function forcing_sognefjord(bottom_drag_coefficient, Nz, grid, external_values)
     Nx = grid[].Nx            # eastern open boundary index
     λRiver = 1 / (30minutes)  # Relaxation timescale [s⁻¹] River
     λOpen = 1 / (12hours)       # Relaxation timescale [s⁻¹] Open boundary
-    
+
     # values in the river, CAN BE MOVED TO SETUP
     src_loc = (1, 13, Nz) # river  # (i, j, k)
     # src_loc = (111, 42, Nz)   # factory
@@ -410,11 +410,11 @@ function forcing_sognefjord(bottom_drag_coefficient, Nz, grid, external_values)
     # HETForcing = Forcing(combined_forcing_func_HET,
     #         field_dependencies = :HET, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=HETsrc, src_loc=src_loc, external_value=external_values.HET),
     #         discrete_form = true)
-    
+
     # ContForcing = Forcing(combined_forcing_func_C,
     #         field_dependencies = :C, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=Csrc, src_loc=src_loc, external_value=external_values.C),
     #         discrete_form = true)
-            
+
     # n_reference, tᶠ, F, λOpen, Nx = params
     # TForcing = Forcing(interp_forcing_T, field_dependencies = :T,
     #                     parameters=(n_reference = n, tᶠ = tᶠ, F=T, λOpen = λOpen, Nx = Nx),
@@ -424,14 +424,14 @@ function forcing_sognefjord(bottom_drag_coefficient, Nz, grid, external_values)
     # forcing_rivers = forcing_rivers_S(Nz)
     final_forcing = forcing_bottom
 
-    return final_forcing 
+    return final_forcing
 end
 
 function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
     Nx = grid[].Nx            # eastern open boundary index
     λRiver = 1 / (30minutes)  # Relaxation timescale [s⁻¹] River
     λOpen = 1 / (12hours)       # Relaxation timescale [s⁻¹] Open boundary
-    
+
     # values in the river, CAN BE MOVED TO SETUP
     src_loc = (1, 13, Nz) # river  # (i, j, k)
     # src_loc = (111, 42, Nz)   # factory
@@ -447,33 +447,113 @@ function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
     # CUDA.@allowscalar user_z = Array(znodes(grid[], Center()))
     # U, V, T, S, z, tᶠ = forcing_fields_from_file(user_z=user_z, Nz_model=Nz)
 
-    TForcing = Forcing(combined_forcing_func_T,
-            field_dependencies = :T, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=Tsrc, src_loc=src_loc, external_value=external_values.T),
-            discrete_form = true)
-    SForcing = Forcing(combined_forcing_func_S,
-            field_dependencies = :S, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=Ssrc, src_loc=(1, 13, Nz), external_value=external_values.S),
-            discrete_form = true)
-    NUTForcing = Forcing(combined_forcing_func_NUT,
-            field_dependencies = :NUT, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=NUTsrc, src_loc=(1, 13, Nz), external_value=external_values.NUT),
-            discrete_form = true)
-    DOMForcing = Forcing(combined_forcing_func_DOM,
-            field_dependencies = :DOM, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=DOMsrc, src_loc=src_loc, external_value=external_values.DOM),
-            discrete_form = true)
-    O2Forcing = Forcing(combined_forcing_func_O2,
-            field_dependencies = :O₂, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=O2src, src_loc=src_loc, external_value=external_values.O₂),
-            discrete_form = true)
-    PForcing = Forcing(combined_forcing_func_P,
-            field_dependencies = :P, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=Psrc, src_loc=src_loc, external_value=external_values.P),
-            discrete_form = true)
-    HETForcing = Forcing(combined_forcing_func_HET,
-            field_dependencies = :HET, parameters=(Nx = Nx, λRiver = 0, λOpen = λOpen, Vsrc=HETsrc, src_loc=src_loc, external_value=external_values.HET),
-            discrete_form = true)
-    
+    TForcing = Forcing(
+        combined_forcing_func_T,
+        field_dependencies = :T,
+        parameters = (
+            Nx = Nx,
+            λRiver = 0,
+            λOpen = λOpen,
+            Vsrc = Tsrc,
+            src_loc = src_loc,
+            external_value = external_values.T,
+        ),
+        discrete_form = true,
+    )
+    SForcing = Forcing(
+        combined_forcing_func_S,
+        field_dependencies = :S,
+        parameters = (
+            Nx = Nx,
+            λRiver = λRiver,
+            λOpen = λOpen,
+            Vsrc = Ssrc,
+            src_loc = (1, 13, Nz),
+            external_value = external_values.S,
+        ),
+        discrete_form = true,
+    )
+    NUTForcing = Forcing(
+        combined_forcing_func_NUT,
+        field_dependencies = :NUT,
+        parameters = (
+            Nx = Nx,
+            λRiver = λRiver,
+            λOpen = λOpen,
+            Vsrc = NUTsrc,
+            src_loc = (1, 13, Nz),
+            external_value = external_values.NUT,
+        ),
+        discrete_form = true,
+    )
+    DOMForcing = Forcing(
+        combined_forcing_func_DOM,
+        field_dependencies = :DOM,
+        parameters = (
+            Nx = Nx,
+            λRiver = λRiver,
+            λOpen = λOpen,
+            Vsrc = DOMsrc,
+            src_loc = src_loc,
+            external_value = external_values.DOM,
+        ),
+        discrete_form = true,
+    )
+    O2Forcing = Forcing(
+        combined_forcing_func_O2,
+        field_dependencies = :O₂,
+        parameters = (
+            Nx = Nx,
+            λRiver = 0,
+            λOpen = λOpen,
+            Vsrc = O2src,
+            src_loc = src_loc,
+            external_value = external_values.O₂,
+        ),
+        discrete_form = true,
+    )
+    PForcing = Forcing(
+        combined_forcing_func_P,
+        field_dependencies = :P,
+        parameters = (
+            Nx = Nx,
+            λRiver = 0,
+            λOpen = λOpen,
+            Vsrc = Psrc,
+            src_loc = src_loc,
+            external_value = external_values.P,
+        ),
+        discrete_form = true,
+    )
+    HETForcing = Forcing(
+        combined_forcing_func_HET,
+        field_dependencies = :HET,
+        parameters = (
+            Nx = Nx,
+            λRiver = 0,
+            λOpen = λOpen,
+            Vsrc = HETsrc,
+            src_loc = src_loc,
+            external_value = external_values.HET,
+        ),
+        discrete_form = true,
+    )
+
     # -λRiver here, because the poin source is on the upper boundary and should point down
-    ContForcing = Forcing(combined_forcing_func_C,
-            field_dependencies = :C, parameters=(Nx = Nx, λRiver = λRiver, λOpen = λOpen, Vsrc=Csrc, src_loc=src_loc, external_value=external_values.C),
-            discrete_form = true)
-            
+    ContForcing = Forcing(
+        combined_forcing_func_C,
+        field_dependencies = :C,
+        parameters = (
+            Nx = Nx,
+            λRiver = λRiver,
+            λOpen = λOpen,
+            Vsrc = Csrc,
+            src_loc = src_loc,
+            external_value = external_values.C,
+        ),
+        discrete_form = true,
+    )
+
     # n_reference, tᶠ, F, λOpen, Nx = params
     # TForcing = Forcing(interp_forcing_T, field_dependencies = :T,
     #                     parameters=(n_reference = n, tᶠ = tᶠ, F=T, λOpen = λOpen, Nx = Nx),
@@ -481,18 +561,21 @@ function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
     forcing_bottom = forcing_bottom_drag(bottom_drag_coefficient)
 
     # forcing_rivers = forcing_rivers_S(Nz)
-    final_forcing = merge(forcing_bottom,
-    (T = TForcing,
-    S = SForcing,
-    C = ContForcing,
-    NUT = NUTForcing,
-    DOM = DOMForcing,
-    O₂ = O2Forcing,
-    P = PForcing,
-    HET = HETForcing,
-    ))
+    final_forcing = merge(
+        forcing_bottom,
+        (
+            T = TForcing,
+            S = SForcing,
+            C = ContForcing,
+            NUT = NUTForcing,
+            DOM = DOMForcing,
+            O₂ = O2Forcing,
+            P = PForcing,
+            HET = HETForcing,
+        ),
+    )
 
-    return final_forcing 
+    return final_forcing
 end
 
 
