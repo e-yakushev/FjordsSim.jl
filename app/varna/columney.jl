@@ -31,7 +31,7 @@ import Oceananigans.Biogeochemistry:
 
 include("setup.jl")
 
-using .FjordsSim: OXYDEP, read_TSU_forcing
+using .FjordsSim: OXYDEP, read_TSU_forcing, OxygenSeaWaterFlux
 
 const year = 365days
 stoptime = 1095days  # Set simulation stoptime here!
@@ -39,17 +39,17 @@ stoptime = 1095days  # Set simulation stoptime here!
 ## Grid
 #depth_extent = 100meters
 Nz = 12
-grid = RectilinearGrid(
-    size = (1, 1, Nz),
-    extent = (500meters, 500meters, 67meters),
-    topology = (Bounded, Bounded, Bounded),
+grid_column = RectilinearGrid(
+   size = (1, 1, Nz),
+   extent = (500meters, 500meters, 67meters),
+   topology = (Bounded, Bounded, Bounded),
 )
 
 ## Model
 add_contaminants = false
 
 biogeochemistry = OXYDEP(;
-    grid,
+    grid=grid_column,
     args_oxydep...,
     surface_photosynthetically_active_radiation = PAR⁰,
     TS_forced = true,
@@ -85,10 +85,12 @@ Kz_function(x, y, z, t) = bilinear_interpolate(kz_itp, mod(t, 365days), clamp(z,
 
 clock = Clock(; time = times[1])
 
-T = FunctionField{Center,Center,Center}(T_function, grid; clock)
-S = FunctionField{Center,Center,Center}(S_function, grid; clock)
+temp_itp
 
-κ = 5.0 * FunctionField{Center,Center,Center}(Kz_function, grid; clock)
+T = FunctionField{Center,Center,Center}(T_function, grid_column; clock)
+S = FunctionField{Center,Center,Center}(S_function, grid_column; clock)
+
+κ = 5.0 * FunctionField{Center,Center,Center}(Kz_function, grid_column; clock)
 
 #- - - - - - - - - - - - - - - - - - - - - - 
 ## Boundary conditions for OxyDep
@@ -106,7 +108,6 @@ windspeed = 5.0    # m/s windspeed for gases exchange
 @inline F_subox(conc, threshold) = (0.5 - 0.5 * tanh(conc - threshold))
 
 ## oxy
-include("sea_water_flux.jl")
 
 Oxy_top_cond(i, j, grid, clock, fields) = @inbounds (OxygenSeaWaterFlux(
     fields.T[i, j, Nz],
@@ -136,8 +137,8 @@ NUT_bottom_cond(i, j, grid, clock, fields) = @inbounds (
 NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond, discrete_form = true)
 
 ## phy
-w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:PHY)).w[1, 1, 1]
-PHY_bottom_cond(i, j, grid, clock, fields) = @inbounds (-bu * w_PHY * fields.PHY[i, j, 1])
+w_PHY = biogeochemical_drift_velocity(biogeochemistry, Val(:P)).w[1, 1, 1]
+PHY_bottom_cond(i, j, grid, clock, fields) = @inbounds (-bu * w_PHY * fields.P[i, j, 1])
 PHY_bottom = FluxBoundaryCondition(PHY_bottom_cond, discrete_form = true)
 
 ## het
@@ -163,7 +164,7 @@ DOM_bottom = FluxBoundaryCondition(DOM_bottom_cond, discrete_form = true)
 
 ## Model instantiation
 model = NonhydrostaticModel(;
-    grid,
+    grid = grid_column,
     clock,
     #closure = VerticallyImplicitTimeDiscretization(), #SmagorinskyLilly(), 
     closure = ScalarDiffusivity(ν = κ, κ = κ), #(ν = 1e-4, κ = 1e-4),
@@ -173,7 +174,7 @@ model = NonhydrostaticModel(;
         NUT = FieldBoundaryConditions(bottom = NUT_bottom),
         DOM = FieldBoundaryConditions(top = DOM_top, bottom = DOM_bottom),
         POM = FieldBoundaryConditions(bottom = POM_bottom),
-        PHY = FieldBoundaryConditions(bottom = PHY_bottom),
+        P = FieldBoundaryConditions(bottom = PHY_bottom),
         HET = FieldBoundaryConditions(bottom = HET_bottom),
     ),
     auxiliary_fields = (; S, T),
@@ -183,9 +184,9 @@ model
 
 ## Set model
 if add_contaminants == false
-    set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0)
+    set!(model, NUT = 10.0, P = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0)
 else
-    set!(model, NUT = 10.0, PHY = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0, Ci_free = 0.123)
+    set!(model, NUT = 10.0, P = 0.01, HET = 0.05, O₂ = 350.0, DOM = 1.0, Ci_free = 0.123)
 end
 
 ## Simulation
@@ -202,9 +203,9 @@ simulation.callbacks[:progress] = Callback(progress_message, TimeInterval(10days
 
 #add_contaminants ? (Ci_free, NUT, PHY, HET, POM, DOM, O₂ = model.tracers) : (NUT, PHY, HET, POM, DOM, O₂ = model.tracers)
 if add_contaminants == false
-    NUT, PHY, HET, POM, DOM, O₂ = model.tracers
+    NUT, P, HET, POM, DOM, O₂ = model.tracers
 else
-    NUT, PHY, HET, POM, DOM, O₂, Ci_free, Ci_PHY, Ci_HET, Ci_POM, Ci_DOM = model.tracers
+    NUT, P, HET, POM, DOM, O₂, Ci_free, Ci_PHY, Ci_HET, Ci_POM, Ci_DOM = model.tracers
 end
 PAR = model.auxiliary_fields.PAR
 T = model.auxiliary_fields.T
@@ -215,7 +216,7 @@ output_prefix = joinpath(homedir(), "data_Varna", "columney_snapshots")
 if add_contaminants == false
     simulation.output_writers[:profiles] = JLD2OutputWriter(
         model,
-        (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR, κ),
+        (; NUT, P, HET, POM, DOM, O₂, T, S, PAR, κ),
         filename = "$output_prefix.jld2",
         schedule = TimeInterval(1day),
         overwrite_existing = true,
@@ -223,7 +224,7 @@ if add_contaminants == false
 else
     simulation.output_writers[:profiles] = JLD2OutputWriter(
         model,
-        (; NUT, PHY, HET, POM, DOM, O₂, T, S, PAR, κ, Ci_free, Ci_PHY, Ci_HET, Ci_POM, Ci_DOM),
+        (; NUT, P, HET, POM, DOM, O₂, T, S, PAR, κ, Ci_free, Ci_PHY, Ci_HET, Ci_POM, Ci_DOM),
         filename = "$output_prefix.jld2",
         schedule = TimeInterval(1day),
         overwrite_existing = true,
@@ -238,11 +239,11 @@ model
 "
 Plotting of images
 "
-filename = joinpath(homedir(), "data_Varna", "columney_snapshots")
+filename = joinpath(homedir(), "FjordsSim_results", "columney_snapshots")
  
 ## Load saved output
 @info "Loading saved outputs..."
-PHY = FieldTimeSeries("$filename.jld2", "PHY")
+P = FieldTimeSeries("$filename.jld2", "P")
 NUT = FieldTimeSeries("$filename.jld2", "NUT")
 HET = FieldTimeSeries("$filename.jld2", "HET")
 POM = FieldTimeSeries("$filename.jld2", "POM")
@@ -275,8 +276,8 @@ for (i, t) in enumerate(times)
     nitrogen_burying[i] = (
         POM[1, 1, 1, i] *
         biogeochemical_drift_velocity(model.biogeochemistry, Val(:POM)).w[1, 1, 1] +
-        PHY[1, 1, 1, i] *
-        biogeochemical_drift_velocity(model.biogeochemistry, Val(:PHY)).w[1, 1, 1] +
+        P[1, 1, 1, i] *
+        biogeochemical_drift_velocity(model.biogeochemistry, Val(:P)).w[1, 1, 1] +
         HET[1, 1, 1, i] * 
         biogeochemical_drift_velocity(model.biogeochemistry, Val(:HET)).w[1, 1, 1]
     )
@@ -285,11 +286,11 @@ for (i, t) in enumerate(times)
         biogeochemical_drift_velocity(model.biogeochemistry, Val(:POM)).w[1, 1, 1]
     )
     PHY_burying[i] = (
-        POM[1, 1, 1, i] *
-        biogeochemical_drift_velocity(model.biogeochemistry, Val(:PHY)).w[1, 1, 1]
+        P[1, 1, 1, i] *
+        biogeochemical_drift_velocity(model.biogeochemistry, Val(:P)).w[1, 1, 1]
     )
     HET_burying[i] = (
-        POM[1, 1, 1, i] *
+        HET[1, 1, 1, i] *
         biogeochemical_drift_velocity(model.biogeochemistry, Val(:HET)).w[1, 1, 1]
     )
 end
@@ -310,7 +311,7 @@ axis_kwargs = (
 )
 
 axPHY = Axis(fig[1, 3]; title = "PHY, mmolN/m³", axis_kwargs...)
-hmPHY = heatmap!(times / days, z, interior(PHY, 1, 1, :, :)', colormap = Reverse(:cubehelix)) #(:davos10))
+hmPHY = heatmap!(times / days, z, interior(P, 1, 1, :, :)', colormap = Reverse(:cubehelix)) #(:davos10))
 Colorbar(fig[1, 4], hmPHY)
 
 axHET = Axis(fig[2, 3]; title = "HET, mmolN/m³", axis_kwargs...)
