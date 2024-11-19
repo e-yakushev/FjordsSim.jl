@@ -203,7 +203,7 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     println("Initialized atmosphere")
     radiation = sim_setup.radiation
     similarity_theory = sim_setup.similarity_theory_callable(; sim_setup.similarity_theory_args...)
-    coupled_model = OceanSeaIceModel(ocean_sim, sea_ice; atmosphere, radiation)  # , similarity_theory)
+    coupled_model = OceanSeaIceModel(ocean_sim, sea_ice; atmosphere, radiation, similarity_theory)
     println("Initialized coupled model")
 
     coupled_simulation = Simulation(coupled_model; Δt)
