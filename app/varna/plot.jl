@@ -5,12 +5,12 @@ using CairoMakie
 
 include("../../src/FjordsSim.jl")
 
-using .FjordsSim: plot_1d_phys, extract_z_faces, record_vertical_tracer, record_surface_speed, record_horizontal_tracer, plot_ztime
+using .FjordsSim: plot_1d_phys, extract_z_faces, record_vertical_tracer, record_surface_speed, record_horizontal_tracer, record_vertical_diff, plot_ztime
 
-Nz = 10
+Nz = 12
 
 folder = joinpath(homedir(), "FjordsSim_results", "varna")
-filename = joinpath(folder, "varna_snapshots270days")
+filename = joinpath(folder, "varna_snapshotsDOM10")
 T =   FieldTimeSeries("$filename.jld2", "T")
 S =   FieldTimeSeries("$filename.jld2", "S")
 u =   FieldTimeSeries("$filename.jld2", "u")
@@ -21,8 +21,17 @@ PHY =  FieldTimeSeries("$filename.jld2", "P")
 HET =  FieldTimeSeries("$filename.jld2", "HET")
 DOM =  FieldTimeSeries("$filename.jld2", "DOM")
 POM =  FieldTimeSeries("$filename.jld2", "POM")
-# C =  FieldTimeSeries("$filename.jld2", "C")       
+C =  FieldTimeSeries("$filename.jld2", "C")       
 times = T.times
+
+# filename10 = joinpath(folder, "varna_snapshotsDOM10")
+# filename20 = joinpath(folder, "varna_snapshots2024-11-19")
+
+# O₂10 =  FieldTimeSeries("$filename10.jld2", "O₂")[:,:,:,1:2:end]
+# O₂20 =  FieldTimeSeries("$filename20.jld2", "O₂")
+
+
+# O₂diff = O₂10 .- O₂20
 
 grid = jldopen("$filename.jld2")["grid"]
 
@@ -31,25 +40,24 @@ println(grid["underlying_grid"]["Δyᶠᶜᵃ"])
 
 # stupid, but I cannot find a right way with znodes
 # znodes(grid["underlying_grid"], with_halos=false)
-z = grid["underlying_grid"]["zᵃᵃᶜ"][8:Nz-1]
+z = grid["underlying_grid"]["zᵃᵃᶜ"][8:Nz+7]
 
 # z = extract_z_faces(grid)
 
-# plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
+plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
 
 # HORIZONTAL
 # plot_1d_phys(T, S, z, times, folder)
 
 record_surface_speed(u, v, Nz, times, folder)
 
-# record_horizontal_tracer(
-#     C, times, folder, "Contsurf", "Contaminant (% of max. concentration)",
-#     colorrange=(0, 100), colormap=:matter, iz=Nz,
-#     )
+record_horizontal_tracer(
+    C, times, folder, "Contsurf", "Contaminant (% of max. concentration)",
+    colorrange=(0, 100), colormap=:matter, iz=Nz,
+    )
 
 record_horizontal_tracer(
     T, times, folder, "Tsurf", "Temperature (°C)",
-    colorrange=(5, 40), colormap=Reverse(:RdYlBu), iz=Nz,
     colorrange=(5, 40), colormap=Reverse(:RdYlBu), iz=Nz,
     )
 
@@ -73,10 +81,15 @@ record_horizontal_tracer(
     colorrange=(0, 2), colormap=Reverse(:cubehelix), iz=Nz,
     )
 
+record_horizontal_tracer(
+    DOM, times, folder, "DOMsurf10", "DOM (μM N)",
+    colorrange=(0, 50), colormap=Reverse(:CMRmap), iz=Nz,
+    )
+    
+
 # VERTICAL
 record_vertical_tracer(
     T, z, 18, times, folder, "Tprofile", "Temperature (°C)",
-    colorrange=(5, 40), colormap=Reverse(:RdYlBu),
     colorrange=(5, 40), colormap=Reverse(:RdYlBu),
     )
 
@@ -114,3 +127,8 @@ record_vertical_tracer(
     O₂, z, 18, times, folder, "O2profile", "Dissolved Oxygen (μM)",
     colorrange=(100, 350), colormap=:turbo,
         )
+
+# record_vertical_diff(
+#     O₂diff, z, 18, times, folder, "O2profile_diff", "O₂ (DOM=10) - O₂ (DOM=20)",
+#     colorrange=(-200, 200), colormap=:balance,
+#         )

@@ -124,6 +124,41 @@ function record_vertical_tracer(
 end
 
 
+function record_vertical_diff(
+    tracer,
+    depth,
+    iy,
+    times,
+    folder,
+    name,
+    label;
+    colorrange = (-1, 30),
+    colormap = :magma,
+)
+
+    xs = 1:size(tracer)[1] # get x-values for x-axis
+    Nt = length(times)
+    iter = Observable(Nt)
+
+    Ti = @lift begin
+        Ti = tracer[:, iy, :, $iter]
+        Ti[Ti.==0] .= NaN
+        Ti
+    end
+
+    fig = Figure(size = (1000, 400))
+
+    title = @lift label * " at " * prettytime(times[$iter])
+    ax = Axis(fig[1, 1]; title = title, transect_axis_kwargs...)
+    hm = heatmap!(ax, xs, depth, Ti, colorrange = colorrange, colormap = colormap)
+    cb = Colorbar(fig[0, 1], hm, vertical = false, label = label)
+    # hidedecorations!(ax)
+
+    CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = framerate) do i
+        iter[] = i
+    end
+end
+
 
 function plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, i, j, times, z, folder)
 
