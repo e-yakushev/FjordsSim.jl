@@ -186,19 +186,20 @@ function OXYDEP(;
     )
 end
 
-@inline required_biogeochemical_tracers(::OXYDEP) = (:NUT, :P, :HET, :POM, :DOM, :O₂, :T)
-# required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(false, true)},<:Any}) =
-#     (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :T, :Ci_free, :Ci_PHY, :Ci_HET, :Ci_POM, :Ci_DOM)
-required_biogeochemical_auxiliary_fields(::OXYDEP) = (:PAR,)
-# required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(false, true)},<:Any}) = (:PAR,)
+required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(false, false)},<:Any}) =
+    (:NUT, :P, :HET, :POM, :DOM, :O₂, :T)
+required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(false, true)},<:Any}) =
+    (:NUT, :P, :HET, :POM, :DOM, :O₂, :T, :Ci_free, :Ci_PHY, :Ci_HET, :Ci_POM, :Ci_DOM)
+required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(false, false)},<:Any}) = (:PAR,)
+required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(false, true)},<:Any}) = (:PAR,)
 
 # colomney.jl
-# required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(true, false)},<:Any}) =
-#     (:NUT, :PHY, :HET, :POM, :DOM, :O₂)
-# required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(true, true)},<:Any}) =
-#     (:NUT, :PHY, :HET, :POM, :DOM, :O₂, :Ci_free, :Ci_PHY, :Ci_HET, :Ci_POM, :Ci_DOM)
-# required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, false)},<:Any}) = (:T, :PAR)
-# required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, true)},<:Any}) = (:T, :PAR)
+required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(true, false)},<:Any}) =
+        (:NUT, :P, :HET, :POM, :DOM, :O₂)
+required_biogeochemical_tracers(::OXYDEP{<:Any,<:Val{(true, true)},<:Any}) =    
+    (:NUT, :P, :HET, :POM, :DOM, :O₂, :Ci_free, :Ci_PHY, :Ci_HET, :Ci_POM, :Ci_DOM)
+required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, false)},<:Any}) = (:T, :PAR)
+required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, true)},<:Any}) = (:T, :PAR)
 
 @inline function biogeochemical_drift_velocity(bgc::OXYDEP, ::Val{tracer_name}) where {tracer_name}
     if tracer_name in keys(bgc.sinking_velocities)
@@ -217,7 +218,7 @@ end
 #         update_TwoBandPhotosyntheticallyActiveRadiation!,
 #         PAR.field,
 #         model.grid,
-#         model.tracers.PHY,
+#         model.tracers.P,
 #         PAR.surface_PAR,
 #         model.clock.time,
 #         PAR,
