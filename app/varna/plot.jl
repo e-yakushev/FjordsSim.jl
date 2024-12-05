@@ -34,7 +34,7 @@ for i in 1:size(O₂, 1)
         for k in size(O₂, 3):-1:1  # Loop backwards to find the latest non-zero
             if O₂[i, j, k, 1] == 0
                 bottom_z[i, j] = k
-                if k != 12
+                if k != Nz
                     bottom_z[i, j] = k+1
                 end
                 break
