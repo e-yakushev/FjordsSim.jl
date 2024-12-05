@@ -56,6 +56,29 @@ function record_surface_speed(u, v, Nz, times, folder; colorrange = (0, 0.5), co
     end
 end
 
+function record_bottom_tracer(tracer, times, bottom_z, folder; colorrange = (-1, 350), colormap = :turbo)
+
+    Nt = length(times)
+    iter = Observable(Nt)
+
+    Ti = @lift begin
+        Ti = [tracer[i,j,bottom_z[i,j],$iter] for i in 1:size(tracer, 1), j in 1:size(tracer, 2)]
+        Ti[Ti.==0] .= NaN
+        Ti
+    end
+
+    title = @lift "bottom $(tracer), mmol/m³ at " * prettytime(times[$iter])
+    fig = Figure(size = (1000, 400))
+    ax = Axis(fig[1, 1]; title = title, map_axis_kwargs...)
+    hm = heatmap!(ax, Ti, colorrange = colorrange, colormap = colormap)
+    cb = Colorbar(fig[0, 1], hm, vertical = false, label = "$(tracer), mmol/m³")
+    # hidedecorations!(ax)
+
+    CairoMakie.record(fig, joinpath(folder, "bottom_$(tracer)_movie.mp4"), 1:Nt, framerate = framerate) do i
+        iter[] = i
+    end
+end
+
 function record_horizontal_tracer(
     tracer,
     times,
@@ -86,7 +109,6 @@ function record_horizontal_tracer(
         iter[] = i
     end
 end
-
 
 function record_vertical_tracer(
     tracer,
@@ -123,7 +145,6 @@ function record_vertical_tracer(
     end
 end
 
-
 function record_vertical_diff(
     tracer,
     depth,
@@ -158,7 +179,6 @@ function record_vertical_diff(
         iter[] = i
     end
 end
-
 
 function plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, i, j, times, z, folder)
 
@@ -227,5 +247,24 @@ function plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, i, j, times, z, folder)
     @info "VARIABLES Z-Time plots made"
 
     save(joinpath(folder, "ztime.png"), fig)
+end
 
+function plot_bottom_tracer(tracer, bottom_z, time , folder)
+        
+    bottom_tracer = [tracer[i,j,bottom_z[i,j],time] for i in 1:size(tracer, 1), j in 1:size(tracer, 2)]
+    fig = Figure(size = (1000, 400), fontsize = 20)
+
+    axis_kwargs = (
+        xlabel = "Grid points, eastward direction",
+        ylabel = "Grid points, northward direction"
+    )
+
+    axOXY = Axis(fig[2, 1]; title = "$(tracer), mmol/m³, " * prettytime(time), axis_kwargs...)
+    hmOXY = heatmap!([i for i in 1:size(tracer, 1)],
+                     [j for j in 1:size(tracer, 2)],
+                     bottom_tracer, colormap = :turbo
+    )
+    Colorbar(fig[2, 2], hmOXY)
+
+    save(joinpath(folder, "bottom_$(tracer).png"), fig)
 end

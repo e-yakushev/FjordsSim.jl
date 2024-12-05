@@ -5,7 +5,7 @@ using CairoMakie
 
 include("../../src/FjordsSim.jl")
 
-using .FjordsSim: plot_1d_phys, extract_z_faces, record_vertical_tracer, record_surface_speed, record_horizontal_tracer, record_vertical_diff, plot_ztime
+using .FjordsSim: plot_1d_phys, extract_z_faces, record_vertical_tracer, record_surface_speed, record_horizontal_tracer, plot_ztime, plot_bottom_tracer, record_bottom_tracer, record_vertical_diff
 
 Nz = 12
 
@@ -35,6 +35,24 @@ times = T.times
 
 grid = jldopen("$filename.jld2")["grid"]
 
+
+# bottom_z evaluation
+bottom_z = ones(Int, size(O₂, 1), size(O₂, 2))
+for i in 1:size(O₂, 1)
+    for j in 1:size(O₂, 2)
+        for k in size(O₂, 3):-1:1  # Loop backwards to find the latest non-zero
+            if O₂[i, j, k, 1] == 0
+                bottom_z[i, j] = k
+                if k != Nz
+                    bottom_z[i, j] = k+1
+                end
+                break
+            end
+        end
+    end
+end
+
+
 println(keys(grid["underlying_grid"]))
 println(grid["underlying_grid"]["Δyᶠᶜᵃ"])
 
@@ -49,7 +67,11 @@ plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
 # HORIZONTAL
 # plot_1d_phys(T, S, z, times, folder)
 
+plot_bottom_oxygen(O₂, bottom_z, 1000 , folder)
+
 record_surface_speed(u, v, Nz, times, folder)
+
+record_bottom_oxygen(O₂, times, bottom_z, folder)
 
 record_horizontal_tracer(
     C, times, folder, "Contsurf", "Contaminant (% of max. concentration)",
