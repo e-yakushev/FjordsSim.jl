@@ -5,7 +5,7 @@ using CairoMakie
 
 include("../../src/FjordsSim.jl")
 
-using .FjordsSim: plot_1d_phys, extract_z_faces, record_vertical_tracer, record_surface_speed, record_horizontal_tracer, plot_ztime, lot_bottom_tracer, record_bottom_tracer
+using .FjordsSim: plot_1d_phys, extract_z_faces, record_vertical_tracer, record_surface_speed, record_horizontal_tracer, plot_ztime, plot_bottom_tracer, record_bottom_tracer
 
 Nz = 10
 
