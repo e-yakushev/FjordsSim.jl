@@ -113,9 +113,7 @@ function resample(depth, Nx_new, Ny_new)
     return depth_resampled
 end
 
-function grid_from_bathymetry_file!(sim_setup)
-    arch, Nx, Ny, Nz, halo, datadir, filename, latitude, longitude = sim_setup.grid_parameters
-
+function grid_from_bathymetry_file(arch, Nx, Ny, Nz, halo, datadir, filename, latitude, longitude)
     filepath_topo = joinpath(datadir, filename)
     @load filepath_topo depth
 
@@ -136,7 +134,6 @@ function grid_from_bathymetry_file!(sim_setup)
         longitude,
     )
     grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(depth); active_cells_map = true)
-    sim_setup.grid[] = grid
     return grid
 end
 

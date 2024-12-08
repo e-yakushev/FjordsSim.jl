@@ -15,11 +15,12 @@ include("../../src/FjordsSim.jl")
 
 using .FjordsSim:
     SetupModel,
-    grid_from_bathymetry_file!,
+    grid_from_bathymetry_file,
     grid_latitude_flat!,
     grid_column!,
-    grid,
+    grid_ref,
     forcing_varna,
+    forcing_fields_from_file,
     bc_varna_bgh_oxydep,
     bgh_oxydep_boundary_conditions,
     bc_varna,
@@ -80,8 +81,8 @@ external_values = (
 
 function setup_region(;
     # Grid
-    grid_callable! = grid_from_bathymetry_file!,
-    grid_parameters = (
+    grid_callable = grid_from_bathymetry_file,
+    grid_args = (
         arch = GPU(),
         Nx = nothing,
         Ny = nothing,
@@ -109,32 +110,46 @@ function setup_region(;
     initial_conditions = (T = 10, S = 15),
     # Free surface
     free_surface_callable = free_surface_default,
-    free_surface_args = (grid,),
+    free_surface_args = (grid_ref,),
     # Coriolis
     coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
     # Forcing
-    forcing_callable = forcing_varna,
-    forcing_args = (bottom_drag_coefficient, grid_parameters.Nz, grid, external_values),
+    forcing_callable = forcing_fields_from_file,
+    forcing_args = (
+        grid_callable = grid_from_bathymetry_file,
+        grid_args = (
+            arch = GPU(),
+            Nx = nothing,
+            Ny = nothing,
+            Nz = 12,
+            halo = (7, 7, 7),
+            datadir = joinpath(homedir(), "FjordsSim_data", "varna"),
+            filename = "Varna_topo_channels.jld2",
+            latitude = (43.177, 43.214),
+            longitude = (27.640, 27.947),
+        ),
+        datapath = joinpath(homedir(), "FjordsSim_data", "varna"),
+    ),
     # Boundary conditions
     bc_callable = bc_ocean,
-    bc_args = (grid, bottom_drag_coefficient),
+    bc_args = (grid_ref, bottom_drag_coefficient),
     # Atmosphere
     atmosphere_callable = atmosphere_JRA55,
     # 8*365 - 1 year, 3H JRA55 frocing
     atmosphere_args = (
-        arch = grid_parameters.arch,
+        arch = grid_args.arch,
         backend = InMemory(),
-        grid = grid,
+        grid_ref = grid_ref,
         start = 1,
         stop = 8 * 365,
     ),
     # Ocean emissivity from https://link.springer.com/article/10.1007/BF02233853
     # With suspended matter 0.96 https://www.sciencedirect.com/science/article/abs/pii/0034425787900095
-    radiation = Radiation(grid_parameters.arch; ocean_emissivity = 0.96),
+    radiation = Radiation(grid_args.arch; ocean_emissivity = 0.96),
     # Similarity theory
     similarity_theory_callable = SimilarityTheoryTurbulentFluxes,
     similarity_theory_args = (
-        grid = grid,
+        grid_ref = grid_ref,
         gravitational_acceleration = g_Earth,
         turbulent_prandtl_number = 0.85,
     ),
@@ -144,9 +159,9 @@ function setup_region(;
 )
 
     return SetupModel(
-        grid_callable!,
-        grid_parameters,
-        grid,
+        grid_callable,
+        grid_args,
+        grid_ref,
         buoyancy,
         closure,
         tracer_advection,
@@ -173,7 +188,7 @@ end
 setup_region_3d() = setup_region()
 setup_region_3d_Lobster() = setup_region(
     biogeochemistry_callable = biogeochemistry_LOBSTER,
-    biogeochemistry_args = (grid,),
+    biogeochemistry_args = (grid_ref,),
     tracers = (:T, :S, :e, :NO₃, :NH₄, :P, :Z, :sPOM, :bPOM, :DOM),
     initial_conditions = (T = 10, S = 15, NO₃ = 10.0, NH₄ = 0.1, P = 0.1, Z = 0.01),
     tracer_advection = (
@@ -202,9 +217,9 @@ setup_region_3d_OXYDEP() = setup_region(
         DOM = 1.0,
     ),
     biogeochemistry_callable = biogeochemistry_OXYDEP,
-    biogeochemistry_args = (grid, args_oxydep),
-    bc_args = (grid, bottom_drag_coefficient, biogeochemistry_OXYDEP),
+    biogeochemistry_args = (grid_ref, args_oxydep),
     bc_callable = bc_varna_bgh_oxydep,
+    bc_args = (grid_ref, bottom_drag_coefficient, biogeochemistry_OXYDEP),
     tracer_advection = (
         T = WENO(),
         S = WENO(),
@@ -241,7 +256,7 @@ setup_region_2d() = setup_region(
     forcing_args = (),
     # Boundary conditions
     bc_callable = bc_ocean,
-    bc_args = (grid, 0),
+    bc_args = (grid_ref, 0),
 )
 setup_region_column() = setup_region(
     grid_callable! = grid_column!,
@@ -265,5 +280,5 @@ setup_region_column() = setup_region(
     forcing_args = (),
     # Boundary conditions
     bc_callable = bc_ocean,
-    bc_args = (grid, 0),
+    bc_args = (grid_ref, 0),
 )

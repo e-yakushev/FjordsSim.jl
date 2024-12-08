@@ -54,28 +54,28 @@ function on_architecture(::GPU, a::StepRangeLen)
     on_architecture(GPU(), collect(a))
 end
 
-free_surface_default(grid) = SplitExplicitFreeSurface(grid[]; cfl = 0.7)
+free_surface_default(grid_ref) = SplitExplicitFreeSurface(grid_ref[]; cfl = 0.7)
 
-atmosphere_JRA55(arch, backend, grid, start, stop) =
-    JRA55_prescribed_atmosphere(arch, start:stop; backend, grid = grid[])
-biogeochemistry_LOBSTER(grid) = LOBSTER(; grid = grid[], carbonates = false, open_bottom = false)
-biogeochemistry_OXYDEP(grid, args_oxydep) = OXYDEP(;
-    grid = grid[],
+atmosphere_JRA55(arch, backend, grid_ref, start, stop) =
+    JRA55_prescribed_atmosphere(arch, start:stop; backend, grid = grid_ref[])
+biogeochemistry_LOBSTER(grid_ref) = LOBSTER(; grid = grid_ref[], carbonates = false, open_bottom = false)
+biogeochemistry_OXYDEP(grid_ref, args_oxydep) = OXYDEP(;
+    grid = grid_ref[],
     args_oxydep...,
     surface_photosynthetically_active_radiation = PAR⁰,
     TS_forced = false,
     Chemicals = false,
     scale_negatives = false,
 )
-SimilarityTheoryTurbulentFluxes(; grid::Ref, kw...) = SimilarityTheoryTurbulentFluxes(grid[]; kw...)
+SimilarityTheoryTurbulentFluxes(; grid_ref::Ref, kw...) = SimilarityTheoryTurbulentFluxes(grid_ref[]; kw...)
 
 # Grid
-grid = Ref{Any}(nothing)
+grid_ref = Ref{Any}(nothing)
 
 mutable struct SetupModel
-    grid_callable!::Function
-    grid_parameters::NamedTuple
-    grid::Ref
+    grid_callable::Function
+    grid_args::NamedTuple
+    grid_ref::Ref
     buoyancy::Any
     closure::Any
     tracer_advection::Any
@@ -100,9 +100,9 @@ mutable struct SetupModel
 end
 
 function SetupModel(
-    grid_callable!,
-    grid_parameters,
-    grid,
+    grid_callable,
+    grid_args,
+    grid_ref,
     buoyance,
     closure,
     tracer_advection,
@@ -129,9 +129,9 @@ function SetupModel(
     !isdir(results_dir) && mkdir(results_dir)
 
     SetupModel(
-        grid_callable!,
-        grid_parameters,
-        grid,
+        grid_callable,
+        grid_args,
+        grid_ref,
         buoyance,
         closure,
         tracer_advection,
@@ -158,7 +158,8 @@ end
 
 
 function coupled_hydrostatic_simulation(sim_setup::SetupModel)
-    grid = sim_setup.grid_callable!(sim_setup)
+    grid = sim_setup.grid_callable(sim_setup.grid_args...)
+    sim_setup.grid_ref[] = grid
     buoyancy = sim_setup.buoyancy
     closure = sim_setup.closure
     tracer_advection = sim_setup.tracer_advection

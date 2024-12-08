@@ -275,8 +275,8 @@ function bgh_oxydep_boundary_conditions(biogeochemistry, Nz)
     return bc_oxydep
 end
 
-function bc_ocean(grid, bottom_drag_coefficient)
-    grid = grid[]
+function bc_ocean(grid_ref, bottom_drag_coefficient)
+    grid = grid_ref[]
     # Set up boundary conditions using Field
     top_zonal_momentum_flux = τx = Field{Face,Center,Nothing}(grid)
     top_meridional_momentum_flux = τy = Field{Center,Face,Nothing}(grid)
@@ -303,8 +303,8 @@ function bc_ocean(grid, bottom_drag_coefficient)
     return bc_ocean
 end
 
-function bc_varna(grid, bottom_drag_coefficient)
-    grid = grid[]
+function bc_varna(grid_ref, bottom_drag_coefficient)
+    grid = grid_ref[]
     top_zonal_momentum_flux = τx = Field{Face,Center,Nothing}(grid)
     top_meridional_momentum_flux = τy = Field{Center,Face,Nothing}(grid)
     top_ocean_heat_flux = Jᵀ = Field{Center,Center,Nothing}(grid)
@@ -335,9 +335,9 @@ function bc_varna(grid, bottom_drag_coefficient)
     return bc
 end
 
-function bc_varna_bgh_oxydep(grid, bottom_drag_coefficient, bgc_model)
-    Nz = grid[].Nz
-    bc_varna_tuple = bc_varna(grid, bottom_drag_coefficient)
+function bc_varna_bgh_oxydep(grid_ref, bottom_drag_coefficient, bgc_model)
+    Nz = grid_ref[].Nz
+    bc_varna_tuple = bc_varna(grid_ref, bottom_drag_coefficient)
     bc_bgh_oxydep_tuple = bgh_oxydep_boundary_conditions(bgc_model, Nz)
 
     return merge(bc_varna_tuple, bc_bgh_oxydep_tuple)
