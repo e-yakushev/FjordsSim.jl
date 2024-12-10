@@ -429,16 +429,16 @@ end
 
 function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
     Nx = grid[].Nx            # eastern open boundary index
-    λRiver = 1 / (30minutes)  # Relaxation timescale [s⁻¹] River
+    λRiver = 1 / (10minutes)  # Relaxation timescale [s⁻¹] River (30 minutes)
     λOpen = 1 / (12hours)       # Relaxation timescale [s⁻¹] Open boundary
     
     # values in the river, CAN BE MOVED TO SETUP
-    src_loc = (1, 13, Nz) # river  # (i, j, k)
+    src_loc = (2, 13, Nz) # river  # (i, j, k)
     # src_loc = (111, 42, Nz)   # factory
     Tsrc = 10.0
     Ssrc = 0.1
-    NUTsrc = 10.0
-    DOMsrc = 5.0
+    NUTsrc = 25.0 #10
+    DOMsrc = 25.0 # 5
     O2src = 300.0
     Psrc = 0.001
     HETsrc = 0.001
