@@ -90,17 +90,18 @@ temp_itp
 T = FunctionField{Center,Center,Center}(T_function, grid_column; clock)
 S = FunctionField{Center,Center,Center}(S_function, grid_column; clock)
 
-κ = 5.0 * FunctionField{Center,Center,Center}(Kz_function, grid_column; clock)
+#κ = 5.0 * FunctionField{Center,Center,Center}(Kz_function, grid_column; clock)
+κ = 10.0 * FunctionField{Center,Center,Center}(Kz_function, grid_column; clock)
 
 #- - - - - - - - - - - - - - - - - - - - - - 
 ## Boundary conditions for OxyDep
-O2_suboxic = 30.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
+O2_suboxic = 20.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
 Trel = 10000.0     # Relaxation time for exchange with the sediments (s/m)
 b_ox = 15.0        # difference of OXY in the sediment and water, 
-b_NUT = 10.0       # NUT in the sediment, (mmol/m3)  18
+b_NUT = 15.0       # NUT in the sediment, (mmol/m3)  18
 b_DOM_ox = 6.0     # OM in the sediment (oxic conditions), (mmol/m3) 
 b_DOM_anox = 20.0  # OM in the sediment (anoxic conditions), (mmol/m3)  
-bu = 0.85 #0.2 0.8=hyp     # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
+bu = 0.5 #0.2 0.8=hyp     # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
 
 windspeed = 5.0    # m/s windspeed for gases exchange
 
@@ -210,8 +211,8 @@ end
 PAR = model.auxiliary_fields.PAR
 T = model.auxiliary_fields.T
 S = model.auxiliary_fields.S
-
-output_prefix = joinpath(homedir(), "data_Varna", "columney_snapshots")
+folder = joinpath(homedir(), "FjordsSim_results", "varna")
+output_prefix = joinpath(folder, "columney_snapshots")
 # output_prefix = joinpath("out")
 if add_contaminants == false
     simulation.output_writers[:profiles] = JLD2OutputWriter(
@@ -239,7 +240,7 @@ model
 "
 Plotting of images
 "
-filename = joinpath(homedir(), "FjordsSim_results", "columney_snapshots")
+filename = joinpath(folder, "columney_snapshots")
  
 ## Load saved output
 @info "Loading saved outputs..."
@@ -300,11 +301,16 @@ end
 
 fig = Figure(size = (1500, 1000), fontsize = 20)
 
+gridtime = 365
+if (stoptime<366) 
+    gridtime = 30
+end    
+
 axis_kwargs = (
     xlabel = "Time (days)",
     ylabel = "z (m)",
  #   limits = ((0, times[end] / days), (-(depth_extent + 10), 10)),
-     xticks = (0:365:stoptime),
+     xticks = (0:gridtime:stoptime),
      xtickformat = "{:.0f}" #   values -> ["$(value)kg" for value in values]     
  #    xtickformat = x -> @sprintf("%.1f", x)
  #   xticks = collect(0:stoptime, 365),
@@ -402,4 +408,4 @@ lines!(axHETburying, times / days, HET_burying / 1e3 * year, linewidth = 3, colo
 
 save("out_fluxes.png", fig2)
 
-println(" BOT XPEHb, OCTAHOBKA...")
+println(" OCTAHOBKA...")
