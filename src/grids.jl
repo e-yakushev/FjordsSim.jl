@@ -94,19 +94,19 @@ end
 
 function resample(depth, Nx_new, Ny_new)
     Nx, Ny = size(depth)  # Original grid size
-    
+
     # Define the range of original grid points
     x_orig = LinRange(1, Nx, Nx)
     y_orig = LinRange(1, Ny, Ny)
-    
+
     # Create the interpolation object with boundary values fixed
     itp = interpolate(depth, BSpline(Linear()), OnGrid())
     depth_itp = scale(itp, x_orig, y_orig)
-    
+
     # Define the new grid points for the target size
     x_new = LinRange(1, Nx, Nx_new)
     y_new = LinRange(1, Ny, Ny_new)
-    
+
     # Resample on the new grid
     depth_resampled = [depth_itp(x, y) for x in x_new, y in y_new]
     @info "size of the new grid: " * string(size(depth_resampled))
@@ -124,7 +124,7 @@ function grid_from_bathymetry_file!(sim_setup)
     else
         depth = resample(depth, Nx, Ny)
     end
-    
+
     depth_max = abs(minimum(depth))
     z_faces = exponential_z_faces(; Nz = Nz, depth = depth_max, h = depth_max)
     underlying_grid = LatitudeLongitudeGrid(
