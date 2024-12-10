@@ -36,7 +36,7 @@ const reference_density = 1010  # T = 15 degC, S = 15 PSU
 
 args_oxydep = (
     initial_photosynthetic_slope = 0.1953 / day, # 1/(W/m²)/s
-    Iopt = 80.0, # 50.0,     # (W/m2)
+    Iopt = 50.0, # 80.0,     # (W/m2)
     alphaI = 1.8,   # [d-1/(W/m2)]
     betaI = 5.2e-4, # [d-1/(W/m2)]
     gammaD = 0.71,  # (-)
@@ -56,7 +56,7 @@ args_oxydep = (
     r_pom_nut_oxy = 0.006 / day, # 1/d
     r_pom_dom = 0.05 / day,      # 1/d
     r_dom_nut_oxy = 0.10 / day,  # 1/d
-    O2_suboxic = 30.0,    # mmol/m3
+    O2_suboxic = 20.0,    # mmol/m3
     r_pom_nut_nut = 0.010 / day, # 1/d
     r_dom_nut_nut = 0.003 / day, # 1/d
     OtoN = 8.625, # (nd)
@@ -247,7 +247,7 @@ setup_region_column() = setup_region(
     grid_callable! = grid_column!,
     grid_parameters = (
         arch = GPU(),
-        Nz = 20,
+        Nz = 12, #20
         halo = (3, 3, 3),
         latitude = 43.177,
         longitude = 27.640,
