@@ -19,8 +19,7 @@ using .FjordsSim:
     grid_latitude_flat!,
     grid_column!,
     grid_ref,
-    forcing_varna,
-    forcing_fields_from_file,
+    varna_forcing,
     bc_varna_bgh_oxydep,
     bgh_oxydep_boundary_conditions,
     bc_varna,
@@ -114,20 +113,9 @@ function setup_region(;
     # Coriolis
     coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
     # Forcing
-    forcing_callable = forcing_fields_from_file,
+    forcing_callable = varna_forcing,
     forcing_args = (
-        grid_callable = grid_from_bathymetry_file,
-        grid_args = (
-            arch = GPU(),
-            Nx = nothing,
-            Ny = nothing,
-            Nz = 12,
-            halo = (7, 7, 7),
-            datadir = joinpath(homedir(), "FjordsSim_data", "varna"),
-            filename = "Varna_topo_channels.jld2",
-            latitude = (43.177, 43.214),
-            longitude = (27.640, 27.947),
-        ),
+        grid_ref = grid_ref,
         datapath = joinpath(homedir(), "FjordsSim_data", "varna"),
     ),
     # Boundary conditions

@@ -8,9 +8,58 @@ using Oceananigans: Forcing
 using Oceananigans.Grids
 using Oceananigans.Units
 using Oceananigans.Architectures: architecture, on_architecture
-using Oceananigans.OutputReaders: Cyclical
+using Oceananigans.OutputReaders: Cyclical, AbstractInMemoryBackend, FlavorOfFTS, time_indices
 
-LX = LY = LZ = Center
+import Oceananigans.Fields: set!
+
+struct JLD2Backend <: AbstractInMemoryBackend{Int}
+    start::Int
+    length::Int
+end
+
+JLD2Backend(length) = JLD2Backend(1, length)
+new_backend(::JLD2Backend, start, length) = JLD2Backend(start, length)
+
+Base.length(backend::JLD2Backend) = backend.length
+Base.summary(backend::JLD2Backend) =
+    string("JLD2Backend(", backend.start, ", ", backend.length, ")")
+
+const JLD2FTS = FlavorOfFTS{<:Any,<:Any,<:Any,<:Any,<:JLD2Backend}
+
+function load_jld2(;
+    path::String,
+    var_name::String,
+    grid_size::Tuple,
+    time_indices_in_memory::UnitRange,
+)
+    file = jldopen(path)
+    native_times = file["data_dict"]["time"]
+    var = file["data_dict"][var_name]
+    close(file)
+
+    indices_1990 = findall(dt -> Year(dt) == Year(DateTime(1990)), native_times)
+    var_1990 = var[:, indices_1990]
+    year_1990_dates = native_times[indices_1990]
+
+    times = native_times_to_seconds(year_1990_dates)
+    data = fill(-999.0, (grid_size[1:end]..., size(time_indices_in_memory)...))
+    for i in time_indices_in_memory
+        var_mean = mean(var_1990[:, i])
+        data[end, :, :, i] .= var_mean
+    end
+    return data, times
+end
+
+function set!(fts::JLD2FTS, path::String = fts.path, name::String = fts.name)
+    ti = time_indices(fts)
+    # ti = collect(ti)
+    data, _ = load_jld2(; path, var_name = name, grid_size = size(fts[:end-1]), time_indices_in_memory = ti)
+
+    copyto!(interior(fts, :, :, 1, :), data)
+    fill_halo_regions!(fts)
+
+    return nothing
+end
 
 function native_times_to_seconds(native_times, start_time = native_times[1])
     times = []
@@ -19,7 +68,6 @@ function native_times_to_seconds(native_times, start_time = native_times[1])
         time = Second(time).value
         push!(times, time)
     end
-
     return times
 end
 
@@ -30,93 +78,46 @@ function field_time_series_tracer_forcing_func(i, j, k, grid, clock, fields, par
     return @inbounds ifelse(condition, radiation_term, 0)
 end
 
-function save_fts(; jld2_filepath, fts_name, fts, grid, times, boundary_conditions)
-    isfile(jld2_filepath) && rm(jld2_filepath)
-    on_disk_fts = FieldTimeSeries{LX,LY,LZ}(
+function varna_forcing(grid_ref, datapath)
+    grid = grid_ref[]
+    filepath = joinpath(datapath, "Varna_BRY.jld2")
+    var_name = "thetao"
+    backend = JLD2Backend(2)
+
+    time_indices_in_memory = 1:length(backend)
+    data, times =
+        load_jld2(; path = filepath, var_name, grid_size = size(grid), time_indices_in_memory)  # , bathymetry)
+
+    LX, LY, LZ = Center, Center, Center
+    boundary_conditions = FieldBoundaryConditions(grid, (LX, LY, LZ))
+    fts = FieldTimeSeries{LX,LY,LZ}(
         grid,
         times;
+        backend,
+        time_indexing = Cyclical(),
         boundary_conditions,
-        backend = OnDisk(),
-        path = jld2_filepath,
-        name = fts_name,
+        path = filepath,
+        name = var_name,
     )
-    for i = 1:size(fts)[end]
-        set!(on_disk_fts, fts[i], i, times[i])
-    end
-end
-
-function forcing_fields_from_file(grid_callable, grid_args, datapath)
-    # grid = grid_callable(grid_args...)
-    grid_args = (grid_args..., arch = CPU())
-    grid_cpu = grid_callable(grid_args...)
-    time_indexing = Cyclical()
-
-    # Load data
-    file = jldopen(joinpath(datapath, "Varna_BRY.jld2"))
-    forcing_times = file["data_dict"]["time"]
-    u = file["data_dict"]["uo"]
-    v = file["data_dict"]["vo"]
-    temp = file["data_dict"]["thetao"]
-    salt = file["data_dict"]["so"]
-    depth = file["data_dict"]["depth"]
-    close(file)
-
-    indices_1990 = findall(dt -> Year(dt) == Year(DateTime(1990)), forcing_times)
-
-    temp_1990 = temp[:, indices_1990]
-
-    year_1990_dates = forcing_times[indices_1990]
-    times = native_times_to_seconds(year_1990_dates)
-
-    bathymetry = Array(interior(grid_cpu.immersed_boundary.bottom_height, :, :, :))
-    east_border = bathymetry[end, :, 1]
-    east_border_water_indices = findall(x -> x < 0, east_border)
-
-    boundary_conditions = FieldBoundaryConditions(grid_cpu, (LX, LY, LZ))
-    fts = FieldTimeSeries{LX,LY,LZ}(grid_cpu, times; time_indexing, boundary_conditions)
-    data = fill(-999.0, size(fts)...)
-    for i = 1:size(data)[end]
-        temp_mean = mean(temp_1990[:, i])
-        data[end, :, :, i] .= temp_mean
-    end
     copyto!(interior(fts, :, :, :, :), data)
     fill_halo_regions!(fts)
-
-    fts_name = "temp"
-    jld2_filepath = joinpath(datapath, string("Varna_forcing_repeat_year_", fts_name, ".jld2"))
-    save_fts(; jld2_filepath, fts_name, fts, grid = grid_cpu, times, boundary_conditions)
-
-    forcing_fts = FieldTimeSeries(
-        jld2_filepath,
-        fts_name;
-        # architecture = GPU(),
-        backend = InMemory(),
-        time_indexing,
-    )
-    # for i = 1:size(forcing_fts)[end]
-    #     tr = forcing_fts[1, 1, 1, Time(5i)]
-    #     println("Indicing check.")
-    # end
-    # fill_halo_regions!(forcing_fts)
 
     λOpen = 1 / (1hours)  # Relaxation timescale [s⁻¹] Open boundary
     TForcing = Forcing(
         field_time_series_tracer_forcing_func,
         discrete_form = true,
-        parameters = (fts = forcing_fts, λOpen = λOpen),
+        parameters = (fts = fts, λOpen = λOpen),
     )
 
     return (T = TForcing,)
 end
 
-# BOTTOM DRAG
 function forcing_bottom_drag(bottom_drag_coefficient)
     Fu = Forcing(u_immersed_bottom_drag, discrete_form = true, parameters = bottom_drag_coefficient)
     Fv = Forcing(v_immersed_bottom_drag, discrete_form = true, parameters = bottom_drag_coefficient)
     return (u = Fu, v = Fv)
 end
 
-# radiation QuasiOpenBoundary
 function radiation_QuasiOpenBoundary_TS(Nx, external_values)
     c = 1 / (30minutes)  # Relaxation timescale [s⁻¹].
 

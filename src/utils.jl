@@ -139,3 +139,18 @@ function netcdf_to_jld2(netcdf_file::String, jld2_file::String)
     println("Conversion completed: NetCDF to JLD2")
 end
 
+function save_fts(; jld2_filepath, fts_name, fts, grid, times, boundary_conditions)
+    isfile(jld2_filepath) && rm(jld2_filepath)
+    on_disk_fts = FieldTimeSeries{LX,LY,LZ}(
+        grid,
+        times;
+        boundary_conditions,
+        backend = OnDisk(),
+        path = jld2_filepath,
+        name = fts_name,
+    )
+    for i = 1:size(fts)[end]
+        set!(on_disk_fts, fts[i], i, times[i])
+    end
+end
+

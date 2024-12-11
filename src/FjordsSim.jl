@@ -25,6 +25,7 @@ using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 
 import Oceananigans.Architectures: on_architecture
 import Oceananigans.TimeSteppers: time_step!, update_state!
+import Oceananigans.Models: update_model_field_time_series!
 import ClimaOcean.OceanSeaIceModels.CrossRealmFluxes: compute_sea_ice_ocean_fluxes!
 import ClimaOcean: SimilarityTheoryTurbulentFluxes
 
@@ -42,34 +43,6 @@ include("BGCModels/BGCModels.jl")
 
 using .BGCModels: OXYDEP
 
-const OceanOnlyModel = OceanSeaIceModel{Nothing}
-const OceanSimplifiedSeaIceModel = OceanSeaIceModel{<:MinimumTemperatureSeaIce}
-
-const NoSeaIceModel = Union{OceanOnlyModel,OceanSimplifiedSeaIceModel}
-
-# there is no a steprangelen method in oceananigans
-# but adding it here is type piracy
-# we need this when loading atmospheric forcing to the video memory
-function on_architecture(::GPU, a::StepRangeLen)
-    on_architecture(GPU(), collect(a))
-end
-
-free_surface_default(grid_ref) = SplitExplicitFreeSurface(grid_ref[]; cfl = 0.7)
-
-atmosphere_JRA55(arch, backend, grid_ref, start, stop) =
-    JRA55_prescribed_atmosphere(arch, start:stop; backend, grid = grid_ref[])
-biogeochemistry_LOBSTER(grid_ref) = LOBSTER(; grid = grid_ref[], carbonates = false, open_bottom = false)
-biogeochemistry_OXYDEP(grid_ref, args_oxydep) = OXYDEP(;
-    grid = grid_ref[],
-    args_oxydep...,
-    surface_photosynthetically_active_radiation = PAR⁰,
-    TS_forced = false,
-    Chemicals = false,
-    scale_negatives = false,
-)
-SimilarityTheoryTurbulentFluxes(; grid_ref::Ref, kw...) = SimilarityTheoryTurbulentFluxes(grid_ref[]; kw...)
-
-# Grid
 grid_ref = Ref{Any}(nothing)
 
 mutable struct SetupModel
@@ -156,7 +129,6 @@ function SetupModel(
     )
 end
 
-
 function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     grid = sim_setup.grid_callable(sim_setup.grid_args...)
     sim_setup.grid_ref[] = grid
@@ -218,6 +190,32 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     return coupled_simulation
 end
 
+# there is no a steprangelen method in oceananigans
+# but adding it here is type piracy ?
+# we need this when loading atmospheric forcing to the video memory
+function on_architecture(::GPU, a::StepRangeLen)
+    on_architecture(GPU(), collect(a))
+end
+
+free_surface_default(grid_ref) = SplitExplicitFreeSurface(grid_ref[]; cfl = 0.7)
+
+atmosphere_JRA55(arch, backend, grid_ref, start, stop) =
+    JRA55_prescribed_atmosphere(arch, start:stop; backend, grid = grid_ref[])
+biogeochemistry_LOBSTER(grid_ref) = LOBSTER(; grid = grid_ref[], carbonates = false, open_bottom = false)
+biogeochemistry_OXYDEP(grid_ref, args_oxydep) = OXYDEP(;
+    grid = grid_ref[],
+    args_oxydep...,
+    surface_photosynthetically_active_radiation = PAR⁰,
+    TS_forced = false,
+    Chemicals = false,
+    scale_negatives = false,
+)
+SimilarityTheoryTurbulentFluxes(; grid_ref::Ref, kw...) = SimilarityTheoryTurbulentFluxes(grid_ref[]; kw...)
+
+const OceanOnlyModel = OceanSeaIceModel{Nothing}
+const OceanSimplifiedSeaIceModel = OceanSeaIceModel{<:MinimumTemperatureSeaIce}
+const NoSeaIceModel = Union{OceanOnlyModel,OceanSimplifiedSeaIceModel}
+
 compute_sea_ice_ocean_fluxes!(::NoSeaIceModel) = nothing
 
 function time_step!(coupled_model::NoSeaIceModel, Δt; callbacks = [], compute_tendencies = true)
@@ -236,8 +234,20 @@ end
 
 function update_state!(coupled_model::NoSeaIceModel, callbacks = []; compute_tendencies = false)
     time = Time(coupled_model.clock.time)
+    for forcing in coupled_model.ocean.model.forcing
+        forcing isa Oceananigans.DiscreteForcing && update_model_field_time_series!(forcing, time)
+    end
     update_model_field_time_series!(coupled_model.atmosphere, time)
     compute_atmosphere_ocean_fluxes!(coupled_model)
+    return nothing
+end
+
+function update_model_field_time_series!(forcing::Oceananigans.DiscreteForcing, time)
+    ftses = extract_field_time_series(forcing)
+    for fts in ftses
+        update_field_time_series!(fts, time)
+    end
+
     return nothing
 end
 
