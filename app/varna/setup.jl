@@ -4,16 +4,14 @@ using Oceananigans.Units
 using Oceananigans.BuoyancyModels: g_Earth
 using Oceananigans.Coriolis: Ω_Earth
 using Oceananigans.OutputReaders: InMemory
+using Oceananigans.TurbulenceClosures: ConvectiveAdjustmentVerticalDiffusivity
 using ClimaOcean
-using OceanBioME
 using ClimaOcean.OceanSimulations:
     default_ocean_closure, default_momentum_advection, default_tracer_advection
+using OceanBioME
 using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
-using Oceananigans.TurbulenceClosures: ConvectiveAdjustmentVerticalDiffusivity
 
-include("../../src/FjordsSim.jl")
-
-using .FjordsSim:
+using FjordsSim:
     SetupModel,
     grid_from_bathymetry_file,
     grid_latitude_flat!,
@@ -114,10 +112,7 @@ function setup_region(;
     coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
     # Forcing
     forcing_callable = varna_forcing,
-    forcing_args = (
-        grid_ref = grid_ref,
-        datapath = joinpath(homedir(), "FjordsSim_data", "varna"),
-    ),
+    forcing_args = (grid_ref = grid_ref, datapath = joinpath(homedir(), "FjordsSim_data", "varna")),
     # Boundary conditions
     bc_callable = bc_ocean,
     bc_args = (grid_ref, bottom_drag_coefficient),

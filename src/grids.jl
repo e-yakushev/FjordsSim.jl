@@ -100,7 +100,7 @@ function resample(depth, Nx_new, Ny_new)
     y_orig = LinRange(1, Ny, Ny)
 
     # Create the interpolation object with boundary values fixed
-    itp = interpolate(depth, BSpline(Linear()), OnGrid())
+    itp = Interpolations.interpolate(depth, BSpline(Linear()), OnGrid())
     depth_itp = scale(itp, x_orig, y_orig)
 
     # Define the new grid points for the target size

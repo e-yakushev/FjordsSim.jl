@@ -16,9 +16,9 @@ using Printf
 using FileIO
 using JLD2
 
-include("setup.jl")
+using FjordsSim: progress, coupled_hydrostatic_simulation
 
-using .FjordsSim: progress, coupled_hydrostatic_simulation
+include("setup.jl")
 
 ## Model Setup
 # sim_setup = setup_region_3d()

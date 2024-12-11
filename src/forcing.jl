@@ -11,6 +11,7 @@ using Oceananigans.Architectures: architecture, on_architecture
 using Oceananigans.OutputReaders: Cyclical, AbstractInMemoryBackend, FlavorOfFTS, time_indices
 
 import Oceananigans.Fields: set!
+import Oceananigans.OutputReaders: new_backend
 
 struct JLD2Backend <: AbstractInMemoryBackend{Int}
     start::Int
@@ -55,7 +56,7 @@ function set!(fts::JLD2FTS, path::String = fts.path, name::String = fts.name)
     # ti = collect(ti)
     data, _ = load_jld2(; path, var_name = name, grid_size = size(fts[:end-1]), time_indices_in_memory = ti)
 
-    copyto!(interior(fts, :, :, 1, :), data)
+    copyto!(interior(fts, :, :, :, :), data)
     fill_halo_regions!(fts)
 
     return nothing
