@@ -31,7 +31,7 @@ function load_jld2(;
     path::String,
     var_name::String,
     grid_size::Tuple,
-    time_indices_in_memory::UnitRange,
+    time_indices_in_memory::Tuple,
 )
     file = jldopen(path)
     native_times = file["data_dict"]["time"]
@@ -43,10 +43,12 @@ function load_jld2(;
     year_1990_dates = native_times[indices_1990]
 
     times = native_times_to_seconds(year_1990_dates)
-    data = fill(-999.0, (grid_size[1:end]..., size(time_indices_in_memory)...))
+    data = fill(-999.0, (grid_size[1:end]..., length(time_indices_in_memory)))
+    j = 1
     for i in time_indices_in_memory
         var_mean = mean(var_1990[:, i])
-        data[end, :, :, i] .= var_mean
+        data[end, :, :, j] .= var_mean
+        j += 1
     end
     return data, times
 end
@@ -54,7 +56,7 @@ end
 function set!(fts::JLD2FTS, path::String = fts.path, name::String = fts.name)
     ti = time_indices(fts)
     # ti = collect(ti)
-    data, _ = load_jld2(; path, var_name = name, grid_size = size(fts[:end-1]), time_indices_in_memory = ti)
+    data, _ = load_jld2(; path, var_name = name, grid_size = size(fts)[1:end-1], time_indices_in_memory = ti)
 
     copyto!(interior(fts, :, :, :, :), data)
     fill_halo_regions!(fts)
@@ -85,7 +87,7 @@ function varna_forcing(grid_ref, datapath)
     var_name = "thetao"
     backend = JLD2Backend(2)
 
-    time_indices_in_memory = 1:length(backend)
+    time_indices_in_memory = (1, length(backend))
     data, times =
         load_jld2(; path = filepath, var_name, grid_size = size(grid), time_indices_in_memory)  # , bathymetry)
 
