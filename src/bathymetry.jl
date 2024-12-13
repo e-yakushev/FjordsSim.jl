@@ -1,21 +1,12 @@
-using Oceananigans
 using Oceananigans.Architectures: architecture
+using Oceananigans.BoundaryConditions: fill_halo_regions!
 using Oceananigans.DistributedComputations: child_architecture
-using Oceananigans.Grids: halo_size, λnodes, φnodes
-using Oceananigans.Grids: x_domain, y_domain
-using Oceananigans.Grids: topology
-using Oceananigans.Utils: pretty_filesize, launch!
-using Oceananigans.Fields: interpolate!
-using Oceananigans.BoundaryConditions
-using ClimaOcean
+using Oceananigans.Grids: LatitudeLongitudeGrid, x_domain, y_domain
+using Oceananigans.Fields: interior, set!, Field
 using ClimaOcean.Bathymetry: interpolate_bathymetry_in_passes, remove_minor_basins!
-
-using ImageMorphology
-using KernelAbstractions: @kernel, @index
-
-using NCDatasets
-using Downloads
-using Scratch
+using NCDatasets: Dataset
+using Downloads: download
+using Scratch: @get_scratch!
 
 download_bathymetry_cache::String = ""
 function __init__()
@@ -47,7 +38,7 @@ function regrid_bathymetry_regional(
         fileurl = joinpath(url, filename)
 
         try
-            Downloads.download(fileurl, filepath; progress = download_progress, verbose = true)
+            download(fileurl, filepath; progress = download_progress, verbose = true)
         catch
             cmd = `wget --no-check-certificate -O $filepath $fileurl`
             run(cmd)

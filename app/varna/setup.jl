@@ -1,16 +1,13 @@
-using Oceananigans
-using Oceananigans.Architectures
-using Oceananigans.Units
-using Oceananigans.BuoyancyModels: g_Earth
-using Oceananigans.Coriolis: Ω_Earth
+using Oceananigans.Architectures: GPU, CPU
+using Oceananigans.Advection: WENO
+using Oceananigans.BuoyancyModels: SeawaterBuoyancy, g_Earth
+using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, BetaPlane, Ω_Earth
+using Oceananigans.TurbulenceClosures: ConvectiveAdjustmentVerticalDiffusivity, ScalarDiffusivity
 using Oceananigans.OutputReaders: InMemory
-using Oceananigans.TurbulenceClosures: ConvectiveAdjustmentVerticalDiffusivity
-using ClimaOcean
-using ClimaOcean.OceanSimulations:
-    default_ocean_closure, default_momentum_advection, default_tracer_advection
-using OceanBioME
+using Oceananigans.Units: day
+using ClimaOcean: Radiation
+using ClimaOcean.OceanSimulations: default_momentum_advection, default_tracer_advection
 using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
-
 using FjordsSim:
     SetupModel,
     grid_from_bathymetry_file,

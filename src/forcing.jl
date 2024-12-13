@@ -1,16 +1,11 @@
-using Statistics
-using Printf
+using Oceananigans.OutputReaders: FieldTimeSeries, Cyclical, AbstractInMemoryBackend, FlavorOfFTS, time_indices
+using Oceananigans.BoundaryConditions: fill_halo_regions!
+using Oceananigans.Fields: interior
+using Oceananigans.Forcings: Forcing
 using Dates: DateTime, Year, Second
+using Statistics: mean
 
-using CUDA
-using Oceananigans
-using Oceananigans: Forcing
-using Oceananigans.Grids
-using Oceananigans.Units
-using Oceananigans.Architectures: architecture, on_architecture
-using Oceananigans.OutputReaders: Cyclical, AbstractInMemoryBackend, FlavorOfFTS, time_indices
-
-import Oceananigans.Fields: set!
+import Oceananigans.Fields: interior, set!
 import Oceananigans.OutputReaders: new_backend
 
 struct JLD2Backend <: AbstractInMemoryBackend{Int}
@@ -55,7 +50,6 @@ end
 
 function set!(fts::JLD2FTS, path::String = fts.path, name::String = fts.name)
     ti = time_indices(fts)
-    # ti = collect(ti)
     data, _ = load_jld2(; path, var_name = name, grid_size = size(fts)[1:end-1], time_indices_in_memory = ti)
 
     copyto!(interior(fts, :, :, :, :), data)

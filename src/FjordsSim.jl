@@ -1,33 +1,20 @@
 module FjordsSim
 
-using Oceananigans
-using Oceananigans.Architectures
-using Oceananigans.BuoyancyModels: g_Earth
-using Oceananigans.Coriolis: Ω_Earth
-using Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities: CATKEVerticalDiffusivity
+using Oceananigans.Models: HydrostaticFreeSurfaceModel, update_model_field_time_series!
+using Oceananigans.Simulations: Simulation
+using Oceananigans.Fields: set!
+using Oceananigans.TimeSteppers: tick!, Time
 using Oceananigans.OutputReaders: extract_field_time_series, update_field_time_series!
-using Oceananigans.Models: update_model_field_time_series!
-using Oceananigans.TimeSteppers: tick!
-using ClimaOcean
-using ClimaOcean.OceanSeaIceModels: MinimumTemperatureSeaIce
+using Oceananigans.Forcings: DiscreteForcing
+using ClimaOcean.OceanSeaIceModels: OceanSeaIceModel, MinimumTemperatureSeaIce
 using ClimaOcean.OceanSeaIceModels.CrossRealmFluxes: compute_atmosphere_ocean_fluxes!
-using ClimaOcean.OceanSimulations:
-    default_free_surface,
-    default_ocean_closure,
-    default_momentum_advection,
-    default_tracer_advection,
-    u_quadratic_bottom_drag,
-    v_quadratic_bottom_drag,
-    u_immersed_bottom_drag,
-    v_immersed_bottom_drag
-using OceanBioME
-using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
+using ClimaOcean.DataWrangling.JRA55: JRA55_prescribed_atmosphere
 
 import Oceananigans.Architectures: on_architecture
 import Oceananigans.TimeSteppers: time_step!, update_state!
 import Oceananigans.Models: update_model_field_time_series!
 import ClimaOcean.OceanSeaIceModels.CrossRealmFluxes: compute_sea_ice_ocean_fluxes!
-import ClimaOcean: SimilarityTheoryTurbulentFluxes
+import ClimaOcean.OceanSeaIceModels.CrossRealmFluxes.SimilarityTheoryTurbulentFluxes
 
 include("utils.jl")
 include("bathymetry.jl")
@@ -38,7 +25,6 @@ include("boundary_conditions.jl")
 include("forcing.jl")
 include("radiation.jl")
 include("output.jl")
-
 include("BGCModels/BGCModels.jl")
 
 using .BGCModels: OXYDEP
@@ -175,7 +161,7 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     atmosphere = safe_execute(sim_setup.atmosphere_callable)(sim_setup.atmosphere_args...)
     println("Initialized atmosphere")
     radiation = sim_setup.radiation
-    similarity_theory = sim_setup.similarity_theory_callable(; sim_setup.similarity_theory_args...)
+    similarity_theory = sim_setup.similarity_theory_callable(sim_setup.similarity_theory_args...)
     coupled_model = OceanSeaIceModel(ocean_sim, sea_ice; atmosphere, radiation, similarity_theory)
     println("Initialized coupled model")
 
@@ -201,7 +187,8 @@ free_surface_default(grid_ref) = SplitExplicitFreeSurface(grid_ref[]; cfl = 0.7)
 
 atmosphere_JRA55(arch, backend, grid_ref, start, stop) =
     JRA55_prescribed_atmosphere(arch, start:stop; backend, grid = grid_ref[])
-biogeochemistry_LOBSTER(grid_ref) = LOBSTER(; grid = grid_ref[], carbonates = false, open_bottom = false)
+biogeochemistry_LOBSTER(grid_ref) =
+    LOBSTER(; grid = grid_ref[], carbonates = false, open_bottom = false)
 biogeochemistry_OXYDEP(grid_ref, args_oxydep) = OXYDEP(;
     grid = grid_ref[],
     args_oxydep...,
@@ -210,7 +197,11 @@ biogeochemistry_OXYDEP(grid_ref, args_oxydep) = OXYDEP(;
     Chemicals = false,
     scale_negatives = false,
 )
-SimilarityTheoryTurbulentFluxes(; grid_ref::Ref, kw...) = SimilarityTheoryTurbulentFluxes(grid_ref[]; kw...)
+SimilarityTheoryTurbulentFluxes(
+    grid_ref::Ref,
+    gravitational_acceleration,
+    turbulent_prandtl_number,
+) = SimilarityTheoryTurbulentFluxes(grid_ref[]; gravitational_acceleration, turbulent_prandtl_number)
 
 const OceanOnlyModel = OceanSeaIceModel{Nothing}
 const OceanSimplifiedSeaIceModel = OceanSeaIceModel{<:MinimumTemperatureSeaIce}
@@ -242,7 +233,7 @@ function update_state!(coupled_model::NoSeaIceModel, callbacks = []; compute_ten
     return nothing
 end
 
-function update_model_field_time_series!(forcing::Oceananigans.DiscreteForcing, time)
+function update_model_field_time_series!(forcing::DiscreteForcing, time)
     ftses = extract_field_time_series(forcing)
     for fts in ftses
         update_field_time_series!(fts, time)

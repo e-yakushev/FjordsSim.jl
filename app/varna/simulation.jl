@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-using Printf
-using FileIO
-using JLD2
+# using Printf
+# using FileIO
+# using JLD2
 
+using Oceananigans.Units: second, seconds, minute, minutes, hour, hours
 using FjordsSim: progress, coupled_hydrostatic_simulation
 
 include("setup.jl")

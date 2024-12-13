@@ -1,10 +1,8 @@
-using Oceananigans
-using Oceananigans.Architectures
-using ClimaOcean
-
-using FileIO
-using JLD2
-using Interpolations
+using Oceananigans.Grids: LatitudeLongitudeGrid, ImmersedBoundaryGrid
+using Oceananigans.ImmersedBoundaries: GridFittedBottom
+using ClimaOcean.VerticalGrids: stretched_vertical_faces, PowerLawStretching
+using Interpolations: interpolate, scale, BSpline, Linear, OnGrid
+using JLD2: @load
 
 function grid_bathymetry_from_lat_lon(
     arch,
@@ -100,7 +98,7 @@ function resample(depth, Nx_new, Ny_new)
     y_orig = LinRange(1, Ny, Ny)
 
     # Create the interpolation object with boundary values fixed
-    itp = Interpolations.interpolate(depth, BSpline(Linear()), OnGrid())
+    itp = interpolate(depth, BSpline(Linear()), OnGrid())
     depth_itp = scale(itp, x_orig, y_orig)
 
     # Define the new grid points for the target size

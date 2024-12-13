@@ -1,19 +1,15 @@
-using CUDA
 using Oceananigans.BoundaryConditions:
-    FluxBoundaryCondition, ValueBoundaryCondition, FieldBoundaryConditions, BoundaryCondition, Open
+    FluxBoundaryCondition, ValueBoundaryCondition, FieldBoundaryConditions
 using Oceananigans.ImmersedBoundaries: ImmersedBoundaryCondition
-using Oceananigans.Operators: Δzᵃᵃᶜ, ℑxyᶜᶠᵃ, ℑxyᶠᶜᵃ
-using Oceananigans.Units
-using Oceananigans.Architectures
-using OceanBioME: GasExchange
+using Oceananigans.Operators: ℑxyᶜᶠᵃ, ℑxyᶠᶜᵃ
+using Oceananigans.Units: days
+using Oceananigans.Architectures: GPU, CPU
+
 import Oceananigans.Biogeochemistry: biogeochemical_drift_velocity
 
 const twelve_months = 12
 const thirty_days = 30days
 
-#- - - - - - - - - - - - - - - - - - - - - - 
-# Function to calculate oxygen saturation in seawater
-#- - - - - - - - - - - - - - - - - - - - - - 
 # Coefficients from Garcia and Gordon (1992)
 const A1 = -173.4292
 const A2 = 249.6339
@@ -26,6 +22,7 @@ const B2 = 0.001429
 const B3 = -0.00007292
 const C1 = 0.0000826
 
+# Function to calculate oxygen saturation in seawater
 function oxygen_saturation(T::Float64, S::Float64, P::Float64)::Float64
 
     T_kelvin = T + 273.15  # Convert temperature to Kelvin
@@ -51,9 +48,7 @@ function oxygen_saturation(T::Float64, S::Float64, P::Float64)::Float64
     return (O2_sat * P_corr)
 end
 
-#- - - - - - - - - - - - - - - - - - - - - - 
 # Sc, Schmidt number for O2  following Wanninkhof 2014
-#- - - - - - - - - - - - - - - - - - - - - - 
 @inline function OxygenSchmidtNumber(T::Float64)::Float64
     return ((1920.4 - 135.6 * T + 5.2122 * T^2 - 0.10939 * T^3 + 0.00093777 * T^4))
     # can be replaced by PolynomialParameterisation{4}((a, b, c, d, e)) i.e.:
@@ -61,16 +56,12 @@ end
     # Sc = PolynomialParameterisation{4}((a, b, c, d, e))
 end
 
-#- - - - - - - - - - - - - - - - - - - - - - 
 # WindDependence, [mmol m-2s-1], Oxygen Sea Water Flux 
-#- - - - - - - - - - - - - - - - - - - - - - 
 function WindDependence(windspeed::Float64)::Float64
     return (0.251 * windspeed^2.0) #ko2o=0.251*windspeed^2*(Sc/660)^(-0.5)  Wanninkhof 2014
 end
 
-#- - - - - - - - - - - - - - - - - - - - - - 
 # OxygenSeaWaterFlux, [mmol m-2s-1], Oxygen Sea Water Flux 
-#- - - - - - - - - - - - - - - - - - - - - - 
 function OxygenSeaWaterFlux(
     T::Float64,
     S::Float64,
@@ -342,4 +333,3 @@ function bc_varna_bgh_oxydep(grid_ref, bottom_drag_coefficient, bgc_model)
 
     return merge(bc_varna_tuple, bc_bgh_oxydep_tuple)
 end
-

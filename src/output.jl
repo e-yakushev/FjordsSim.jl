@@ -1,6 +1,5 @@
-using Oceananigans
-using CairoMakie
-using Oceananigans.Units
+using CairoMakie: Axis, Figure, Colorbar, Observable, record, heatmap!, @lift
+using Oceananigans.Fields: Field, interior, compute!
 
 function plot_1d_phys(T, S, z, times, folder, x, y)
     fig = Figure(size = (1000, 400), fontsize = 20)
@@ -51,7 +50,7 @@ function record_surface_speed(u, v, Nz, times, folder; colorrange = (0, 0.5), co
     cb = Colorbar(fig[0, 1], hm, vertical = false, label = "Surface speed (ms⁻¹)")
     # hidedecorations!(ax)
 
-    CairoMakie.record(fig, joinpath(folder, "surface_speed.mp4"), 1:Nt, framerate = framerate) do i
+    record(fig, joinpath(folder, "surface_speed.mp4"), 1:Nt, framerate = framerate) do i
         iter[] = i
     end
 end
