@@ -404,7 +404,7 @@ function forcing_varna(bottom_drag_coefficient, Nz, grid, external_values)
     Tsrc = 10.0
     Ssrc = 0.1
     NUTsrc = 10.0
-    DOMsrc = 5.0
+    DOMsrc = 20.0  # 5
     O2src = 300.0
     Psrc = 0.001
     HETsrc = 0.001

@@ -52,7 +52,7 @@ ocean_model = ocean_sim.model
 profile_prefix = joinpath(sim_setup.results_dir, "varna_snapshots")
 ocean_sim.output_writers[:profile] = JLD2OutputWriter(
     ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
-    schedule = TimeInterval(6hours),
+    schedule = TimeInterval(12hours),
     filename = "$profile_prefix.jld2",
     overwrite_existing = true,
     array_type=Array{Float32}
