@@ -4,6 +4,8 @@ using Oceananigans.ImmersedBoundaries: ImmersedBoundaryCondition
 using Oceananigans.Operators: ℑxyᶜᶠᵃ, ℑxyᶠᶜᵃ
 using Oceananigans.Units: days
 using Oceananigans.Architectures: GPU, CPU
+using Oceananigans.Grids: Center, Face
+using ClimaOcean.OceanSimulations: u_quadratic_bottom_drag, v_quadratic_bottom_drag
 
 import Oceananigans.Biogeochemistry: biogeochemical_drift_velocity
 

@@ -1,11 +1,13 @@
 module FjordsSim
 
 using Oceananigans.Models: HydrostaticFreeSurfaceModel, update_model_field_time_series!
+using Oceananigans.Models.HydrostaticFreeSurfaceModels: SplitExplicitFreeSurface
 using Oceananigans.Simulations: Simulation
 using Oceananigans.Fields: set!
 using Oceananigans.TimeSteppers: tick!, Time
 using Oceananigans.OutputReaders: extract_field_time_series, update_field_time_series!
 using Oceananigans.Forcings: DiscreteForcing
+using Oceananigans.Units: second
 using ClimaOcean.OceanSeaIceModels: OceanSeaIceModel, MinimumTemperatureSeaIce
 using ClimaOcean.OceanSeaIceModels.CrossRealmFluxes: compute_atmosphere_ocean_fluxes!
 using ClimaOcean.DataWrangling.JRA55: JRA55_prescribed_atmosphere
@@ -187,8 +189,10 @@ free_surface_default(grid_ref) = SplitExplicitFreeSurface(grid_ref[]; cfl = 0.7)
 
 atmosphere_JRA55(arch, backend, grid_ref, start, stop) =
     JRA55_prescribed_atmosphere(arch, start:stop; backend, grid = grid_ref[])
+
 biogeochemistry_LOBSTER(grid_ref) =
     LOBSTER(; grid = grid_ref[], carbonates = false, open_bottom = false)
+
 biogeochemistry_OXYDEP(grid_ref, args_oxydep) = OXYDEP(;
     grid = grid_ref[],
     args_oxydep...,
@@ -197,6 +201,7 @@ biogeochemistry_OXYDEP(grid_ref, args_oxydep) = OXYDEP(;
     Chemicals = false,
     scale_negatives = false,
 )
+
 SimilarityTheoryTurbulentFluxes(
     grid_ref::Ref,
     gravitational_acceleration,
@@ -226,7 +231,7 @@ end
 function update_state!(coupled_model::NoSeaIceModel, callbacks = []; compute_tendencies = false)
     time = Time(coupled_model.clock.time)
     for forcing in coupled_model.ocean.model.forcing
-        forcing isa Oceananigans.DiscreteForcing && update_model_field_time_series!(forcing, time)
+        forcing isa DiscreteForcing && update_model_field_time_series!(forcing, time)
     end
     update_model_field_time_series!(coupled_model.atmosphere, time)
     compute_atmosphere_ocean_fluxes!(coupled_model)

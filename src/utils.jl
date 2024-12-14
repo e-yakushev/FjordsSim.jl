@@ -1,5 +1,6 @@
 using Oceananigans.Fields: interior
 using Oceananigans.OutputReaders: FieldTimeSeries, OnDisk
+using Oceananigans.Utils: prettytime, pretty_filesize
 using NCDatasets: Dataset
 using JLD2: @save
 using Printf: @sprintf

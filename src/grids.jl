@@ -1,6 +1,6 @@
 using Oceananigans.Grids: LatitudeLongitudeGrid, ImmersedBoundaryGrid
 using Oceananigans.ImmersedBoundaries: GridFittedBottom
-using ClimaOcean.VerticalGrids: stretched_vertical_faces, PowerLawStretching
+using ClimaOcean.VerticalGrids: stretched_vertical_faces, exponential_z_faces, PowerLawStretching
 using Interpolations: interpolate, scale, BSpline, Linear, OnGrid
 using JLD2: @load
 
