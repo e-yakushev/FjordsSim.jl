@@ -1,4 +1,5 @@
-using CairoMakie: Axis, Figure, Colorbar, Observable, record, heatmap!, @lift
+using CairoMakie: Axis, Figure, Colorbar, Observable, Reverse, record, heatmap!, @lift
+using FileIO: save
 using Oceananigans.Fields: Field, interior, compute!
 
 function plot_1d_phys(T, S, z, times, folder, x, y)
@@ -73,7 +74,7 @@ function record_bottom_tracer(tracer, times, bottom_z, folder; colorrange = (-1,
     cb = Colorbar(fig[0, 1], hm, vertical = false, label = "$(tracer), mmol/m³")
     # hidedecorations!(ax)
 
-    CairoMakie.record(fig, joinpath(folder, "bottom_$(tracer)_movie.mp4"), 1:Nt, framerate = framerate) do i
+    record(fig, joinpath(folder, "bottom_$(tracer)_movie.mp4"), 1:Nt, framerate = framerate) do i
         iter[] = i
     end
 end
@@ -104,7 +105,7 @@ function record_horizontal_tracer(
     cb = Colorbar(fig[0, 1], hm, vertical = false, label = label)
     # hidedecorations!(ax)
 
-    CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = framerate) do i
+    record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = framerate) do i
         iter[] = i
     end
 end
@@ -139,7 +140,7 @@ function record_vertical_tracer(
     cb = Colorbar(fig[0, 1], hm, vertical = false, label = label)
     # hidedecorations!(ax)
 
-    CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = framerate) do i
+    record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = framerate) do i
         iter[] = i
     end
 end
@@ -174,7 +175,7 @@ function record_vertical_diff(
     cb = Colorbar(fig[0, 1], hm, vertical = false, label = label)
     # hidedecorations!(ax)
 
-    CairoMakie.record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = framerate) do i
+    record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = framerate) do i
         iter[] = i
     end
 end
