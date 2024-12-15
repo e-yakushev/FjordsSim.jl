@@ -10,9 +10,21 @@
             "name": "Varna simulation",
             "program": "${workspaceFolder}/app/varna/simulation.jl",
             "stopOnEntry": false,
-            "juliaAdditionalArgs": ["-O0"]
+            "juliaAdditionalArgs": [
+                "-O0"
+            ]
         },
-{
+        {
+            "type": "julia",
+            "request": "launch",
+            "name": "Sognefjord simulation",
+            "program": "${workspaceFolder}/app/sognefjord/simulation.jl",
+            "stopOnEntry": false,
+            "juliaAdditionalArgs": [
+                "-O0"
+            ]
+        },
+        {
             "type": "julia",
             "request": "launch",
             "name": "Run active Julia file",

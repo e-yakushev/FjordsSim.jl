@@ -1,128 +1,12 @@
 using Oceananigans.Grids: LatitudeLongitudeGrid, ImmersedBoundaryGrid
 using Oceananigans.ImmersedBoundaries: GridFittedBottom
-using ClimaOcean.VerticalGrids: stretched_vertical_faces, exponential_z_faces, PowerLawStretching
-using Interpolations: interpolate, scale, BSpline, Linear, OnGrid
+using ClimaOcean.VerticalGrids: exponential_z_faces
 using JLD2: @load
 
-function grid_bathymetry_from_lat_lon(
-    arch,
-    Nx,
-    Ny,
-    halo,
-    latitude,
-    longitude,
-    datadir,
-    filename,
-    depth,
-    surface_layer_Δz,
-    stretching_factor,
-    surface_layer_height,
-    height_above_water,
-    minimum_depth,
-)
-
-    z_faces = stretched_vertical_faces(;
-        depth,
-        surface_layer_Δz,
-        stretching = PowerLawStretching(stretching_factor),
-        surface_layer_height,
-    )
-
+function grid_from_bathymetry_file(arch, halo, filepath, latitude, longitude)
+    @load filepath depth z_faces
+    Nx, Ny = size(depth)
     Nz = length(z_faces) - 1
-
-    underlying_grid = LatitudeLongitudeGrid(
-        arch;
-        size = (Nx, Ny, Nz),
-        latitude = latitude,
-        longitude = longitude,
-        z = z_faces,
-        halo = halo,
-    )
-
-    h = regrid_bathymetry_regional(
-        underlying_grid;
-        height_above_water = height_above_water,
-        minimum_depth = minimum_depth,
-        dir = datadir,
-        filename = filename,
-        interpolation_passes = 1,
-        major_basins = 1,
-    )
-    return underlying_grid, h
-end
-
-function grid_from_lat_lon!(sim_setup)
-    arch,
-    Nx,
-    Ny,
-    halo,
-    latitude,
-    longitude,
-    datadir,
-    filename,
-    depth,
-    surface_layer_Δz,
-    stretching_factor,
-    surface_layer_height,
-    height_above_water,
-    minimum_depth = sim_setup.grid_parameters
-
-    underlying_grid, h = grid_bathymetry_from_lat_lon(
-        arch,
-        Nx,
-        Ny,
-        halo,
-        latitude,
-        longitude,
-        datadir,
-        filename,
-        depth,
-        surface_layer_Δz,
-        stretching_factor,
-        surface_layer_height,
-        height_above_water,
-        minimum_depth,
-    )
-
-    grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(h))
-    sim_setup.grid[] = grid
-    return grid
-end
-
-
-function resample(depth, Nx_new, Ny_new)
-    Nx, Ny = size(depth)  # Original grid size
-
-    # Define the range of original grid points
-    x_orig = LinRange(1, Nx, Nx)
-    y_orig = LinRange(1, Ny, Ny)
-
-    # Create the interpolation object with boundary values fixed
-    itp = interpolate(depth, BSpline(Linear()), OnGrid())
-    depth_itp = scale(itp, x_orig, y_orig)
-
-    # Define the new grid points for the target size
-    x_new = LinRange(1, Nx, Nx_new)
-    y_new = LinRange(1, Ny, Ny_new)
-
-    # Resample on the new grid
-    depth_resampled = [depth_itp(x, y) for x in x_new, y in y_new]
-    @info "size of the new grid: " * string(size(depth_resampled))
-    return depth_resampled
-end
-
-function grid_from_bathymetry_file(arch, Nx, Ny, Nz, halo, datadir, filename, latitude, longitude)
-    filepath_topo = joinpath(datadir, filename)
-    @load filepath_topo depth
-
-    if isnothing(Nx)
-        Nx, Ny = size(depth)
-    else
-        depth = resample(depth, Nx, Ny)
-    end
-
-    depth_max = abs(minimum(depth))
-    z_faces = exponential_z_faces(; Nz = Nz, depth = depth_max, h = depth_max)
     underlying_grid = LatitudeLongitudeGrid(
         arch;
         size = (Nx, Ny, Nz),
@@ -135,9 +19,7 @@ function grid_from_bathymetry_file(arch, Nx, Ny, Nz, halo, datadir, filename, la
     return grid
 end
 
-function grid_latitude_flat!(sim_setup)
-    arch, Nx, Ny, Nz, halo, latitude, longitude, depth = sim_setup.grid_parameters
-
+function grid_latitude_flat!(arch, Nx, Ny, Nz, halo, latitude, longitude, depth)
     z_faces = exponential_z_faces(; Nz = Nz, depth = depth, h = depth)
     grid = LatitudeLongitudeGrid(
         arch;
@@ -147,15 +29,12 @@ function grid_latitude_flat!(sim_setup)
         latitude,
         longitude,
     )
-    sim_setup.grid[] = grid
     return grid
 end
 
-function grid_column!(sim_setup)
-    arch, Nz, halo, latitude, longitude, depth, h = sim_setup.grid_parameters
+function grid_column!(arch, Nz, halo, latitude, longitude, depth, h)
     longitude = longitude .+ (-0.03, 0.03)
     latitude = latitude .+ (-0.03, 0.03)
-
     z_faces = exponential_z_faces(; Nz, depth, h)
     grid = LatitudeLongitudeGrid(
         arch;
@@ -165,6 +44,5 @@ function grid_column!(sim_setup)
         latitude,
         longitude,
     )
-    sim_setup.grid[] = grid
     return grid
 end
