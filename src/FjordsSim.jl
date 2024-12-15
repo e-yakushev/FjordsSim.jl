@@ -230,20 +230,8 @@ end
 
 function update_state!(coupled_model::NoSeaIceModel, callbacks = []; compute_tendencies = false)
     time = Time(coupled_model.clock.time)
-    for forcing in coupled_model.ocean.model.forcing
-        forcing isa DiscreteForcing && update_model_field_time_series!(forcing, time)
-    end
     update_model_field_time_series!(coupled_model.atmosphere, time)
     compute_atmosphere_ocean_fluxes!(coupled_model)
-    return nothing
-end
-
-function update_model_field_time_series!(forcing::DiscreteForcing, time)
-    ftses = extract_field_time_series(forcing)
-    for fts in ftses
-        update_field_time_series!(fts, time)
-    end
-
     return nothing
 end
 
