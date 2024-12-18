@@ -52,18 +52,18 @@ for i in 1:size(O₂, 1)
     end
 end
 
+@info "bottom layer array made"
 
 # println(keys(grid["underlying_grid"]))
 # println(grid["underlying_grid"]["Δyᶠᶜᵃ"])
-
 # stupid, but I cannot find a right way with znodes
 # znodes(grid["underlying_grid"], with_halos=false)
 z = grid["underlying_grid"]["zᵃᵃᶜ"][8:Nz+7]
-
 # z = extract_z_faces(grid)
 
-plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
+# VERTICAL in 1 position with coordinated in gridpoint numbers
 
+plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
 plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 15, 18, times, z, folder)
 
 # HORIZONTAL
@@ -110,6 +110,7 @@ record_horizontal_tracer(
     colorrange=(0, 50), colormap=Reverse(:CMRmap), iz=Nz,
     )
 @info "HORIZONTAL tracers plots made"
+
 # VERTICAL
 record_vertical_tracer(
     T, z, 18, times, folder, "Tprofile", "Temperature (°C)",
