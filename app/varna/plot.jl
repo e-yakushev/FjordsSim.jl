@@ -10,18 +10,18 @@ using .FjordsSim: plot_1d_phys, extract_z_faces, record_vertical_tracer, record_
 Nz = 12
 
 folder = joinpath(homedir(), "FjordsSim_results", "varna")
-filename = joinpath(folder, "varna_snapshots") #filename = joinpath(folder, "varna_snapshots270days")
+filename = joinpath(folder, "varna_snapshots_3d") #filename = joinpath(folder, "varna_snapshots270days")
 T =   FieldTimeSeries("$filename.jld2", "T")
 S =   FieldTimeSeries("$filename.jld2", "S")
-u =   FieldTimeSeries("$filename.jld2", "u")
-v =   FieldTimeSeries("$filename.jld2", "v")
+# u =   FieldTimeSeries("$filename.jld2", "u")
+# v =   FieldTimeSeries("$filename.jld2", "v")
 O₂ =  FieldTimeSeries("$filename.jld2", "O₂")
 NUT =  FieldTimeSeries("$filename.jld2", "NUT")
 PHY =  FieldTimeSeries("$filename.jld2", "P")
 HET =  FieldTimeSeries("$filename.jld2", "HET")
 DOM =  FieldTimeSeries("$filename.jld2", "DOM")
 POM =  FieldTimeSeries("$filename.jld2", "POM")
-C =  FieldTimeSeries("$filename.jld2", "C")       
+# C =  FieldTimeSeries("$filename.jld2", "C")       
 times = T.times
 
 # filename10 = joinpath(folder, "varna_snapshotsDOM10")
@@ -53,8 +53,8 @@ for i in 1:size(O₂, 1)
 end
 
 
-println(keys(grid["underlying_grid"]))
-println(grid["underlying_grid"]["Δyᶠᶜᵃ"])
+# println(keys(grid["underlying_grid"]))
+# println(grid["underlying_grid"]["Δyᶠᶜᵃ"])
 
 # stupid, but I cannot find a right way with znodes
 # znodes(grid["underlying_grid"], with_halos=false)
@@ -64,19 +64,21 @@ z = grid["underlying_grid"]["zᵃᵃᶜ"][8:Nz+7]
 
 plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
 
+plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 15, 18, times, z, folder)
+
 # HORIZONTAL
 # plot_1d_phys(T, S, z, times, folder)
 
-plot_bottom_oxygen(O₂, bottom_z, 1000 , folder)
+# plot_bottom_tracer(O₂, bottom_z, 1000 , folder)
 
-record_surface_speed(u, v, Nz, times, folder)
+# record_surface_speed(u, v, Nz, times, folder)
 
-record_bottom_oxygen(O₂, times, bottom_z, folder)
+record_bottom_tracer(O₂,"O₂", times, bottom_z, folder)
 
-record_horizontal_tracer(
-    C, times, folder, "Contsurf", "Contaminant (% of max. concentration)",
-    colorrange=(0, 100), colormap=:matter, iz=Nz,
-    )
+# record_horizontal_tracer(
+#     C, times, folder, "Contsurf", "Contaminant (% of max. concentration)",
+#     colorrange=(0, 100), colormap=:matter, iz=Nz,
+#     )
 
 record_horizontal_tracer(
     T, times, folder, "Tsurf", "Temperature (°C)",
@@ -88,14 +90,14 @@ record_horizontal_tracer(
     colorrange=(0, 17), colormap=:viridis,
     )
 
-record_horizontal_tracer(
-    O₂, times, folder, "O2bottom", "Dissolved oxygen (μM)",
-    colorrange=(100, 350), colormap=:turbo, iz=3,
-    )
+# record_horizontal_tracer(
+#     O₂, times, folder, "O2bottom", "Dissolved oxygen (μM)",
+#     colorrange=(0, 350), colormap=:turbo, iz=3,
+#     )
 
 record_horizontal_tracer(
     NUT, times, folder, "NUTsurf", "Nutrients (μM N)",
-    colorrange=(0, 25), colormap=Reverse(:cherry), iz=Nz,
+    colorrange=(0, 20), colormap=Reverse(:cherry), iz=Nz,
     )
 
 record_horizontal_tracer(
@@ -104,20 +106,20 @@ record_horizontal_tracer(
     )
 
 record_horizontal_tracer(
-    DOM, times, folder, "DOMsurf", "DOM (μM N)",
-    colorrange=(0, 25), colormap=Reverse(:CMRmap), iz=Nz,
+    DOM, times, folder, "DOMsurf10", "DOM (μM N)",
+    colorrange=(0, 50), colormap=Reverse(:CMRmap), iz=Nz,
     )
-
+@info "HORIZONTAL tracers plots made"
 # VERTICAL
 record_vertical_tracer(
     T, z, 18, times, folder, "Tprofile", "Temperature (°C)",
     colorrange=(5, 40), colormap=Reverse(:RdYlBu),
     )
 
-record_vertical_tracer(
-    u, z, 18, times, folder, "Uprofile", "u velocity component (ms⁻¹)",
-    colorrange=(-0.5, 0.5), colormap=:deep,
-    )
+# record_vertical_tracer(
+#     u, z, 18, times, folder, "Uprofile", "u velocity component (ms⁻¹)",
+#     colorrange=(-0.5, 0.5), colormap=:deep,
+#     )
 
 record_vertical_tracer(
     S, z, 18, times, folder, "Sprofile", "Salinity (PSU)",
@@ -126,7 +128,7 @@ record_vertical_tracer(
 
 record_vertical_tracer(
     PHY, z, 18, times, folder, "PHYprofile", "Phytoplankton (μM N)",
-    colorrange=(0, 2), colormap=Reverse(:cubehelix),
+    colorrange=(0, 3), colormap=Reverse(:cubehelix),
         )
 
 record_vertical_tracer(
@@ -141,15 +143,17 @@ record_vertical_tracer(
 
 record_vertical_tracer(
     NUT, z, 18, times, folder, "NUTprofile", "Nutrients (μM N)",
-    colorrange=(0, 10), colormap=Reverse(:cherry),
+    colorrange=(0, 25), colormap=Reverse(:cherry),
         )
 
 record_vertical_tracer(
     O₂, z, 18, times, folder, "O2profile", "Dissolved Oxygen (μM)",
-    colorrange=(0, 350), colormap=:turbo,
+    colorrange=(0, 350), colormap=:turbo, #Reverse(:websafe), #
         )
 
 # record_vertical_diff(
 #     O₂diff, z, 18, times, folder, "O2profile_diff", "O₂ (DOM=10) - O₂ (DOM=20)",
 #     colorrange=(-200, 200), colormap=:balance,
 #         )
+
+@info "VERTICAL tracers plots made"
