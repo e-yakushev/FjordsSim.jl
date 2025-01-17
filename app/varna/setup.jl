@@ -14,7 +14,7 @@ using FjordsSim:
     grid_latitude_flat!,
     grid_column!,
     grid_ref,
-    varna_forcing,
+    forcing_from_file,
     bc_varna_bgh_oxydep,
     bgh_oxydep_boundary_conditions,
     bc_varna,
@@ -78,12 +78,8 @@ function setup_region(;
     grid_callable = grid_from_bathymetry_file,
     grid_args = (
         arch = GPU(),
-        Nx = nothing,
-        Ny = nothing,
-        Nz = 12,
         halo = (7, 7, 7),
-        datadir = joinpath(homedir(), "FjordsSim_data", "varna"),
-        filename = "Varna_topo_channels.jld2",
+        filepath = joinpath(homedir(), "FjordsSim_data", "varna", "Varna_topo_channels.jld2"),
         latitude = (43.177, 43.214),
         longitude = (27.640, 27.947),
     ),
@@ -108,8 +104,12 @@ function setup_region(;
     # Coriolis
     coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
     # Forcing
-    forcing_callable = varna_forcing,
-    forcing_args = (grid_ref = grid_ref, datapath = joinpath(homedir(), "FjordsSim_data", "varna")),
+    forcing_callable = forcing_from_file,
+    forcing_args = (
+        grid_ref = grid_ref,
+        filepath = joinpath(homedir(), "FjordsSim_data", "varna", "Varna_bry.nc"),
+        tracers = tracers,
+    ),
     # Boundary conditions
     bc_callable = bc_ocean,
     bc_args = (grid_ref, bottom_drag_coefficient),
@@ -136,6 +136,8 @@ function setup_region(;
     # Biogeochemistry
     biogeochemistry_callable = nothing,
     biogeochemistry_args = (nothing,),
+    # Output folder
+    results_dir = joinpath(homedir(), "FjordsSim_results", "varna"),
 )
 
     return SetupModel(
@@ -161,29 +163,12 @@ function setup_region(;
         similarity_theory_callable,
         similarity_theory_args,
         biogeochemistry_callable,
-        biogeochemistry_args,
+        biogeochemistry_args;
+        results_dir,
     )
 end
 
 setup_region_3d() = setup_region()
-setup_region_3d_Lobster() = setup_region(
-    biogeochemistry_callable = biogeochemistry_LOBSTER,
-    biogeochemistry_args = (grid_ref,),
-    tracers = (:T, :S, :e, :NO₃, :NH₄, :P, :Z, :sPOM, :bPOM, :DOM),
-    initial_conditions = (T = 10, S = 15, NO₃ = 10.0, NH₄ = 0.1, P = 0.1, Z = 0.01),
-    tracer_advection = (
-        T = default_tracer_advection(),
-        S = default_tracer_advection(),
-        e = nothing,
-        NO₃ = default_tracer_advection(),
-        NH₄ = default_tracer_advection(),
-        P = default_tracer_advection(),
-        Z = default_tracer_advection(),
-        sPOM = default_tracer_advection(),
-        bPOM = default_tracer_advection(),
-        DOM = default_tracer_advection(),
-    ),
-)
 setup_region_3d_OXYDEP() = setup_region(
     tracers = (:T, :S, :e, :C, :NUT, :P, :HET, :POM, :DOM, :O₂),
     initial_conditions = (
@@ -212,53 +197,4 @@ setup_region_3d_OXYDEP() = setup_region(
         DOM = WENO(),
         O₂ = WENO(),
     ),
-)
-setup_region_2d() = setup_region(
-    grid_callable! = grid_latitude_flat!,
-    grid_parameters = (
-        arch = GPU(),
-        Nx = 30,
-        Ny = 1,
-        Nz = 20,
-        halo = (1, 1, 1),
-        latitude = (43.177, 43.214),
-        longitude = (27.640, 27.947),
-        depth = 20,
-    ),
-    closure = ScalarDiffusivity(ν = 1e-5, κ = 1e-5),
-    tracer_advection = nothing,
-    momentum_advection = nothing,
-    tracers = (:T, :S),
-    # Coriolis
-    coriolis = nothing,
-    # Forcing
-    forcing_callable = NamedTuple,
-    forcing_args = (),
-    # Boundary conditions
-    bc_callable = bc_ocean,
-    bc_args = (grid_ref, 0),
-)
-setup_region_column() = setup_region(
-    grid_callable! = grid_column!,
-    grid_parameters = (
-        arch = GPU(),
-        Nz = 20,
-        halo = (3, 3, 3),
-        latitude = 43.177,
-        longitude = 27.640,
-        depth = 20,
-        h = 20,
-    ),
-    closure = ScalarDiffusivity(ν = 1e-5, κ = 1e-5),
-    tracer_advection = nothing,
-    momentum_advection = nothing,
-    tracers = (:T, :S),
-    # Coriolis
-    coriolis = FPlane(latitude = 43.177),
-    # Forcing
-    forcing_callable = NamedTuple,
-    forcing_args = (),
-    # Boundary conditions
-    bc_callable = bc_ocean,
-    bc_args = (grid_ref, 0),
 )
