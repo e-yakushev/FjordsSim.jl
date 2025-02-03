@@ -15,7 +15,8 @@
 using Oceananigans.Units: second, seconds, minute, minutes, hour, hours, day, days
 using Oceananigans.Utils: TimeInterval, IterationInterval
 using Oceananigans.Simulations: Callback, conjure_time_step_wizard!, run!
-using Oceananigans.OutputWriters: JLD2OutputWriter
+using Oceananigans.OutputWriters: JLD2OutputWriter, NetCDFOutputWriter
+using Oceanostics
 using FjordsSim: progress, coupled_hydrostatic_simulation
 
 include("setup.jl")
@@ -25,28 +26,39 @@ sim_setup = setup_region_3d_OXYDEP()
 
 coupled_simulation = coupled_hydrostatic_simulation(sim_setup)
 
-## Callbacks
-coupled_simulation.callbacks[:progress] = Callback(progress, IterationInterval(100))
-
 ## Set up output writers
 ocean_sim = coupled_simulation.model.ocean
+# coupled_simulation.callbacks[:progress] = Callback(progress, IterationInterval(100))
+ocean_sim.callbacks[:progress] = Callback(ProgressMessengers.TimedMessenger(), IterationInterval(100));
 ocean_model = ocean_sim.model
+# ke = KineticEnergy(ocean_model)
+# ε = KineticEnergyDissipationRate(ocean_model)
 
 prefix = joinpath(sim_setup.results_dir, "snapshots")
 ocean_sim.output_writers[:all] = JLD2OutputWriter(
-    ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
-    schedule = TimeInterval(6hours),
+    ocean_model,
+    merge(ocean_model.tracers, ocean_model.velocities);
+    schedule = TimeInterval(1hours),
     filename = "$prefix.jld2",
     overwrite_existing = true,
-    array_type=Array{Float32}
+    array_type = Array{Float32},
 )
+# prefix_debug = joinpath(sim_setup.results_dir, "snapshots_debug")
+# ocean_sim.output_writers[:netcdf_writer] = NetCDFOutputWriter(
+#     ocean_model,
+#     merge(ocean_model.tracers, ocean_model.velocities, (; ke, ε));
+#     schedule = TimeInterval(1minute),
+#     filename = "$prefix_debug.nc",
+#     overwrite_existing = true,
+#     array_type = Array{Float32},
+# );
 
 ## Spinning up the simulation
 # We use an adaptive time step that maintains the [CFL condition](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition) equal to 0.1.
 ocean_sim.stop_time = 10days
 coupled_simulation.stop_time = 10days
 
-conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=1.5minutes, max_change=1.01)
+conjure_time_step_wizard!(ocean_sim; cfl = 0.1, max_Δt = 1.5minutes, max_change = 1.01)
 run!(coupled_simulation)
 
 ## Running the simulation
@@ -55,5 +67,5 @@ run!(coupled_simulation)
 ocean_sim.stop_time = 355days
 coupled_simulation.stop_time = 355days
 
-conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=10minutes, max_change=1.01)
+conjure_time_step_wizard!(ocean_sim; cfl = 0.25, max_Δt = 10minutes, max_change = 1.01)
 run!(coupled_simulation)

@@ -7,7 +7,7 @@ using Oceananigans.Fields: set!
 using Oceananigans.TimeSteppers: tick!, Time
 using Oceananigans.OutputReaders: extract_field_time_series, update_field_time_series!
 using Oceananigans.Forcings: DiscreteForcing
-using Oceananigans.Units: second
+using Oceananigans.Units: second, seconds
 using ClimaOcean.OceanSeaIceModels: OceanSeaIceModel, MinimumTemperatureSeaIce
 using ClimaOcean.OceanSeaIceModels.CrossRealmFluxes: compute_atmosphere_ocean_fluxes!
 using ClimaOcean.DataWrangling.JRA55: JRA55_prescribed_atmosphere
@@ -87,7 +87,7 @@ function SetupModel(
     results_dir = joinpath(homedir(), "FjordsSim_results"),
 )
 
-    !isdir(results_dir) && mkdir(results_dir)
+    !isdir(results_dir) && mkpath(results_dir)
 
     SetupModel(
         grid_callable,

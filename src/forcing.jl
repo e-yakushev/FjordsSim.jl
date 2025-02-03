@@ -86,7 +86,7 @@ function forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, bac
     copyto!(interior(fts, :, :, :, :), data)
     fill_halo_regions!(fts)
 
-    λOpen = 1 / (1hours)  # Relaxation timescale [s⁻¹] Open boundary
+    λOpen = 1 / (12hours)  # Relaxation timescale [s⁻¹] Open boundary
     _forcing = Forcing(fts_tracer_forcing_func; discrete_form = true, parameters = (fts = fts, λOpen = λOpen))
 
     result = NamedTuple{(Symbol(var_name),)}((_forcing,))
