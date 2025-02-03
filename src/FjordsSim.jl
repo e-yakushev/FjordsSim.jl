@@ -32,6 +32,7 @@ include("BGCModels/BGCModels.jl")
 using .BGCModels: OXYDEP
 
 grid_ref = Ref{Any}(nothing)
+biogeochemistry_ref = Ref{Any}(nothing)
 
 mutable struct SetupModel
     grid_callable::Function
@@ -57,6 +58,7 @@ mutable struct SetupModel
     similarity_theory_args::Any
     biogeochemistry_callable::Any
     biogeochemistry_args::Any
+    biogeochemistry_ref::Ref
     results_dir::String
 end
 
@@ -83,7 +85,8 @@ function SetupModel(
     similarity_theory_callable,
     similarity_theory_args,
     biogeochemistry_callable,
-    biogeochemistry_args;
+    biogeochemistry_args,
+    biogeochemistry_ref;
     results_dir = joinpath(homedir(), "FjordsSim_results"),
 )
 
@@ -113,6 +116,7 @@ function SetupModel(
         similarity_theory_args,
         biogeochemistry_callable,
         biogeochemistry_args,
+        biogeochemistry_ref,
         results_dir,
     )
 end
@@ -128,9 +132,10 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     free_surface = sim_setup.free_surface_callable(sim_setup.free_surface_args...)
     coriolis = sim_setup.coriolis
     forcing = sim_setup.forcing_callable(sim_setup.forcing_args...)
-    boundary_conditions = sim_setup.bc_callable(sim_setup.bc_args...)
     biogeochemistry =
         safe_execute(sim_setup.biogeochemistry_callable)(sim_setup.biogeochemistry_args...)
+    sim_setup.biogeochemistry_ref[] = biogeochemistry
+    boundary_conditions = sim_setup.bc_callable(sim_setup.bc_args...)
 
     println("Start compiling HydrostaticFreeSurfaceModel")
     ## Model

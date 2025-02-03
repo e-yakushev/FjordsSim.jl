@@ -236,16 +236,16 @@ function bgh_oxydep_boundary_conditions(biogeochemistry, Nz)
     ) / Trel
     NUT_bottom = FluxBoundaryCondition(NUT_bottom_cond, discrete_form = true) #ValueBoundaryCondition(10.0)
 
-    w_P = biogeochemical_drift_velocity(biogeochemistry, Val(:P)).w[1, 1, 1]
-    @inline P_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_P * fields.P[i, j, 1]
+    w_P(i, j) = biogeochemical_drift_velocity(biogeochemistry, Val(:P)).w[i, j, 1]
+    @inline P_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_P(i, j) * fields.P[i, j, 1]
     P_bottom = FluxBoundaryCondition(P_bottom_cond, discrete_form = true)
 
-    w_HET = biogeochemical_drift_velocity(biogeochemistry, Val(:HET)).w[1, 1, 1]
-    @inline HET_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_HET * fields.HET[i, j, 1]
+    w_HET(i, j) = biogeochemical_drift_velocity(biogeochemistry, Val(:HET)).w[i, j, 1]
+    @inline HET_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_HET(i, j) * fields.HET[i, j, 1]
     HET_bottom = FluxBoundaryCondition(HET_bottom_cond, discrete_form = true)
 
-    w_POM = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[1, 1, 1]
-    @inline POM_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_POM * fields.POM[i, j, 1]
+    w_POM(i, j) = biogeochemical_drift_velocity(biogeochemistry, Val(:POM)).w[i, j, 1]
+    @inline POM_bottom_cond(i, j, grid, clock, fields) = @inbounds -bu * w_POM(i, j) * fields.POM[i, j, 1]
     POM_bottom = FluxBoundaryCondition(POM_bottom_cond, discrete_form = true)
 
     DOM_top = ValueBoundaryCondition(0.0)
@@ -328,8 +328,9 @@ function bc_varna(grid_ref, bottom_drag_coefficient)
     return bc
 end
 
-function bc_varna_bgh_oxydep(grid_ref, bottom_drag_coefficient, bgc_model)
+function bc_varna_bgh_oxydep(grid_ref, bottom_drag_coefficient, biogeochemistry_ref)
     Nz = grid_ref[].Nz
+    bgc_model = biogeochemistry_ref[]
     bc_varna_tuple = bc_varna(grid_ref, bottom_drag_coefficient)
     bc_bgh_oxydep_tuple = bgh_oxydep_boundary_conditions(bgc_model, Nz)
 
