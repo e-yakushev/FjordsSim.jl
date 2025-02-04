@@ -65,15 +65,18 @@ end
 
 function fts_tracer_forcing_func(i, j, k, grid, clock, fields, parameters)
     tr = @inbounds parameters.fts[i, j, k, Time(clock.time)]
+    λopen = @inbounds parameters.ftsλ[i, j, k, Time(clock.time)]
     condition = !(tr < -990.0)
-    radiation_term = -parameters.λOpen * (fields.T[i, j, k] - tr)
+    radiation_term = -λopen * (fields.T[i, j, k] - tr)
     return @inbounds ifelse(condition, radiation_term, 0)
 end
 
 function forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, backend)
     grid_size = size(grid)
     data, times = load_from_netcdf(; path = filepath, var_name, grid_size, time_indices_in_memory)
+    dataλ, times = load_from_netcdf(; path = filepath, var_name = var_name * "_lambda", grid_size, time_indices_in_memory)
     boundary_conditions = FieldBoundaryConditions(grid, (LX, LY, LZ))
+
     fts = FieldTimeSeries{LX,LY,LZ}(
         grid,
         times;
@@ -86,8 +89,19 @@ function forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, bac
     copyto!(interior(fts, :, :, :, :), data)
     fill_halo_regions!(fts)
 
-    λOpen = 1 / (12hours)  # Relaxation timescale [s⁻¹] Open boundary
-    _forcing = Forcing(fts_tracer_forcing_func; discrete_form = true, parameters = (fts = fts, λOpen = λOpen))
+    ftsλ = FieldTimeSeries{LX,LY,LZ}(
+        grid,
+        times;
+        backend,
+        time_indexing = Cyclical(),
+        boundary_conditions,
+        path = filepath,
+        name = var_name * "_lambda",
+    )
+    copyto!(interior(ftsλ, :, :, :, :), dataλ)
+    fill_halo_regions!(ftsλ)
+
+    _forcing = Forcing(fts_tracer_forcing_func; discrete_form = true, parameters = (fts = fts, ftsλ = ftsλ))
 
     result = NamedTuple{(Symbol(var_name),)}((_forcing,))
     return result
