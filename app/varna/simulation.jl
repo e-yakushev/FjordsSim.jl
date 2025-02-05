@@ -43,29 +43,13 @@ ocean_sim.output_writers[:all] = JLD2OutputWriter(
     overwrite_existing = true,
     array_type = Array{Float32},
 )
-# prefix_debug = joinpath(sim_setup.results_dir, "snapshots_debug")
-# ocean_sim.output_writers[:netcdf_writer] = NetCDFOutputWriter(
-#     ocean_model,
-#     merge(ocean_model.tracers, ocean_model.velocities, (; ke, ε));
-#     schedule = TimeInterval(1minute),
-#     filename = "$prefix_debug.nc",
-#     overwrite_existing = true,
-#     array_type = Array{Float32},
-# );
-
-## Spinning up the simulation
-# We use an adaptive time step that maintains the [CFL condition](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition) equal to 0.1.
-ocean_sim.stop_time = 10days
-coupled_simulation.stop_time = 10days
-
-conjure_time_step_wizard!(ocean_sim; cfl = 0.1, max_Δt = 1.5minutes, max_change = 1.01)
-run!(coupled_simulation)
 
 ## Running the simulation
-# This time, we set the CFL in the time_step_wizard to be 0.25 as this is the maximum recommended CFL to be
+# We use an adaptive time step that maintains the [CFL condition](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition)
+# We set the CFL in the time_step_wizard to be 0.25 as this is the maximum recommended CFL to be
 # used in conjunction with Oceananigans' hydrostatic time-stepping algorithm ([two step Adams-Bashfort](https://en.wikipedia.org/wiki/Linear_multistep_method))
-ocean_sim.stop_time = 355days
-coupled_simulation.stop_time = 355days
+ocean_sim.stop_time = 365days
+coupled_simulation.stop_time = 365days
 
 conjure_time_step_wizard!(ocean_sim; cfl = 0.25, max_Δt = 10minutes, max_change = 1.01)
 run!(coupled_simulation)
