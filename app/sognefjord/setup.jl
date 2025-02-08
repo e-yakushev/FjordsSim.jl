@@ -24,6 +24,7 @@ using FjordsSim:
     atmosphere_JRA55,
     biogeochemistry_LOBSTER,
     biogeochemistry_OXYDEP,
+    biogeochemistry_ref,
     SimilarityTheoryTurbulentFluxes
 
 const bottom_drag_coefficient = 0.003
@@ -151,7 +152,8 @@ function setup_region(;
         similarity_theory_callable,
         similarity_theory_args,
         biogeochemistry_callable,
-        biogeochemistry_args;
+        biogeochemistry_args,
+        biogeochemistry_ref;
         results_dir,
     )
 end
@@ -172,7 +174,7 @@ setup_region_3d_OXYDEP() = setup_region(
     biogeochemistry_callable = biogeochemistry_OXYDEP,
     biogeochemistry_args = (grid_ref, args_oxydep),
     bc_callable = bc_varna_bgh_oxydep,
-    bc_args = (grid_ref, bottom_drag_coefficient, biogeochemistry_OXYDEP),
+    bc_args = (grid_ref, bottom_drag_coefficient, biogeochemistry_ref),
     tracer_advection = (
         T = WENO(),
         S = WENO(),

@@ -16,26 +16,25 @@ using Oceananigans.Units: second, seconds, minute, minutes, hour, hours, day, da
 using Oceananigans.Utils: TimeInterval, IterationInterval
 using Oceananigans.Simulations: Callback, conjure_time_step_wizard!, run!
 using Oceananigans.OutputWriters: JLD2OutputWriter
+using Oceanostics
 using FjordsSim: progress, coupled_hydrostatic_simulation
 
 include("setup.jl")
 
 ## Model Setup
-sim_setup = setup_region_3d_OXYDEP()
+sim_setup = setup_region_3d()
 
 coupled_simulation = coupled_hydrostatic_simulation(sim_setup)
 
-## Callbacks
-coupled_simulation.callbacks[:progress] = Callback(progress, IterationInterval(100))
-
 ## Set up output writers
 ocean_sim = coupled_simulation.model.ocean
+ocean_sim.callbacks[:progress] = Callback(ProgressMessengers.TimedMessenger(), IterationInterval(100));
 ocean_model = ocean_sim.model
 
 prefix = joinpath(sim_setup.results_dir, "snapshots")
 ocean_sim.output_writers[:all] = JLD2OutputWriter(
     ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
-    schedule = TimeInterval(6hours),
+    schedule = TimeInterval(1hours),
     filename = "$prefix.jld2",
     overwrite_existing = true,
     array_type=Array{Float32}

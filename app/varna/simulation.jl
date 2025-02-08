@@ -28,7 +28,6 @@ coupled_simulation = coupled_hydrostatic_simulation(sim_setup)
 
 ## Set up output writers
 ocean_sim = coupled_simulation.model.ocean
-# coupled_simulation.callbacks[:progress] = Callback(progress, IterationInterval(100))
 ocean_sim.callbacks[:progress] = Callback(ProgressMessengers.TimedMessenger(), IterationInterval(100));
 ocean_model = ocean_sim.model
 # ke = KineticEnergy(ocean_model)
