@@ -8,6 +8,7 @@ using ClimaOcean.OceanSimulations: u_immersed_bottom_drag, v_immersed_bottom_dra
 using Dates: DateTime, Year, Second
 using Statistics: mean
 using NCDatasets: Dataset
+using Adapt
 
 import Oceananigans.Fields: set!
 import Oceananigans.OutputReaders: new_backend
@@ -25,6 +26,43 @@ Base.summary(backend::NetCDFBackend) = string("JLD2Backend(", backend.start, ", 
 
 const NetCDFFTS = FlavorOfFTS{<:Any,<:Any,<:Any,<:Any,<:NetCDFBackend}
 LX, LY, LZ = Center, Center, Center
+
+# Variable names for restoreable data
+struct Temperature end
+struct Salinity end
+struct UVelocity end
+struct VVelocity end
+
+oceananigans_fieldname = Dict(:T => Temperature(), :S => Salinity(), :u => UVelocity(), :v => VVelocity())
+
+@inline Base.getindex(fields, i, j, k, ::Temperature) = @inbounds fields.T[i, j, k]
+@inline Base.getindex(fields, i, j, k, ::Salinity) = @inbounds fields.S[i, j, k]
+@inline Base.getindex(fields, i, j, k, ::UVelocity) = @inbounds fields.u[i, j, k]
+@inline Base.getindex(fields, i, j, k, ::VVelocity) = @inbounds fields.v[i, j, k]
+
+Base.summary(::Temperature) = "temperature"
+Base.summary(::Salinity) = "salinity"
+Base.summary(::UVelocity) = "u_velocity"
+Base.summary(::VVelocity) = "v_velocity"
+
+struct ForcingFromFile{FTS,V}
+    fts_value::FTS
+    fts_λ::FTS
+    variable_name::V
+end
+
+Adapt.adapt_structure(to, p::ForcingFromFile) =
+    ForcingFromFile(Adapt.adapt(to, p.fts_value), Adapt.adapt(to, p.fts_λ), Adapt.adapt(to, p.variable_name))
+
+@inline function (p::ForcingFromFile)(i, j, k, grid, clock, fields)
+    value = @inbounds p.fts_value[i, j, k, Time(clock.time)]
+    λopen = @inbounds p.fts_λ[i, j, k, Time(clock.time)]
+    condition = !(value < -990.0)
+    radiation_term = -λopen * (fields[i, j, k, p.variable_name] - value)
+    return @inbounds ifelse(condition, radiation_term, 0)
+end
+
+regularize_forcing(forcing::ForcingFromFile, field, field_name, model_field_names) = forcing
 
 function native_times_to_seconds(native_times, start_time = native_times[1])
     times = []
@@ -63,18 +101,11 @@ function set!(fts::NetCDFFTS, path::String = fts.path, name::String = fts.name)
     return nothing
 end
 
-function fts_tracer_forcing_func(i, j, k, grid, clock, fields, parameters)
-    tr = @inbounds parameters.fts[i, j, k, Time(clock.time)]
-    λopen = @inbounds parameters.ftsλ[i, j, k, Time(clock.time)]
-    condition = !(tr < -990.0)
-    radiation_term = -λopen * (fields.T[i, j, k] - tr)
-    return @inbounds ifelse(condition, radiation_term, 0)
-end
-
 function forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, backend)
     grid_size = size(grid)
     data, times = load_from_netcdf(; path = filepath, var_name, grid_size, time_indices_in_memory)
-    dataλ, times = load_from_netcdf(; path = filepath, var_name = var_name * "_lambda", grid_size, time_indices_in_memory)
+    dataλ, times =
+        load_from_netcdf(; path = filepath, var_name = var_name * "_lambda", grid_size, time_indices_in_memory)
     boundary_conditions = FieldBoundaryConditions(grid, (LX, LY, LZ))
 
     fts = FieldTimeSeries{LX,LY,LZ}(
@@ -101,8 +132,8 @@ function forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, bac
     copyto!(interior(ftsλ, :, :, :, :), dataλ)
     fill_halo_regions!(ftsλ)
 
-    _forcing = Forcing(fts_tracer_forcing_func; discrete_form = true, parameters = (fts = fts, ftsλ = ftsλ))
-
+    field_name = oceananigans_fieldname[Symbol(var_name)]
+    _forcing = ForcingFromFile(fts, ftsλ, field_name)
     result = NamedTuple{(Symbol(var_name),)}((_forcing,))
     return result
 end
