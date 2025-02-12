@@ -25,23 +25,35 @@ Base.length(backend::NetCDFBackend) = backend.length
 Base.summary(backend::NetCDFBackend) = string("JLD2Backend(", backend.start, ", ", backend.length, ")")
 
 const NetCDFFTS = FlavorOfFTS{<:Any,<:Any,<:Any,<:Any,<:NetCDFBackend}
-LX, LY, LZ = Center, Center, Center
+DATA_LOCATION = Dict(
+    :T => (Center, Center, Center),
+    :S => (Center, Center, Center),
+    :C => (Center, Center, Center),
+    :sea_ice_thickness => (Center, Center, Nothing),
+    :sea_ice_area_fraction => (Center, Center, Nothing),
+    :net_heat_flux => (Center, Center, Nothing),
+    :u => (Face, Center, Center),
+    :v => (Center, Face, Center),
+)
 
 # Variable names for restoreable data
 struct Temperature end
 struct Salinity end
+struct Contaminant end
 struct UVelocity end
 struct VVelocity end
 
-oceananigans_fieldname = Dict(:T => Temperature(), :S => Salinity(), :u => UVelocity(), :v => VVelocity())
+oceananigans_fieldname = Dict(:T => Temperature(), :S => Salinity(), :C => Contaminant(), :u => UVelocity(), :v => VVelocity())
 
 @inline Base.getindex(fields, i, j, k, ::Temperature) = @inbounds fields.T[i, j, k]
 @inline Base.getindex(fields, i, j, k, ::Salinity) = @inbounds fields.S[i, j, k]
+@inline Base.getindex(fields, i, j, k, ::Contaminant) = @inbounds fields.C[i, j, k]
 @inline Base.getindex(fields, i, j, k, ::UVelocity) = @inbounds fields.u[i, j, k]
 @inline Base.getindex(fields, i, j, k, ::VVelocity) = @inbounds fields.v[i, j, k]
 
 Base.summary(::Temperature) = "temperature"
 Base.summary(::Salinity) = "salinity"
+Base.summary(::Contaminant) = "contaminant"
 Base.summary(::UVelocity) = "u_velocity"
 Base.summary(::VVelocity) = "v_velocity"
 
@@ -57,7 +69,7 @@ Adapt.adapt_structure(to, p::ForcingFromFile) =
 @inline function (p::ForcingFromFile)(i, j, k, grid, clock, fields)
     value = @inbounds p.fts_value[i, j, k, Time(clock.time)]
     λopen = @inbounds p.fts_λ[i, j, k, Time(clock.time)]
-    condition = !(value < -990.0)
+    condition = value > -990.0 && λopen > -990.0
     radiation_term = -λopen * (fields[i, j, k, p.variable_name] - value)
     return @inbounds ifelse(condition, radiation_term, 0)
 end
@@ -106,6 +118,7 @@ function forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, bac
     data, times = load_from_netcdf(; path = filepath, var_name, grid_size, time_indices_in_memory)
     dataλ, times =
         load_from_netcdf(; path = filepath, var_name = var_name * "_lambda", grid_size, time_indices_in_memory)
+    LX, LY, LZ = DATA_LOCATION[Symbol(var_name)]
     boundary_conditions = FieldBoundaryConditions(grid, (LX, LY, LZ))
 
     fts = FieldTimeSeries{LX,LY,LZ}(
@@ -145,16 +158,22 @@ function forcing_from_file(grid_ref, filepath, tracers)
         grid.underlying_grid.Ny == ds.dim["Ny"] &&
         grid.underlying_grid.Nz == ds.dim["Nz"] ||
         throw(DimensionMismatch("forcing file dimensions not equal to grid dimensions"))
-    tracer_names = map(String, tracers) ∩ keys(ds)
+    forcing_variables_names = (map(String, tracers) ∪ ("u", "v")) ∩ keys(ds)
     close(ds)
 
     backend = NetCDFBackend(2)
     time_indices_in_memory = (1, length(backend))
-    result = mapreduce(
-        var_name -> forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, backend),
-        merge,
-        tracer_names,
-    )
+    # result = mapreduce(
+    #     var_name -> forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, backend),
+    #     merge,
+    #     forcing_variables_names,
+    # )
+    result = NamedTuple()
+    for var_name in forcing_variables_names
+        output = forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, backend)
+        merge(result, output)
+    end
+
     return result
 end
 

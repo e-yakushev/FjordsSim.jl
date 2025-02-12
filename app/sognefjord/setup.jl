@@ -94,11 +94,13 @@ function setup_region(;
     coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
     # Forcing
     forcing_callable = forcing_from_file,
+    # forcing_callable = NamedTuple,
     forcing_args = (
         grid_ref = grid_ref,
         filepath = joinpath(homedir(), "FjordsSim_data", "sognefjord", "Sogn_bry800.nc"),
         tracers = tracers,
     ),
+    # forcing_args = (),
     # Boundary conditions
     bc_callable = bc_ocean,
     bc_args = (grid_ref, bottom_drag_coefficient),
