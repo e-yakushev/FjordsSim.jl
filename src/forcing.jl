@@ -2,7 +2,7 @@ using Oceananigans.OutputReaders: FieldTimeSeries, Cyclical, AbstractInMemoryBac
 using Oceananigans.BoundaryConditions: fill_halo_regions!
 using Oceananigans.Fields: interior
 using Oceananigans.Forcings: Forcing
-using Oceananigans.Grids: Center
+using Oceananigans.Grids: Center, Face, nodes
 using Oceananigans.Units: hours
 using ClimaOcean.OceanSimulations: u_immersed_bottom_drag, v_immersed_bottom_drag
 using Dates: DateTime, Year, Second
@@ -43,7 +43,8 @@ struct Contaminant end
 struct UVelocity end
 struct VVelocity end
 
-oceananigans_fieldname = Dict(:T => Temperature(), :S => Salinity(), :C => Contaminant(), :u => UVelocity(), :v => VVelocity())
+oceananigans_fieldname =
+    Dict(:T => Temperature(), :S => Salinity(), :C => Contaminant(), :u => UVelocity(), :v => VVelocity())
 
 @inline Base.getindex(fields, i, j, k, ::Temperature) = @inbounds fields.T[i, j, k]
 @inline Base.getindex(fields, i, j, k, ::Salinity) = @inbounds fields.S[i, j, k]
@@ -66,7 +67,13 @@ end
 Adapt.adapt_structure(to, p::ForcingFromFile) =
     ForcingFromFile(Adapt.adapt(to, p.fts_value), Adapt.adapt(to, p.fts_λ), Adapt.adapt(to, p.variable_name))
 
-@inline function (p::ForcingFromFile)(i, j, k, grid, clock, fields)
+on_architecture(to, forcing::ForcingFromFile) = ForcingFromFile(
+    on_architecture(to, forcing.fts_value),
+    on_architecture(to, forcing.fts_λ),
+    on_architecture(to, forcing.variable_name),
+)
+
+@inline function (p::ForcingFromFile{FTS,V})(i, j, k, grid, clock, fields) where {FTS,V}
     value = @inbounds p.fts_value[i, j, k, Time(clock.time)]
     λopen = @inbounds p.fts_λ[i, j, k, Time(clock.time)]
     condition = value > -990.0 && λopen > -990.0
@@ -114,11 +121,13 @@ function set!(fts::NetCDFFTS, path::String = fts.path, name::String = fts.name)
 end
 
 function forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, backend)
-    grid_size = size(grid)
+    LX, LY, LZ = DATA_LOCATION[Symbol(var_name)]
+    grid_size_tupled = size.(nodes(grid, (LX(), LY(), LZ())))
+    grid_size = Tuple(x[1] for x in grid_size_tupled)
+
     data, times = load_from_netcdf(; path = filepath, var_name, grid_size, time_indices_in_memory)
     dataλ, times =
         load_from_netcdf(; path = filepath, var_name = var_name * "_lambda", grid_size, time_indices_in_memory)
-    LX, LY, LZ = DATA_LOCATION[Symbol(var_name)]
     boundary_conditions = FieldBoundaryConditions(grid, (LX, LY, LZ))
 
     fts = FieldTimeSeries{LX,LY,LZ}(
@@ -163,16 +172,16 @@ function forcing_from_file(grid_ref, filepath, tracers)
 
     backend = NetCDFBackend(2)
     time_indices_in_memory = (1, length(backend))
-    # result = mapreduce(
-    #     var_name -> forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, backend),
-    #     merge,
-    #     forcing_variables_names,
-    # )
-    result = NamedTuple()
-    for var_name in forcing_variables_names
-        output = forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, backend)
-        merge(result, output)
-    end
+    result = mapreduce(
+        var_name -> forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, backend),
+        merge,
+        forcing_variables_names,
+    )
+    # result = NamedTuple()
+    # for var_name in forcing_variables_names
+    #     output = forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, backend)
+    #     merge(result, output)
+    # end
 
     return result
 end
