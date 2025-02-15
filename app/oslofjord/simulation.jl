@@ -12,40 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-using Printf
-using FileIO
-using JLD2
+using Oceananigans.Units: second, seconds, minute, minutes, hour, hours, day, days
+using Oceananigans.Utils: TimeInterval, IterationInterval
+using Oceananigans.Simulations: Callback, conjure_time_step_wizard!, run!
+using Oceananigans.OutputWriters: JLD2OutputWriter
+using Oceanostics
+using FjordsSim: progress, coupled_hydrostatic_simulation
 
 include("setup.jl")
 
-using .FjordsSim: progress, coupled_hydrostatic_simulation
-
 ## Model Setup
-sim_setup = setup_region()
+sim_setup = setup_region_3d()
 
 coupled_simulation = coupled_hydrostatic_simulation(sim_setup)
 
-## Callbacks
-coupled_simulation.callbacks[:progress] = Callback(progress, IterationInterval(100))
-
 ## Set up output writers
 ocean_sim = coupled_simulation.model.ocean
+ocean_sim.callbacks[:progress] = Callback(ProgressMessengers.TimedMessenger(), IterationInterval(100));
 ocean_model = ocean_sim.model
-surface_prefix = joinpath(homedir(), "FjordsSim_results", "oslo", "oslo_surface_snapshots")
-ocean_sim.output_writers[:surface] = JLD2OutputWriter(
-    ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
-    schedule = TimeInterval(1hour),
-    filename = "$surface_prefix.jld2",
-    indices=(:, :, grid[].Nz),
-    overwrite_existing = true,
-    array_type=Array{Float32}
-)
 
-profile_prefix = joinpath(homedir(), "FjordsSim_results", "oslo", "oslo_snapshots")
-ocean_sim.output_writers[:profile] = JLD2OutputWriter(
+prefix = joinpath(sim_setup.results_dir, "snapshots")
+ocean_sim.output_writers[:all] = JLD2OutputWriter(
     ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
-    schedule = TimeInterval(1day),
-    filename = "$profile_prefix.jld2",
+    schedule = TimeInterval(1hours),
+    filename = "$prefix.jld2",
     overwrite_existing = true,
     array_type=Array{Float32}
 )
@@ -54,6 +44,7 @@ ocean_sim.output_writers[:profile] = JLD2OutputWriter(
 # We use an adaptive time step that maintains the [CFL condition](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition) equal to 0.1.
 ocean_sim.stop_time = 10days
 coupled_simulation.stop_time = 10days
+
 conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=1.5minutes, max_change=1.01)
 run!(coupled_simulation)
 
@@ -62,5 +53,6 @@ run!(coupled_simulation)
 # used in conjunction with Oceananigans' hydrostatic time-stepping algorithm ([two step Adams-Bashfort](https://en.wikipedia.org/wiki/Linear_multistep_method))
 ocean_sim.stop_time = 355days
 coupled_simulation.stop_time = 355days
+
 conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=10minutes, max_change=1.01)
 run!(coupled_simulation)

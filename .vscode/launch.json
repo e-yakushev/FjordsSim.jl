@@ -27,6 +27,16 @@
         {
             "type": "julia",
             "request": "launch",
+            "name": "Oslofjord simulation",
+            "program": "${workspaceFolder}/app/oslofjord/simulation.jl",
+            "stopOnEntry": false,
+            "juliaAdditionalArgs": [
+                "-O0"
+            ]
+        },
+        {
+            "type": "julia",
+            "request": "launch",
             "name": "Run active Julia file",
             "program": "${file}",
             "stopOnEntry": false,
