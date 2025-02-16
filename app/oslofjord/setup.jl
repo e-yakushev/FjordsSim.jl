@@ -68,7 +68,7 @@ function setup_region(;
     grid_args = (
         arch = GPU(),
         halo = (7, 7, 7),
-        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF160_inner_bathymetry.jld2"),
+        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_66to440_bathymetry.jld2"),
         latitude = (59.1, 59.98),
         longitude = (10.2, 10.85),
     ),
@@ -97,7 +97,7 @@ function setup_region(;
     # forcing_callable = NamedTuple,
     forcing_args = (
         grid_ref = grid_ref,
-        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF160_inner_forcing.nc"),
+        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_66to440_forcing.nc"),
         tracers = tracers,
     ),
     # forcing_args = (),
