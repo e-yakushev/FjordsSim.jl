@@ -16,6 +16,7 @@ using FjordsSim:
     grid_ref,
     forcing_from_file,
     bc_varna_bgh_oxydep,
+    bc_lobster,
     bgh_oxydep_boundary_conditions,
     bc_varna,
     bc_ocean,
@@ -212,6 +213,8 @@ setup_region_3d_LOBSTER() = setup_region(
     similarity_theory_args = (nothing,),
     biogeochemistry_callable = biogeochemistry_LOBSTER,
     biogeochemistry_args = (grid_ref,),
+    bc_callable = bc_lobster,
+    bc_args = (grid_ref, bottom_drag_coefficient),
     tracer_advection = (
         T = WENO(),
         S = WENO(),
