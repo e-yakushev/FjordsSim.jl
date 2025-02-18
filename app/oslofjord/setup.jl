@@ -68,7 +68,7 @@ function setup_region(;
     grid_args = (
         arch = GPU(),
         halo = (7, 7, 7),
-        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_66to440_bathymetry.jld2"),
+        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_88to490_bathymetry.jld2"),
         latitude = (59.1, 59.98),
         longitude = (10.2, 10.85),
     ),
@@ -94,13 +94,11 @@ function setup_region(;
     coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
     # Forcing
     forcing_callable = forcing_from_file,
-    # forcing_callable = NamedTuple,
     forcing_args = (
         grid_ref = grid_ref,
-        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_66to440_forcing.nc"),
+        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_88to490_forcing.nc"),
         tracers = tracers,
     ),
-    # forcing_args = (),
     # Boundary conditions
     bc_callable = bc_ocean,
     bc_args = (grid_ref, bottom_drag_coefficient),
@@ -173,6 +171,11 @@ setup_region_3d_OXYDEP() = setup_region(
         O₂ = 350.0,
         DOM = 1.0,
     ),
+    atmosphere_callable = nothing,
+    atmosphere_args = (nothing,),
+    radiation = nothing,
+    similarity_theory_callable = nothing,
+    similarity_theory_args = (nothing,),
     biogeochemistry_callable = biogeochemistry_OXYDEP,
     biogeochemistry_args = (grid_ref, args_oxydep),
     bc_callable = bc_varna_bgh_oxydep,

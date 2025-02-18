@@ -22,7 +22,7 @@ using FjordsSim: progress, coupled_hydrostatic_simulation
 include("setup.jl")
 
 ## Model Setup
-sim_setup = setup_region_3d()
+sim_setup = setup_region_3d_OXYDEP()
 
 coupled_simulation = coupled_hydrostatic_simulation(sim_setup)
 

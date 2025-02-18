@@ -28,29 +28,52 @@ const NetCDFFTS = FlavorOfFTS{<:Any,<:Any,<:Any,<:Any,<:NetCDFBackend}
 DATA_LOCATION = Dict(
     :T => (Center, Center, Center),
     :S => (Center, Center, Center),
-    :C => (Center, Center, Center),
-    :sea_ice_thickness => (Center, Center, Nothing),
-    :sea_ice_area_fraction => (Center, Center, Nothing),
-    :net_heat_flux => (Center, Center, Nothing),
     :u => (Face, Center, Center),
     :v => (Center, Face, Center),
+    :C => (Center, Center, Center),
+    :NUT => (Center, Center, Center),
+    :P => (Center, Center, Center),
+    :HET => (Center, Center, Center),
+    :O₂ => (Center, Center, Center),
+    :DOM => (Center, Center, Center),
 )
 
 # Variable names for restoreable data
 struct Temperature end
 struct Salinity end
-struct Contaminant end
 struct UVelocity end
 struct VVelocity end
+struct Contaminant end
+struct OXYDEP_NUT end
+struct OXYDEP_PHY end
+struct OXYDEP_HET end
+struct OXYDEP_O₂ end
+struct OXYDEP_DOM end
 
 oceananigans_fieldname =
-    Dict(:T => Temperature(), :S => Salinity(), :C => Contaminant(), :u => UVelocity(), :v => VVelocity())
+    Dict(
+        :T => Temperature(), 
+        :S => Salinity(), 
+        :u => UVelocity(), 
+        :v => VVelocity(),
+        :C => Contaminant(), 
+        :NUT => OXYDEP_NUT(), 
+        :P => OXYDEP_PHY(), 
+        :HET => OXYDEP_HET(), 
+        :O₂ => OXYDEP_O₂(), 
+        :DOM => OXYDEP_DOM(), 
+    )
 
 @inline Base.getindex(fields, i, j, k, ::Temperature) = @inbounds fields.T[i, j, k]
 @inline Base.getindex(fields, i, j, k, ::Salinity) = @inbounds fields.S[i, j, k]
-@inline Base.getindex(fields, i, j, k, ::Contaminant) = @inbounds fields.C[i, j, k]
 @inline Base.getindex(fields, i, j, k, ::UVelocity) = @inbounds fields.u[i, j, k]
 @inline Base.getindex(fields, i, j, k, ::VVelocity) = @inbounds fields.v[i, j, k]
+@inline Base.getindex(fields, i, j, k, ::Contaminant) = @inbounds fields.C[i, j, k]
+@inline Base.getindex(fields, i, j, k, ::OXYDEP_NUT) = @inbounds fields.NUT[i, j, k]
+@inline Base.getindex(fields, i, j, k, ::OXYDEP_PHY) = @inbounds fields.P[i, j, k]
+@inline Base.getindex(fields, i, j, k, ::OXYDEP_HET) = @inbounds fields.HET[i, j, k]
+@inline Base.getindex(fields, i, j, k, ::OXYDEP_O₂) = @inbounds fields.O₂[i, j, k]
+@inline Base.getindex(fields, i, j, k, ::OXYDEP_DOM) = @inbounds fields.DOM[i, j, k]
 
 Base.summary(::Temperature) = "temperature"
 Base.summary(::Salinity) = "salinity"
@@ -177,11 +200,6 @@ function forcing_from_file(grid_ref, filepath, tracers)
         merge,
         forcing_variables_names,
     )
-    # result = NamedTuple()
-    # for var_name in forcing_variables_names
-    #     output = forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, backend)
-    #     merge(result, output)
-    # end
 
     return result
 end
