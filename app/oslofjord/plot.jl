@@ -52,6 +52,12 @@ PHY = FieldTimeSeries("$filename.jld2", "P")
 HET = FieldTimeSeries("$filename.jld2", "HET")
 DOM = FieldTimeSeries("$filename.jld2", "DOM")
 POM = FieldTimeSeries("$filename.jld2", "POM")
+P = FieldTimeSeries("$filename.jld2", "P")
+Z = FieldTimeSeries("$filename.jld2", "Z")
+NO₃ = FieldTimeSeries("$filename.jld2", "NO₃")
+NH₄ = FieldTimeSeries("$filename.jld2", "NH₄")
+DIC = FieldTimeSeries("$filename.jld2", "DIC")
+Alk = FieldTimeSeries("$filename.jld2", "Alk")
 
 grid = jldopen("$filename.jld2")["grid"]
 Nz = grid["underlying_grid"]["Nz"]
@@ -62,6 +68,11 @@ record_variable(u, "u velocity surface", Nz, u.times, folder, (300, 700); colorr
 record_variable(v, "v velocity surface", Nz, v.times, folder, (300, 700); colorrange = (-1, 1))
 record_variable(NUT, "NUT surface", Nz, v.times, folder, (300, 700); colorrange = (0, 5))
 record_variable(PHY, "PHY surface", Nz, v.times, folder, (300, 700); colorrange = (0, 5))
+record_variable(P, "P surface", Nz, v.times, folder, (300, 700); colorrange = (0, 1))
+record_variable(Z, "Z surface", Nz, v.times, folder, (300, 700); colorrange = (0, 1))
+record_variable(NO₃, "NO₃ surface", Nz, v.times, folder, (300, 700); colorrange = (0, 20))
+record_variable(DIC, "DIC surface", Nz, v.times, folder, (300, 700); colorrange = (2230, 2270))
+record_variable(Alk, "Alk surface", Nz, v.times, folder, (300, 700); colorrange = (2300, 2500))
 
 record_variable(T, "temperature bottom", 1, T.times, folder, (300, 700); colorrange = (2, 10))
 record_variable(S, "salinity bottom", 1, S.times, folder, (300, 700); colorrange = (30, 37))
