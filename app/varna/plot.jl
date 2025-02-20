@@ -9,7 +9,6 @@ using FjordsSim:
     record_surface_speed,
     record_horizontal_tracer,
     plot_ztime,
-    plot_bottom_tracer,
     record_bottom_tracer,
     record_vertical_diff
 
@@ -28,35 +27,10 @@ POM = FieldTimeSeries("$filename.jld2", "POM")
 C = FieldTimeSeries("$filename.jld2", "C")
 times = T.times
 
-# filename10 = joinpath(folder, "varna_snapshotsDOM10")
-# filename20 = joinpath(folder, "varna_snapshots2024-11-19")
-
-# O₂10 =  FieldTimeSeries("$filename10.jld2", "O₂")[:,:,:,1:2:end]
-# O₂20 =  FieldTimeSeries("$filename20.jld2", "O₂")
-
-
-# O₂diff = O₂10 .- O₂20
-
 grid = jldopen("$filename.jld2")["grid"]
 Nz = grid["underlying_grid"]["Nz"]
 
-
-# bottom_z evaluation
-bottom_z = ones(Int, size(O₂, 1), size(O₂, 2))
-for i = 1:size(O₂, 1)
-    for j = 1:size(O₂, 2)
-        for k = size(O₂, 3):-1:1  # Loop backwards to find the latest non-zero
-            if O₂[i, j, k, 1] == 0
-                bottom_z[i, j] = k
-                if k != Nz
-                    bottom_z[i, j] = k + 1
-                end
-                break
-            end
-        end
-    end
-end
-
+record_bottom_tracer(O₂, "Oxygen", Nz, O₂.times, folder)
 
 println(keys(grid["underlying_grid"]))
 println(grid["underlying_grid"]["Δyᶠᶜᵃ"])
@@ -65,18 +39,9 @@ println(grid["underlying_grid"]["Δyᶠᶜᵃ"])
 # znodes(grid["underlying_grid"], with_halos=false)
 z = grid["underlying_grid"]["zᵃᵃᶜ"][8:Nz+7]
 
-# z = extract_z_faces(grid)
-
 plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
 
-# HORIZONTAL
-# plot_1d_phys(T, S, z, times, folder)
-
-# plot_bottom_oxygen(O₂, bottom_z, 1000 , folder)
-
 record_surface_speed(u, v, Nz, times, folder)
-
-# record_bottom_oxygen(O₂, times, bottom_z, folder)
 
 record_horizontal_tracer(
     C,
@@ -242,8 +207,3 @@ record_vertical_tracer(
     colorrange = (100, 350),
     colormap = :turbo,
 )
-
-# record_vertical_diff(
-#     O₂diff, z, 18, times, folder, "O2profile_diff", "O₂ (DOM=10) - O₂ (DOM=20)",
-#     colorrange=(-200, 200), colormap=:balance,
-#         )
