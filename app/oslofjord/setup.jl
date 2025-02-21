@@ -10,9 +10,7 @@ using ClimaOcean.OceanSimulations: default_momentum_advection, default_tracer_ad
 using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 using FjordsSim:
     SetupModel,
-    grid_from_bathymetry_file,
-    grid_latitude_flat!,
-    grid_column!,
+    grid_from_nc,
     grid_ref,
     forcing_from_file,
     bc_varna_bgh_oxydep,
@@ -65,13 +63,11 @@ args_oxydep = (
 
 function setup_region(;
     # Grid
-    grid_callable = grid_from_bathymetry_file,
+    grid_callable = grid_from_nc,
     grid_args = (
         arch = GPU(),
         halo = (7, 7, 7),
-        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_88to490_bathymetry.jld2"),
-        latitude = (59.1, 59.98),
-        longitude = (10.2, 10.85),
+        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_105to232_bathymetry_v2.nc"),
     ),
     # Buoyancy
     buoyancy = SeawaterBuoyancy(;
