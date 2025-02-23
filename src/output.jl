@@ -145,6 +145,45 @@ function record_vertical_tracer(
     end
 end
 
+function record_vertical_tracer_points(
+    tracer,
+    depth,
+    indices::Vector{Tuple{Int, Int}},  # List of (ix, iy) pairs
+    times,
+    folder,
+    name,
+    label;
+    colorrange = (-1, 30),
+    colormap = :magma,
+)
+
+    
+    Nt = length(times)
+    iter = Observable(Nt)
+
+    Ti = @lift begin
+        # Collect slices from all given (ix, iy) points
+        slices = [interior(tracer[$iter], ix, iy, :) for (ix, iy) in indices]
+        Ti = hcat(slices...)  # Stack slices
+        Ti[Ti.==0] .= NaN
+        Ti = Ti'
+        Ti
+    end
+
+    xs = 1:size(indices)[1] # get x-values for x-axis
+    fig = Figure(size = (1000, 400))
+
+    title = @lift label * " at " * prettytime(times[$iter])
+    ax = Axis(fig[1, 1]; title = title, transect_axis_kwargs...)
+    hm = heatmap!(ax, xs, depth, Ti, colorrange = colorrange, colormap = colormap)
+    cb = Colorbar(fig[0, 1], hm, vertical = false, label = label)
+    # hidedecorations!(ax)
+
+    record(fig, joinpath(folder, "$(name).mp4"), 1:Nt, framerate = framerate) do i
+        iter[] = i
+    end
+end
+
 function record_vertical_diff(
     tracer,
     depth,
