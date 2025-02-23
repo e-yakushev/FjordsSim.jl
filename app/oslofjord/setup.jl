@@ -10,12 +10,11 @@ using ClimaOcean.OceanSimulations: default_momentum_advection, default_tracer_ad
 using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 using FjordsSim:
     SetupModel,
-    grid_from_bathymetry_file,
-    grid_latitude_flat!,
-    grid_column!,
+    grid_from_nc,
     grid_ref,
     forcing_from_file,
     bc_varna_bgh_oxydep,
+    bc_lobster,
     bgh_oxydep_boundary_conditions,
     bc_varna,
     bc_ocean,
@@ -64,13 +63,11 @@ args_oxydep = (
 
 function setup_region(;
     # Grid
-    grid_callable = grid_from_bathymetry_file,
+    grid_callable = grid_from_nc,
     grid_args = (
         arch = GPU(),
         halo = (7, 7, 7),
-        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_66to440_bathymetry.jld2"),
-        latitude = (59.1, 59.98),
-        longitude = (10.2, 10.85),
+        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_105to232_bathymetry_v2.nc"),
     ),
     # Buoyancy
     buoyancy = SeawaterBuoyancy(;
@@ -94,13 +91,11 @@ function setup_region(;
     coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
     # Forcing
     forcing_callable = forcing_from_file,
-    # forcing_callable = NamedTuple,
     forcing_args = (
         grid_ref = grid_ref,
-        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_66to440_forcing.nc"),
+        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_105to232_forcing_v2.nc"),
         tracers = tracers,
     ),
-    # forcing_args = (),
     # Boundary conditions
     bc_callable = bc_ocean,
     bc_args = (grid_ref, bottom_drag_coefficient),
@@ -160,7 +155,13 @@ function setup_region(;
     )
 end
 
-setup_region_3d() = setup_region()
+setup_region_3d() = setup_region(
+    atmosphere_callable = nothing,
+    atmosphere_args = (nothing,),
+    radiation = nothing,
+    similarity_theory_callable = nothing,
+    similarity_theory_args = (nothing,),
+)
 setup_region_3d_OXYDEP() = setup_region(
     tracers = (:T, :S, :e, :C, :NUT, :P, :HET, :POM, :DOM, :O₂),
     initial_conditions = (
@@ -173,6 +174,11 @@ setup_region_3d_OXYDEP() = setup_region(
         O₂ = 350.0,
         DOM = 1.0,
     ),
+    atmosphere_callable = nothing,
+    atmosphere_args = (nothing,),
+    radiation = nothing,
+    similarity_theory_callable = nothing,
+    similarity_theory_args = (nothing,),
     biogeochemistry_callable = biogeochemistry_OXYDEP,
     biogeochemistry_args = (grid_ref, args_oxydep),
     bc_callable = bc_varna_bgh_oxydep,
@@ -188,5 +194,45 @@ setup_region_3d_OXYDEP() = setup_region(
         POM = WENO(),
         DOM = WENO(),
         O₂ = WENO(),
+    ),
+)
+setup_region_3d_LOBSTER() = setup_region(
+    tracers = (:T, :S, :e, :NO₃, :NH₄, :P, :Z, :sPON, :bPON, :DON, :DIC, :Alk, :O₂, :sPOC, :bPOC, :DOC),
+    initial_conditions = (
+        T = 5.0,
+        S = 33.0,
+        P = 0.03, 
+        Z = 0.03, 
+        NO₃ = 4.0, 
+        NH₄ = 0.05, 
+        DIC = 2239.8, 
+        Alk = 2409.0
+    ),
+    atmosphere_callable = nothing,
+    atmosphere_args = (nothing,),
+    radiation = nothing,
+    similarity_theory_callable = nothing,
+    similarity_theory_args = (nothing,),
+    biogeochemistry_callable = biogeochemistry_LOBSTER,
+    biogeochemistry_args = (grid_ref,),
+    bc_callable = bc_lobster,
+    bc_args = (grid_ref, bottom_drag_coefficient),
+    tracer_advection = (
+        T = WENO(),
+        S = WENO(),
+        e = nothing,
+        NO₃ = WENO(),
+        NH₄ = WENO(),
+        P = WENO(),
+        Z = WENO(),
+        sPON = WENO(),
+        bPON = WENO(),
+        DON = WENO(),
+        DIC = WENO(),
+        Alk = WENO(),
+        O₂ = WENO(),
+        sPOC = WENO(),
+        bPOC = WENO(),
+        DOC = WENO(),
     ),
 )

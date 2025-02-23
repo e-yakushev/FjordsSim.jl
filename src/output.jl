@@ -5,12 +5,7 @@ using Oceananigans.Fields: Field, interior, compute!
 function plot_1d_phys(T, S, z, times, folder, x, y)
     fig = Figure(size = (1000, 400), fontsize = 20)
 
-    axis_kwargs = (
-        xlabel = "Time (days)",
-        ylabel = "z (m)",
-        xticks = (0:30:times[end]/days),
-        xtickformat = "{:.0f}",
-    )
+    axis_kwargs = (xlabel = "Time (days)", ylabel = "z (m)", xticks = (0:30:times[end]/days), xtickformat = "{:.0f}")
 
     Axis(fig[1, 1]; title = "T, ⁰C", axis_kwargs...)
     hmT = heatmap!(times / days, z, interior(T, x, y, :, :)', colormap = Reverse(:RdYlBu))
@@ -23,8 +18,7 @@ function plot_1d_phys(T, S, z, times, folder, x, y)
     save(joinpath(folder, "1d_phys.png"), fig)
 end
 
-map_axis_kwargs =
-    (xlabel = "Grid points, eastward direction", ylabel = "Grid points, northward direction")
+map_axis_kwargs = (xlabel = "Grid points, eastward direction", ylabel = "Grid points, northward direction")
 
 transect_axis_kwargs = (xlabel = "Grid points, eastward direction", ylabel = "z (m)")
 
@@ -56,39 +50,52 @@ function record_surface_speed(u, v, Nz, times, folder; colorrange = (0, 0.5), co
     end
 end
 
-function record_bottom_tracer(tracer, times, bottom_z, folder; colorrange = (-1, 350), colormap = :turbo)
+function record_bottom_tracer(
+    variable,
+    var_name,
+    Nz,
+    times,
+    folder;
+    colorrange = (-1, 350),
+    colormap = :turbo,
+    figsize = (1000, 400),
+)
 
-    Nt = length(times)
-    iter = Observable(Nt)
-
-    Ti = @lift begin
-        Ti = [tracer[i,j,bottom_z[i,j],$iter] for i in 1:size(tracer, 1), j in 1:size(tracer, 2)]
-        Ti[Ti.==0] .= NaN
-        Ti
+    # bottom_z evaluation
+    bottom_z = ones(Int, size(variable, 1), size(variable, 2))
+    for i = 1:size(variable, 1)
+        for j = 1:size(variable, 2)
+            for k = size(variable, 3):-1:1  # Loop backwards to find the latest non-zero
+                if variable[i, j, k, 1] == 0
+                    bottom_z[i, j] = k
+                    if k != Nz
+                        bottom_z[i, j] = k + 1
+                    end
+                    break
+                end
+            end
+        end
     end
 
-    title = @lift "bottom $(tracer), mmol/m³ at " * prettytime(times[$iter])
-    fig = Figure(size = (1000, 400))
+    iter = Observable(1)
+    f = @lift begin
+        x = [variable[i, j, bottom_z[i, j], $iter] for i = 1:size(variable, 1), j = 1:size(variable, 2)]
+        x[x.==0] .= NaN
+        x
+    end
+    title = @lift "bottom $(var_name), mmol/m³ at " * prettytime(times[$iter])
+    fig = Figure(size = figsize)
     ax = Axis(fig[1, 1]; title = title, map_axis_kwargs...)
-    hm = heatmap!(ax, Ti, colorrange = colorrange, colormap = colormap)
-    cb = Colorbar(fig[0, 1], hm, vertical = false, label = "$(tracer), mmol/m³")
-    # hidedecorations!(ax)
+    hm = heatmap!(ax, f, colorrange = colorrange, colormap = colormap)
+    cb = Colorbar(fig[0, 1], hm, vertical = false, label = "$(var_name), mmol/m³")
 
-    record(fig, joinpath(folder, "bottom_$(tracer)_movie.mp4"), 1:Nt, framerate = framerate) do i
+    Nt = length(times)
+    record(fig, joinpath(folder, "bottom_$(var_name).mp4"), 1:Nt, framerate = framerate) do i
         iter[] = i
     end
 end
 
-function record_horizontal_tracer(
-    tracer,
-    times,
-    folder,
-    name,
-    label;
-    colorrange = (-1, 30),
-    colormap = :magma,
-    iz = 10,
-)
+function record_horizontal_tracer(tracer, times, folder, name, label; colorrange = (-1, 30), colormap = :magma, iz = 10)
     Nt = length(times)
     iter = Observable(Nt)
 
@@ -110,17 +117,7 @@ function record_horizontal_tracer(
     end
 end
 
-function record_vertical_tracer(
-    tracer,
-    depth,
-    iy,
-    times,
-    folder,
-    name,
-    label;
-    colorrange = (-1, 30),
-    colormap = :magma,
-)
+function record_vertical_tracer(tracer, depth, iy, times, folder, name, label; colorrange = (-1, 30), colormap = :magma)
 
     xs = 1:size(tracer)[1] # get x-values for x-axis
     Nt = length(times)
@@ -157,7 +154,6 @@ function record_vertical_tracer_points(
     colormap = :magma,
 )
 
-    
     Nt = length(times)
     iter = Observable(Nt)
 
@@ -239,18 +235,8 @@ function plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, i, j, times, z, folder)
     Colorbar(fig[2, 4], hmHET)
 
     axPOM = Axis(fig[3, 3]; title = "POM, mmolN/m³", axis_kwargs...)
-    hmPOM = heatmap!(
-        times / days,
-        z,
-        interior(POM, i, j, :, :)',
-        colormap = Reverse(:greenbrownterrain),
-    ) #(:bilbao25))
-    hmPOM = heatmap!(
-        times / days,
-        z,
-        interior(POM, i, j, :, :)',
-        colormap = Reverse(:greenbrownterrain),
-    ) #(:bilbao25))
+    hmPOM = heatmap!(times / days, z, interior(POM, i, j, :, :)', colormap = Reverse(:greenbrownterrain)) #(:bilbao25))
+    hmPOM = heatmap!(times / days, z, interior(POM, i, j, :, :)', colormap = Reverse(:greenbrownterrain)) #(:bilbao25))
     Colorbar(fig[3, 4], hmPOM)
 
     axDOM = Axis(fig[3, 1]; title = "DOM, mmolN/m³", axis_kwargs...)
@@ -288,21 +274,15 @@ function plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, i, j, times, z, folder)
     save(joinpath(folder, "ztime.png"), fig)
 end
 
-function plot_bottom_tracer(tracer, bottom_z, time , folder)
-        
-    bottom_tracer = [tracer[i,j,bottom_z[i,j],time] for i in 1:size(tracer, 1), j in 1:size(tracer, 2)]
+function plot_bottom_tracer(tracer, bottom_z, time, folder)
+
+    bottom_tracer = [tracer[i, j, bottom_z[i, j], time] for i = 1:size(tracer, 1), j = 1:size(tracer, 2)]
     fig = Figure(size = (1000, 400), fontsize = 20)
 
-    axis_kwargs = (
-        xlabel = "Grid points, eastward direction",
-        ylabel = "Grid points, northward direction"
-    )
+    axis_kwargs = (xlabel = "Grid points, eastward direction", ylabel = "Grid points, northward direction")
 
     axOXY = Axis(fig[2, 1]; title = "$(tracer), mmol/m³, " * prettytime(time), axis_kwargs...)
-    hmOXY = heatmap!([i for i in 1:size(tracer, 1)],
-                     [j for j in 1:size(tracer, 2)],
-                     bottom_tracer, colormap = :turbo
-    )
+    hmOXY = heatmap!([i for i = 1:size(tracer, 1)], [j for j = 1:size(tracer, 2)], bottom_tracer, colormap = :turbo)
     Colorbar(fig[2, 2], hmOXY)
 
     save(joinpath(folder, "bottom_$(tracer).png"), fig)

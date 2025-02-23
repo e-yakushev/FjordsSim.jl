@@ -1,11 +1,11 @@
-using Oceananigans.BoundaryConditions:
-    FluxBoundaryCondition, ValueBoundaryCondition, FieldBoundaryConditions
+using Oceananigans.BoundaryConditions: FluxBoundaryCondition, ValueBoundaryCondition, FieldBoundaryConditions
 using Oceananigans.ImmersedBoundaries: ImmersedBoundaryCondition
 using Oceananigans.Operators: ℑxyᶜᶠᵃ, ℑxyᶠᶜᵃ
 using Oceananigans.Units: days
 using Oceananigans.Architectures: GPU, CPU
 using Oceananigans.Grids: Center, Face
 using ClimaOcean.OceanSimulations: u_quadratic_bottom_drag, v_quadratic_bottom_drag
+using OceanBioME: CarbonDioxideGasExchangeBoundaryCondition
 
 import Oceananigans.Biogeochemistry: biogeochemical_drift_velocity
 
@@ -64,18 +64,10 @@ function WindDependence(windspeed::Float64)::Float64
 end
 
 # OxygenSeaWaterFlux, [mmol m-2s-1], Oxygen Sea Water Flux 
-function OxygenSeaWaterFlux(
-    T::Float64,
-    S::Float64,
-    P::Float64,
-    O₂::Float64,
-    windspeed::Float64,
-)::Float64
+function OxygenSeaWaterFlux(T::Float64, S::Float64, P::Float64, O₂::Float64, windspeed::Float64)::Float64
     return (
-        WindDependence(windspeed) *
-        (OxygenSchmidtNumber(T) / 660.0)^(-0.5) *
-        (O₂ - oxygen_saturation(T, S, P)) *
-        0.24 / 86400.0        # 0.24 is to convert from [cm/h] to [m/day]  * 0.24  / 86400.0
+        WindDependence(windspeed) * (OxygenSchmidtNumber(T) / 660.0)^(-0.5) * (O₂ - oxygen_saturation(T, S, P)) * 0.24 /
+        86400.0        # 0.24 is to convert from [cm/h] to [m/day]  * 0.24  / 86400.0
     )
 end
 
@@ -127,10 +119,8 @@ end
 function wind_stress(arch, Nx, Ny)
     τˣ, τʸ = wind_data_hardcoded(arch, Nx, Ny)
 
-    u_wind_stress_bc =
-        FluxBoundaryCondition(surface_wind_stress, discrete_form = true, parameters = τˣ)
-    v_wind_stress_bc =
-        FluxBoundaryCondition(surface_wind_stress, discrete_form = true, parameters = τʸ)
+    u_wind_stress_bc = FluxBoundaryCondition(surface_wind_stress, discrete_form = true, parameters = τˣ)
+    v_wind_stress_bc = FluxBoundaryCondition(surface_wind_stress, discrete_form = true, parameters = τʸ)
     return u_wind_stress_bc, v_wind_stress_bc
 end
 
@@ -139,10 +129,8 @@ function bottom_drag()
     # Linear bottom drag:
     μ = 0.003 # Non dimensional
 
-    @inline speedᶠᶜᶜ(i, j, k, grid, fields) =
-        @inbounds sqrt(fields.u[i, j, k]^2 + ℑxyᶠᶜᵃ(i, j, k, grid, fields.v)^2)
-    @inline speedᶜᶠᶜ(i, j, k, grid, fields) =
-        @inbounds sqrt(fields.v[i, j, k]^2 + ℑxyᶜᶠᵃ(i, j, k, grid, fields.u)^2)
+    @inline speedᶠᶜᶜ(i, j, k, grid, fields) = @inbounds sqrt(fields.u[i, j, k]^2 + ℑxyᶠᶜᵃ(i, j, k, grid, fields.v)^2)
+    @inline speedᶜᶠᶜ(i, j, k, grid, fields) = @inbounds sqrt(fields.v[i, j, k]^2 + ℑxyᶜᶠᵃ(i, j, k, grid, fields.u)^2)
 
     @inline u_bottom_drag(i, j, grid, clock, fields, μ) =
         @inbounds -μ * fields.u[i, j, 1] * speedᶠᶜᶜ(i, j, 1, grid, fields)
@@ -262,8 +250,7 @@ function bgh_oxydep_boundary_conditions(biogeochemistry, Nz)
     phy_bcs = FieldBoundaryConditions(bottom = P_bottom)
     het_bcs = FieldBoundaryConditions(bottom = HET_bottom)
 
-    bc_oxydep =
-        (O₂ = oxy_bcs, NUT = nut_bcs, DOM = dom_bcs, POM = pom_bcs, P = phy_bcs, HET = het_bcs)
+    bc_oxydep = (O₂ = oxy_bcs, NUT = nut_bcs, DOM = dom_bcs, POM = pom_bcs, P = phy_bcs, HET = het_bcs)
 
     return bc_oxydep
 end
@@ -276,16 +263,10 @@ function bc_ocean(grid_ref, bottom_drag_coefficient)
     top_ocean_heat_flux = Jᵀ = Field{Center,Center,Nothing}(grid)
     top_salt_flux = Jˢ = Field{Center,Center,Nothing}(grid)
 
-    u_bot_bc = FluxBoundaryCondition(
-        u_quadratic_bottom_drag,
-        discrete_form = true,
-        parameters = bottom_drag_coefficient,
-    )
-    v_bot_bc = FluxBoundaryCondition(
-        v_quadratic_bottom_drag,
-        discrete_form = true,
-        parameters = bottom_drag_coefficient,
-    )
+    u_bot_bc =
+        FluxBoundaryCondition(u_quadratic_bottom_drag, discrete_form = true, parameters = bottom_drag_coefficient)
+    v_bot_bc =
+        FluxBoundaryCondition(v_quadratic_bottom_drag, discrete_form = true, parameters = bottom_drag_coefficient)
 
     bc_ocean = (
         u = FieldBoundaryConditions(top = FluxBoundaryCondition(τx), bottom = u_bot_bc),
@@ -303,16 +284,10 @@ function bc_varna(grid_ref, bottom_drag_coefficient)
     top_ocean_heat_flux = Jᵀ = Field{Center,Center,Nothing}(grid)
     top_salt_flux = Jˢ = Field{Center,Center,Nothing}(grid)
 
-    u_bot_bc = FluxBoundaryCondition(
-        u_quadratic_bottom_drag,
-        discrete_form = true,
-        parameters = bottom_drag_coefficient,
-    )
-    v_bot_bc = FluxBoundaryCondition(
-        v_quadratic_bottom_drag,
-        discrete_form = true,
-        parameters = bottom_drag_coefficient,
-    )
+    u_bot_bc =
+        FluxBoundaryCondition(u_quadratic_bottom_drag, discrete_form = true, parameters = bottom_drag_coefficient)
+    v_bot_bc =
+        FluxBoundaryCondition(v_quadratic_bottom_drag, discrete_form = true, parameters = bottom_drag_coefficient)
 
     # 42 is length of y ax
     # sin_flux(y, z, t) = @inbounds ifelse(z == grid.Nz, 0.05 * sin((2 * 3.14 / 42) * y) , 0)
@@ -335,4 +310,11 @@ function bc_varna_bgh_oxydep(grid_ref, bottom_drag_coefficient, biogeochemistry_
     bc_bgh_oxydep_tuple = bgh_oxydep_boundary_conditions(bgc_model, Nz)
 
     return merge(bc_varna_tuple, bc_bgh_oxydep_tuple)
+end
+
+function bc_lobster(grid_ref, bottom_drag_coefficient)
+    bc_general = bc_ocean(grid_ref, bottom_drag_coefficient)
+    CO₂_flux = CarbonDioxideGasExchangeBoundaryCondition()
+    bc_lobster = (DIC = FieldBoundaryConditions(top = CO₂_flux),)
+    return merge(bc_general, bc_lobster)
 end

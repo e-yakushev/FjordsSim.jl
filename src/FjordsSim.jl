@@ -11,6 +11,7 @@ using Oceananigans.Units: second, seconds
 using ClimaOcean.OceanSeaIceModels: OceanSeaIceModel, MinimumTemperatureSeaIce
 using ClimaOcean.OceanSeaIceModels.CrossRealmFluxes: compute_atmosphere_ocean_fluxes!
 using ClimaOcean.DataWrangling.JRA55: JRA55_prescribed_atmosphere
+using OceanBioME: LOBSTER
 
 import Oceananigans.Architectures: on_architecture
 import Oceananigans.TimeSteppers: time_step!, update_state!
@@ -168,17 +169,11 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     atmosphere = safe_execute(sim_setup.atmosphere_callable)(sim_setup.atmosphere_args...)
     println("Initialized atmosphere")
     radiation = sim_setup.radiation
-    similarity_theory = sim_setup.similarity_theory_callable(sim_setup.similarity_theory_args...)
+    similarity_theory = safe_execute(sim_setup.similarity_theory_callable)(sim_setup.similarity_theory_args...)
     coupled_model = OceanSeaIceModel(ocean_sim, sea_ice; atmosphere, radiation, similarity_theory)
     println("Initialized coupled model")
 
     coupled_simulation = Simulation(coupled_model; Δt)
-    # function atm_progress(sim)
-    #     atmosphere_message = @sprintf("max(Ta) = %.1f", maximum(sim.model.atmosphere.tracers.T))
-    #     @info atmosphere_message
-    #     return nothing
-    # end
-    # add_callback!(coupled_simulation, atm_progress, IterationInterval(100))
     println("Initialized coupled simulation")
     return coupled_simulation
 end
@@ -196,7 +191,14 @@ atmosphere_JRA55(arch, backend, grid_ref, start, stop) =
     JRA55_prescribed_atmosphere(arch, start:stop; backend, grid = grid_ref[])
 
 biogeochemistry_LOBSTER(grid_ref) =
-    LOBSTER(; grid = grid_ref[], carbonates = false, open_bottom = false)
+    LOBSTER(; 
+    grid = grid_ref[], 
+    surface_photosynthetically_active_radiation = PAR⁰,
+    carbonates = true, 
+    variable_redfield = true,
+    oxygen = true,
+    scale_negatives = true,
+    )
 
 biogeochemistry_OXYDEP(grid_ref, args_oxydep) = OXYDEP(;
     grid = grid_ref[],
