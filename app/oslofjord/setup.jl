@@ -93,7 +93,7 @@ function setup_region(;
     forcing_callable = forcing_from_file,
     forcing_args = (
         grid_ref = grid_ref,
-        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_88to490_forcing.nc"),
+        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_105to232_forcing_v2.nc"),
         tracers = tracers,
     ),
     # Boundary conditions
@@ -155,7 +155,13 @@ function setup_region(;
     )
 end
 
-setup_region_3d() = setup_region()
+setup_region_3d() = setup_region(
+    atmosphere_callable = nothing,
+    atmosphere_args = (nothing,),
+    radiation = nothing,
+    similarity_theory_callable = nothing,
+    similarity_theory_args = (nothing,),
+)
 setup_region_3d_OXYDEP() = setup_region(
     tracers = (:T, :S, :e, :C, :NUT, :P, :HET, :POM, :DOM, :O₂),
     initial_conditions = (
