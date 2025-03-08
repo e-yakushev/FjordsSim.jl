@@ -4,7 +4,7 @@ using Oceananigans.Fields: interior
 using Oceananigans.Forcings: Forcing
 using Oceananigans.Grids: Center, Face, nodes
 using Oceananigans.Units: hours
-using ClimaOcean.OceanSimulations: u_immersed_bottom_drag, v_immersed_bottom_drag
+using Oceananigans.Operators: Ax, Ay, Az, volume
 using Dates: DateTime, Year, Second
 using Statistics: mean
 using NCDatasets: Dataset
@@ -25,20 +25,8 @@ Base.length(backend::NetCDFBackend) = backend.length
 Base.summary(backend::NetCDFBackend) = string("JLD2Backend(", backend.start, ", ", backend.length, ")")
 
 const NetCDFFTS = FlavorOfFTS{<:Any,<:Any,<:Any,<:Any,<:NetCDFBackend}
-DATA_LOCATION = Dict(
-    :T => (Center, Center, Center),
-    :S => (Center, Center, Center),
-    :u => (Face, Center, Center),
-    :v => (Center, Face, Center),
-    :C => (Center, Center, Center),
-    :NUT => (Center, Center, Center),
-    :P => (Center, Center, Center),
-    :HET => (Center, Center, Center),
-    :O₂ => (Center, Center, Center),
-    :DOM => (Center, Center, Center),
-)
 
-# Variable names for restoreable data
+# Variable names for restoreable data (to be used in CUDA kernels)
 struct Temperature end
 struct Salinity end
 struct UVelocity end
@@ -50,20 +38,33 @@ struct OXYDEP_HET end
 struct OXYDEP_O₂ end
 struct OXYDEP_DOM end
 
-oceananigans_fieldname =
-    Dict(
-        :T => Temperature(), 
-        :S => Salinity(), 
-        :u => UVelocity(), 
-        :v => VVelocity(),
-        :C => Contaminant(), 
-        :NUT => OXYDEP_NUT(), 
-        :P => OXYDEP_PHY(), 
-        :HET => OXYDEP_HET(), 
-        :O₂ => OXYDEP_O₂(), 
-        :DOM => OXYDEP_DOM(), 
-    )
+const oceananigans_fieldname = Dict(
+    :T => Temperature(),
+    :S => Salinity(),
+    :u => UVelocity(),
+    :v => VVelocity(),
+    :C => Contaminant(),
+    :NUT => OXYDEP_NUT(),
+    :P => OXYDEP_PHY(),
+    :HET => OXYDEP_HET(),
+    :O₂ => OXYDEP_O₂(),
+    :DOM => OXYDEP_DOM(),
+)
 
+const DATA_LOCATION = Dict(
+    Temperature() => (Center, Center, Center),
+    Salinity() => (Center, Center, Center),
+    UVelocity() => (Face, Center, Center),
+    VVelocity() => (Center, Face, Center),
+    Contaminant() => (Center, Center, Center),
+    OXYDEP_NUT() => (Center, Center, Center),
+    OXYDEP_PHY() => (Center, Center, Center),
+    OXYDEP_HET() => (Center, Center, Center),
+    OXYDEP_O₂() => (Center, Center, Center),
+    OXYDEP_DOM() => (Center, Center, Center),
+)
+
+# fields[:VARIABLE] doesn't work in CUDA kernels
 @inline Base.getindex(fields, i, j, k, ::Temperature) = @inbounds fields.T[i, j, k]
 @inline Base.getindex(fields, i, j, k, ::Salinity) = @inbounds fields.S[i, j, k]
 @inline Base.getindex(fields, i, j, k, ::UVelocity) = @inbounds fields.u[i, j, k]
@@ -84,24 +85,40 @@ Base.summary(::VVelocity) = "v_velocity"
 struct ForcingFromFile{FTS,V}
     fts_value::FTS
     fts_λ::FTS
-    variable_name::V
+    fieldname::V
 end
 
 Adapt.adapt_structure(to, p::ForcingFromFile) =
-    ForcingFromFile(Adapt.adapt(to, p.fts_value), Adapt.adapt(to, p.fts_λ), Adapt.adapt(to, p.variable_name))
+    ForcingFromFile(Adapt.adapt(to, p.fts_value), Adapt.adapt(to, p.fts_λ), Adapt.adapt(to, p.fieldname))
 
 on_architecture(to, forcing::ForcingFromFile) = ForcingFromFile(
     on_architecture(to, forcing.fts_value),
     on_architecture(to, forcing.fts_λ),
-    on_architecture(to, forcing.variable_name),
+    on_architecture(to, forcing.fieldname),
 )
+
+# x direction
+function forcing_term_u(λ, flux, i, j, k, grid, args...)
+    return flux * Ax(i, j, k, grid, Center(), Center(), Center()) / volume(i, j, k, grid, Center(), Center(), Center())
+end
+
+# y direction
+function forcing_term_v(λ, flux, i, j, k, grid, args...)
+    return flux * Ay(i, j, k, grid, Center(), Center(), Center()) / volume(i, j, k, grid, Center(), Center(), Center())
+end
+
+function forcing_term_relax(λ, value, i, j, k, grid, field)
+    return -λ * (field - value)
+end
 
 @inline function (p::ForcingFromFile{FTS,V})(i, j, k, grid, clock, fields) where {FTS,V}
     value = @inbounds p.fts_value[i, j, k, Time(clock.time)]
-    λopen = @inbounds p.fts_λ[i, j, k, Time(clock.time)]
-    condition = value > -990.0 && λopen > -990.0
-    radiation_term = -λopen * (fields[i, j, k, p.variable_name] - value)
-    return @inbounds ifelse(condition, radiation_term, 0)
+    λ = @inbounds p.fts_λ[i, j, k, Time(clock.time)]
+    result = 0.0
+    result += @inbounds ifelse(λ > 1, forcing_term_u(λ, value, i, j, k, grid, fields[i, j, k, p.fieldname]), 0)
+    result += @inbounds ifelse(λ < -1, forcing_term_v(λ, value, i, j, k, grid, fields[i, j, k, p.fieldname]), 0)
+    result += @inbounds ifelse(-1 < λ < 1, forcing_term_relax(λ, value, i, j, k, grid, fields[i, j, k, p.fieldname]), 0)
+    return result
 end
 
 regularize_forcing(forcing::ForcingFromFile, field, field_name, model_field_names) = forcing
@@ -121,13 +138,13 @@ function load_from_netcdf(; path::String, var_name::String, grid_size::Tuple, ti
     var = ds[var_name]
     native_times = ds["time"]
 
-    data = fill(-999.0, (grid_size[1:end]..., length(time_indices_in_memory)))
+    data = zeros(Float64, (grid_size[1:end]..., length(time_indices_in_memory)))
     j = 1
     for i in time_indices_in_memory
         data[:, :, :, j] .= var[:, :, :, i]
         j += 1
     end
-    times = convert.(eltype(data), native_times_to_seconds(native_times))
+    times = convert.(Int64, native_times_to_seconds(native_times))
 
     close(ds)
     return data, times
@@ -144,12 +161,13 @@ function set!(fts::NetCDFFTS, path::String = fts.path, name::String = fts.name)
 end
 
 function forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, backend)
-    LX, LY, LZ = DATA_LOCATION[Symbol(var_name)]
+    field_name = oceananigans_fieldname[Symbol(var_name)]
+    LX, LY, LZ = DATA_LOCATION[field_name]
     grid_size_tupled = size.(nodes(grid, (LX(), LY(), LZ())))
     grid_size = Tuple(x[1] for x in grid_size_tupled)
 
     data, times = load_from_netcdf(; path = filepath, var_name, grid_size, time_indices_in_memory)
-    dataλ, times =
+    dataλ, timesλ =
         load_from_netcdf(; path = filepath, var_name = var_name * "_lambda", grid_size, time_indices_in_memory)
     boundary_conditions = FieldBoundaryConditions(grid, (LX, LY, LZ))
 
@@ -167,7 +185,7 @@ function forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, bac
 
     ftsλ = FieldTimeSeries{LX,LY,LZ}(
         grid,
-        times;
+        timesλ;
         backend,
         time_indexing = Cyclical(),
         boundary_conditions,
@@ -177,7 +195,6 @@ function forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, bac
     copyto!(interior(ftsλ, :, :, :, :), dataλ)
     fill_halo_regions!(ftsλ)
 
-    field_name = oceananigans_fieldname[Symbol(var_name)]
     _forcing = ForcingFromFile(fts, ftsλ, field_name)
     result = NamedTuple{(Symbol(var_name),)}((_forcing,))
     return result
@@ -202,10 +219,4 @@ function forcing_from_file(grid_ref, filepath, tracers)
     )
 
     return result
-end
-
-function forcing_bottom_drag(bottom_drag_coefficient)
-    Fu = Forcing(u_immersed_bottom_drag, discrete_form = true, parameters = bottom_drag_coefficient)
-    Fv = Forcing(v_immersed_bottom_drag, discrete_form = true, parameters = bottom_drag_coefficient)
-    return (u = Fu, v = Fv)
 end
