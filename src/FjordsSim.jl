@@ -20,7 +20,6 @@ import ClimaOcean.OceanSeaIceModels.CrossRealmFluxes: compute_sea_ice_ocean_flux
 import ClimaOcean.OceanSeaIceModels.CrossRealmFluxes.SimilarityTheoryTurbulentFluxes
 
 include("utils.jl")
-include("bathymetry.jl")
 include("grids.jl")
 include("initial_conditions.jl")
 include("turbulence_closures.jl")

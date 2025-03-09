@@ -66,7 +66,7 @@ Nz = grid["underlying_grid"]["Nz"]
 
 record_bottom_tracer(O₂, "oxygen", Nz, O₂.times, folder; figsize = (300, 700))
 
-record_variable(T, "temperature surface", Nz, T.times, folder, (300, 450); colorrange = (2, 6))
+record_variable(T, "temperature surface", Nz, T.times, folder, (300, 450); colorrange = (0, 20))
 record_variable(S, "salinity surface", Nz, S.times, folder, (300, 450); colorrange = (20, 37))
 record_variable(u, "u velocity surface", Nz, u.times, folder, (300, 450); colorrange = (-1, 1))
 record_variable(v, "v velocity surface", Nz, v.times, folder, (300, 450); colorrange = (-1, 1))

@@ -34,7 +34,7 @@ ocean_model = ocean_sim.model
 prefix = joinpath(sim_setup.results_dir, "snapshots")
 ocean_sim.output_writers[:all] = JLD2OutputWriter(
     ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
-    schedule = TimeInterval(1hours),
+    schedule = TimeInterval(6hours),
     filename = "$prefix.jld2",
     overwrite_existing = true,
     array_type=Array{Float32}
