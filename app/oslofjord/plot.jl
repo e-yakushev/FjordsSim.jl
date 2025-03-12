@@ -1,7 +1,9 @@
 using Oceananigans
 using JLD2
+using Printf
 using Oceananigans.Units
-using CairoMakie: Axis, Figure, Colorbar, Observable, Reverse, record, heatmap!, @lift
+using Oceananigans.Utils: prettytimeunits, maybe_int
+using CairoMakie: Auto, Axis, Figure, GridLayout, Colorbar, Observable, Reverse, record, heatmap!, @lift
 using FjordsSim:
     record_bottom_tracer
 
@@ -42,8 +44,72 @@ function record_variable(
     end
 end
 
+function prettiertime(t, longform=true)
+    s = longform ? "seconds" : "s" 
+    iszero(t) && return "0 $s"
+    t < 1e-9 && return @sprintf("%.3e %s", t, s) # yah that's small
+
+    t = maybe_int(t)
+    value, units = prettytimeunits(t, longform)
+    return @sprintf("%d %s", Int(trunc(Int, value)), units)
+end
+
+function record_variable_multilayer(
+    variable,
+    var_name,
+    Nz_layers,
+    times,
+    folder;
+    colorrange = (0, 0.5),
+    colormap = :deep,
+    framerate = 30,
+)
+    Nt = length(times)
+    iter = Observable(Nt)
+    num_layers = length(Nz_layers)
+    figsize = (200 * num_layers, 400)  # Adaptive figure size based on number of layers
+
+    figs = []
+    titles = []
+    heatmaps = []
+    axes = []
+
+    fig = Figure(size = figsize)
+    grid = GridLayout(fig[1, 1])  # Stack vertically
+    
+    for (i, Nz) in enumerate(Nz_layers)
+        f = @lift begin
+            x = variable[$iter]
+            x = interior(x, :, :, Nz)
+            x[x .== 0] .= NaN
+            x
+        end
+
+        title = @lift "Layer $Nz - " * prettiertime(times[$iter])
+        push!(titles, title)
+
+        ax = Axis(
+            grid[1, i];
+            title = title,
+            titlealign = :left,
+            width = Auto(),  # Adaptive width
+            height = Auto()  # Adaptive height
+        )
+        push!(axes, ax)
+
+        hm = heatmap!(ax, f, colorrange = colorrange, colormap = colormap)
+        push!(heatmaps, hm)
+    end
+
+    cb = Colorbar(fig[1, 2], heatmaps[1], vertical = true, label = "$(var_name)")
+
+    record(fig, joinpath(folder, "$(var_name)_multi.mp4"), 1:Nt, framerate = framerate) do i
+        iter[] = i
+    end
+end
+
 folder = joinpath(homedir(), "FjordsSim_results", "oslofjord")
-filename = joinpath(folder, "snapshots")
+filename = joinpath(folder, "snapshots_LOBSTER")
 T = FieldTimeSeries("$filename.jld2", "T")
 S = FieldTimeSeries("$filename.jld2", "S")
 u = FieldTimeSeries("$filename.jld2", "u")
@@ -63,6 +129,11 @@ Alk = FieldTimeSeries("$filename.jld2", "Alk")
 
 grid = jldopen("$filename.jld2")["grid"]
 Nz = grid["underlying_grid"]["Nz"]
+
+record_variable_multilayer(T, "temperature", [10, 12, 14, 16, 18], T.times, folder; colorrange = (0, 20), colormap = Reverse(:RdYlBu))
+record_variable_multilayer(S, "salinity", [10, 12, 14, 16, 18], S.times, folder; colorrange = (20, 37), colormap = :viridis)
+record_variable_multilayer(DIC, "dissolved inorganic carbon", [10, 12, 14, 16, 18], DIC.times, folder; colorrange = (2200, 2300), colormap = Reverse(:CMRmap))
+record_variable_multilayer(P, "phytoplankton", [10, 12, 14, 16, 18], P.times, folder; colorrange = (0, 1), colormap = Reverse(:cubehelix))
 
 record_bottom_tracer(O₂, "oxygen", Nz, O₂.times, folder; figsize = (300, 700))
 
