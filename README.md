@@ -20,4 +20,4 @@ By default, the result will go to `$HOME/FjorsSim_results/oslofjord/`.
 This will generate `snapshots.jld2` results file.
 4. There are some options for plotting the results in `app/oslofjord/plot.jl`.
 
-![example_result](./images/phytoplankton_multi.png)
+![example_result](./artifacts/phytoplankton_multi.png)
