@@ -17,7 +17,7 @@ using Oceananigans.Utils: TimeInterval, IterationInterval
 using Oceananigans.Simulations: Callback, conjure_time_step_wizard!, run!
 using Oceananigans.OutputWriters: JLD2OutputWriter
 using Oceanostics
-using FjordsSim: progress, coupled_hydrostatic_simulation
+using FjordsSim: coupled_hydrostatic_simulation
 
 include("setup.jl")
 

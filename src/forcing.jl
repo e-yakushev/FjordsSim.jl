@@ -13,6 +13,7 @@ using Adapt
 import Oceananigans.Fields: set!
 import Oceananigans.OutputReaders: new_backend
 
+""" Custom backend for FieldTimeSeries """
 struct NetCDFBackend <: AbstractInMemoryBackend{Int}
     start::Int
     length::Int
@@ -82,6 +83,7 @@ Base.summary(::Contaminant) = "contaminant"
 Base.summary(::UVelocity) = "u_velocity"
 Base.summary(::VVelocity) = "v_velocity"
 
+""" A custom forcing callable structure """
 struct ForcingFromFile{FTS,V}
     fts_value::FTS
     fts_λ::FTS
@@ -97,20 +99,24 @@ on_architecture(to, forcing::ForcingFromFile) = ForcingFromFile(
     on_architecture(to, forcing.fieldname),
 )
 
-# x direction
+""" x direction """
 function forcing_term_u(λ, flux, i, j, k, grid, args...)
     return flux * Ax(i, j, k, grid, Center(), Center(), Center()) / volume(i, j, k, grid, Center(), Center(), Center())
 end
 
-# y direction
+""" y direction """
 function forcing_term_v(λ, flux, i, j, k, grid, args...)
     return flux * Ay(i, j, k, grid, Center(), Center(), Center()) / volume(i, j, k, grid, Center(), Center(), Center())
 end
 
+""" relaxation term """
 function forcing_term_relax(λ, value, i, j, k, grid, field)
     return -λ * (field - value)
 end
 
+""" 
+Result will be added to the tendency contributions (a kernel function).
+"""
 @inline function (p::ForcingFromFile{FTS,V})(i, j, k, grid, clock, fields) where {FTS,V}
     value = @inbounds p.fts_value[i, j, k, Time(clock.time)]
     λ = @inbounds p.fts_λ[i, j, k, Time(clock.time)]
@@ -150,6 +156,7 @@ function load_from_netcdf(; path::String, var_name::String, grid_size::Tuple, ti
     return data, times
 end
 
+""" Updates data in the FieldTimeSeries, e.g. in ForcingFromFile forcing structures. """
 function set!(fts::NetCDFFTS, path::String = fts.path, name::String = fts.name)
     ti = time_indices(fts)
     data, _ = load_from_netcdf(; path, var_name = name, grid_size = size(fts)[1:end-1], time_indices_in_memory = ti)
@@ -160,6 +167,11 @@ function set!(fts::NetCDFFTS, path::String = fts.path, name::String = fts.name)
     return nothing
 end
 
+"""
+Constructs a custom ForcingFromFile forcing, which is a structure keeping 2 FieldTimeSeries
+with forcing values and forcing 'lambdas'.
+By default both FieldTimeSeries keep only 2 times indices in memory.
+"""
 function forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, backend)
     field_name = oceananigans_fieldname[Symbol(var_name)]
     LX, LY, LZ = DATA_LOCATION[field_name]
@@ -200,6 +212,9 @@ function forcing_get_tuple(filepath, var_name, grid, time_indices_in_memory, bac
     return result
 end
 
+"""
+Returns a named tuple of forcing functions for all available variables in a NetCDF file.
+"""
 function forcing_from_file(grid_ref, filepath, tracers)
     grid = grid_ref[]
     ds = Dataset(filepath)

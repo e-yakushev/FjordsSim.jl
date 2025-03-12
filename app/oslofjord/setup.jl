@@ -16,7 +16,6 @@ using FjordsSim:
     bc_varna_bgh_oxydep,
     bc_lobster,
     bgh_oxydep_boundary_conditions,
-    bc_varna,
     bc_ocean,
     PAR⁰,
     free_surface_default,

@@ -34,6 +34,7 @@ using .BGCModels: OXYDEP
 grid_ref = Ref{Any}(nothing)
 biogeochemistry_ref = Ref{Any}(nothing)
 
+"""A struct with callable and argument objects to construct a coupled hydrostatic simulation. """
 mutable struct SetupModel
     grid_callable::Function
     grid_args::NamedTuple
@@ -62,6 +63,7 @@ mutable struct SetupModel
     results_dir::String
 end
 
+"""A constructor to create a folder with results. """
 function SetupModel(
     grid_callable,
     grid_args,
@@ -121,6 +123,16 @@ function SetupModel(
     )
 end
 
+"""
+Creates a coupled (precomputed atmosphere + ocean) simulation following ClimaOcean with stubs for the not available components.
+Stubs are `nothing`s and for some cases they don't work because some oceananigans callables expect empty tuples.
+The hierarchy is as follows:
+    ocean_model ->
+    ocean_simulation ->
+    coupled_model ->
+    coupled_simulation
+time_step! and update_state! methods are called recursively from coupled_simulation to ocean_model.
+"""
 function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     grid = sim_setup.grid_callable(sim_setup.grid_args...)
     sim_setup.grid_ref[] = grid
@@ -184,6 +196,8 @@ function on_architecture(::GPU, a::StepRangeLen)
     on_architecture(GPU(), collect(a))
 end
 
+## The block is mainly to get a grid from a reference. Probably I should just delete all these.
+
 free_surface_default(grid_ref) = SplitExplicitFreeSurface(grid_ref[]; cfl = 0.7)
 
 atmosphere_JRA55(arch, backend, grid_ref, start, stop) =
@@ -213,6 +227,8 @@ SimilarityTheoryTurbulentFluxes(
     gravitational_acceleration,
     turbulent_prandtl_number,
 ) = SimilarityTheoryTurbulentFluxes(grid_ref[]; gravitational_acceleration, turbulent_prandtl_number)
+
+##  Some const structs to call the proper model.
 
 const OceanOnlyModel = OceanSeaIceModel{Nothing}
 const OceanSimplifiedSeaIceModel = OceanSeaIceModel{<:MinimumTemperatureSeaIce}

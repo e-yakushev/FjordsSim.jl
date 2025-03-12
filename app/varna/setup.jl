@@ -11,13 +11,10 @@ using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 using FjordsSim:
     SetupModel,
     grid_from_bathymetry_file,
-    grid_latitude_flat!,
-    grid_column!,
     grid_ref,
     forcing_from_file,
     bc_varna_bgh_oxydep,
     bgh_oxydep_boundary_conditions,
-    bc_varna,
     bc_ocean,
     PAR⁰,
     free_surface_default,

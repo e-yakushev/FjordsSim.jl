@@ -19,9 +19,7 @@ function plot_1d_phys(T, S, z, times, folder, x, y)
 end
 
 map_axis_kwargs = (xlabel = "Grid points, eastward direction", ylabel = "Grid points, northward direction")
-
 transect_axis_kwargs = (xlabel = "Grid points, eastward direction", ylabel = "z (m)")
-
 framerate = 12
 
 function record_surface_speed(u, v, Nz, times, folder; colorrange = (0, 0.5), colormap = :deep)
@@ -253,10 +251,6 @@ function plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, i, j, times, z, folder)
     hmOXY = heatmap!(times / days, z, interior(O₂, i, j, :, :)', colormap = :turbo)
     Colorbar(fig[2, 2], hmOXY)
 
-    # axκ = Axis(fig[1, 5]; title = "κ  m³/s", axis_kwargs...)
-    # hmκ = heatmap!(times / days, z, interior(κ, 1, 1, :, :)', colormap = Reverse(:RdYlBu)) # :linear_grey_0_100_c0_n256)
-    # Colorbar(fig[1, 6], hmκ)
-
     axT = Axis(fig[2, 5]; title = "T, oC", axis_kwargs...)
     hmT = heatmap!(times / days, z, interior(T, i, j, :, :)', colormap = Reverse(:RdYlBu))
     Colorbar(fig[2, 6], hmT)
@@ -264,10 +258,6 @@ function plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, i, j, times, z, folder)
     axS = Axis(fig[3, 5]; title = "S, psu", axis_kwargs...)
     hmS = heatmap!(times / days, z, interior(S, i, j, :, :)', colormap = :viridis)
     Colorbar(fig[3, 6], hmS)
-
-    # axPAR = Axis(fig[4, 1]; title = "PAR  μE⋅m-2⋅s-1", axis_kwargs...)
-    # hmPAR = heatmap!(times / days, z, interior(PAR, 1, 1, :, :)', colormap = :grayC100) # :linear_grey_0_100_c0_n256)
-    # Colorbar(fig[4, 2], hmPAR)
 
     @info "VARIABLES Z-Time plots made"
 
