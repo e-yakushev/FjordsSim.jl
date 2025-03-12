@@ -11,14 +11,26 @@ using FjordsSim:
     plot_ztime,
     plot_bottom_tracer,
     record_bottom_tracer,
-    record_vertical_diff
+    record_vertical_diff,
+    record_vertical_tracer_points
+
+using CSV, DataFrames
 
 folder = joinpath(homedir(), "FjordsSim_results", "sognefjord")
+
+df = CSV.read(joinpath(folder, "transect.csv"), DataFrame)
+# Convert DataFrame columns to a vector of tuples
+indices = [(row.ix, row.iy) for row in eachrow(df)]
+
+
+# folder = joinpath("D:", "FjordsSim_results", "sognefjord")
+
 filename = joinpath(folder, "snapshots")
-T =   FieldTimeSeries("$filename.jld2", "T")
-S =   FieldTimeSeries("$filename.jld2", "S")
-u =   FieldTimeSeries("$filename.jld2", "u")
-v =   FieldTimeSeries("$filename.jld2", "v")
+# filename = joinpath("D:", "snapshots")
+T =   FieldTimeSeries("$filename.jld2", "T", backend=OnDisk())
+S =   FieldTimeSeries("$filename.jld2", "S", backend=OnDisk())
+u =   FieldTimeSeries("$filename.jld2", "u", backend=OnDisk())
+v =   FieldTimeSeries("$filename.jld2", "v", backend=OnDisk())
 # O₂ =  FieldTimeSeries("$filename.jld2", "O₂")
 # NUT =  FieldTimeSeries("$filename.jld2", "NUT")
 # PHY =  FieldTimeSeries("$filename.jld2", "P")
@@ -34,7 +46,7 @@ z = grid["underlying_grid"]["zᵃᵃᶜ"][8:Nz+7]
 
 # plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
 
-record_surface_speed(u, v, Nz, times, folder)
+record_surface_speed(u, v, Nz, times, folder, colorrange=(0, 1))
 
 # record_horizontal_tracer(
 #     C, times, folder, "Contsurf", "Contaminant (% of max. concentration)",
@@ -43,12 +55,12 @@ record_surface_speed(u, v, Nz, times, folder)
 
 record_horizontal_tracer(
     T, times, folder, "Tsurf", "Temperature (°C)",
-    colorrange=(5, 40), colormap=Reverse(:RdYlBu), iz=Nz,
+    colorrange=(0, 10), colormap=Reverse(:RdYlBu), iz=Nz,
 )
 
 record_horizontal_tracer(
     S, times, folder, "Ssurf", "Salinity (PSU)", iz=Nz,
-    colorrange=(30, 40), colormap=:viridis,
+    colorrange=(30, 35), colormap=:viridis,
 )
 
 # record_horizontal_tracer(
@@ -71,20 +83,27 @@ record_horizontal_tracer(
 #     colorrange=(0, 50), colormap=Reverse(:CMRmap), iz=Nz,
 # )
 
-record_vertical_tracer(
-    T, z, 18, times, folder, "Tprofile", "Temperature (°C)",
-    colorrange=(5, 40), colormap=Reverse(:RdYlBu),
+record_vertical_tracer_points(
+    T, z,
+    indices,
+    times, folder, "Tprofile", "Temperature (°C)",
+    colorrange=(0, 10), colormap=Reverse(:RdYlBu),
 )
+
+# record_vertical_tracer(
+#     T, z, 18, times, folder, "Tprofile", "Temperature (°C)",
+#     colorrange=(0, 10), colormap=Reverse(:RdYlBu),
+# )
 
 # record_vertical_tracer(
 #     u, z, 18, times, folder, "Uprofile", "u velocity component (ms⁻¹)",
 #     colorrange=(-0.5, 0.5), colormap=:deep,
 # )
 
-record_vertical_tracer(
-    S, z, 18, times, folder, "Sprofile", "Salinity (PSU)",
-    colorrange=(0, 17), colormap=:viridis,
-)
+# record_vertical_tracer(
+#     S, z, 18, times, folder, "Sprofile", "Salinity (PSU)",
+#     colorrange=(30, 35), colormap=:viridis,
+# )
 
 # record_vertical_tracer(
 #     PHY, z, 18, times, folder, "PHYprofile", "Phytoplankton (μM N)",

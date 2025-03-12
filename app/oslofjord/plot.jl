@@ -137,15 +137,16 @@ record_variable_multilayer(P, "phytoplankton", [10, 12, 14, 16, 18], P.times, fo
 
 record_bottom_tracer(O₂, "oxygen", Nz, O₂.times, folder; figsize = (300, 700))
 
-record_variable(T, "temperature surface", Nz, T.times, folder, (300, 450); colorrange = (0, 20))
-record_variable(S, "salinity surface", Nz, S.times, folder, (300, 450); colorrange = (20, 37))
+record_variable(T, "temperature surface", Nz, T.times, folder, (300, 450); colorrange = (2, 6), colormap = Reverse(:RdYlBu))
+record_variable(S, "salinity surface", Nz, S.times, folder, (300, 450); colorrange = (20, 37), colormap = :viridis)
 record_variable(u, "u velocity surface", Nz, u.times, folder, (300, 450); colorrange = (-1, 1))
 record_variable(v, "v velocity surface", Nz, v.times, folder, (300, 450); colorrange = (-1, 1))
-record_variable(O₂, "O₂ surface", Nz, O₂.times, folder, (300, 700); colorrange = (0, 400))
+record_variable(O₂, "O₂ surface", Nz, O₂.times, folder, (300, 700); colorrange = (0, 400), colormap = :turbo)
 record_variable(NUT, "NUT surface", Nz, v.times, folder, (300, 700); colorrange = (0, 5))
-record_variable(PHY, "PHY surface", Nz, v.times, folder, (300, 700); colorrange = (0, 5))
+record_variable(PHY, "PHY surface", Nz, v.times, folder, (300, 700); colorrange = (0, 5), colormap = Reverse(:cubehelix))
 record_variable(P, "P surface", Nz, P.times, folder, (300, 700); colorrange = (0, 1))
 record_variable(Z, "Z surface", Nz, Z.times, folder, (300, 700); colorrange = (0, 1))
 record_variable(NO₃, "NO₃ surface", Nz, NO₃.times, folder, (300, 700); colorrange = (0, 20))
 record_variable(DIC, "DIC surface", Nz, DIC.times, folder, (300, 700); colorrange = (2230, 2270))
 record_variable(Alk, "Alk surface", Nz, Alk.times, folder, (300, 700); colorrange = (2300, 2500))
+
