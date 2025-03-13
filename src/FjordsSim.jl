@@ -22,7 +22,6 @@ import ClimaOcean.OceanSeaIceModels.CrossRealmFluxes.SimilarityTheoryTurbulentFl
 include("utils.jl")
 include("grids.jl")
 include("initial_conditions.jl")
-include("turbulence_closures.jl")
 include("boundary_conditions.jl")
 include("forcing.jl")
 include("radiation.jl")
