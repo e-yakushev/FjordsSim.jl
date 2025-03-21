@@ -41,6 +41,9 @@ function grid_from_bathymetry_file(arch, halo, filepath, latitude, longitude)
     Nx, Ny = size(depth)
     Nz = length(z_faces) - 1
     underlying_grid = LatitudeLongitudeGrid(arch; size = (Nx, Ny, Nz), halo = halo, z = z_faces, latitude, longitude)
-    grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(depth); active_cells_map = true)
+    bathymetry = Field{Center, Center, Nothing}(underlying_grid)
+    set!(bathymetry, depth)
+    fill_halo_regions!(bathymetry)
+    grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(bathymetry); active_cells_map = true)
     return grid
 end

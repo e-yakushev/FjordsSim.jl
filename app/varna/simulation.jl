@@ -22,7 +22,7 @@ using FjordsSim: coupled_hydrostatic_simulation
 include("setup.jl")
 
 ## Model Setup
-sim_setup = setup_region_3d_OXYDEP()
+sim_setup = setup_region_3d()
 
 coupled_simulation = coupled_hydrostatic_simulation(sim_setup)
 
@@ -30,8 +30,6 @@ coupled_simulation = coupled_hydrostatic_simulation(sim_setup)
 ocean_sim = coupled_simulation.model.ocean
 ocean_sim.callbacks[:progress] = Callback(ProgressMessengers.TimedMessenger(), IterationInterval(100));
 ocean_model = ocean_sim.model
-# ke = KineticEnergy(ocean_model)
-# ε = KineticEnergyDissipationRate(ocean_model)
 
 prefix = joinpath(sim_setup.results_dir, "snapshots")
 ocean_sim.output_writers[:all] = JLD2OutputWriter(
@@ -50,5 +48,5 @@ ocean_sim.output_writers[:all] = JLD2OutputWriter(
 ocean_sim.stop_time = 365days
 coupled_simulation.stop_time = 365days
 
-conjure_time_step_wizard!(ocean_sim; cfl = 0.25, max_Δt = 10minutes, max_change = 1.01)
+conjure_time_step_wizard!(coupled_simulation; cfl = 0.25, max_Δt = 10minutes, max_change = 1.01)
 run!(coupled_simulation)

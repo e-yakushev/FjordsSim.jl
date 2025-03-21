@@ -1,6 +1,6 @@
 using Oceananigans.Architectures: GPU, CPU
 using Oceananigans.Advection: WENO
-using Oceananigans.BuoyancyModels: SeawaterBuoyancy, g_Earth
+using Oceananigans.BuoyancyFormulations: SeawaterBuoyancy
 using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, BetaPlane, Ω_Earth
 using Oceananigans.TurbulenceClosures: ConvectiveAdjustmentVerticalDiffusivity, ScalarDiffusivity
 using Oceananigans.OutputReaders: InMemory
@@ -18,11 +18,10 @@ using FjordsSim:
     bc_ocean,
     PAR⁰,
     free_surface_default,
-    atmosphere_JRA55,
+    JRA55PrescribedAtmosphere,
     biogeochemistry_LOBSTER,
     biogeochemistry_OXYDEP,
-    biogeochemistry_ref,
-    SimilarityTheoryTurbulentFluxes
+    biogeochemistry_ref
 
 const bottom_drag_coefficient = 0.003
 const reference_density = 1010  # T = 15 degC, S = 15 PSU
@@ -83,7 +82,6 @@ function setup_region(;
     ),
     # Buoyancy
     buoyancy = SeawaterBuoyancy(;
-        gravitational_acceleration = g_Earth,
         equation_of_state = TEOS10EquationOfState(; reference_density),
     ),
     # Closure
@@ -114,25 +112,15 @@ function setup_region(;
     bc_callable = bc_ocean,
     bc_args = (grid_ref, bottom_drag_coefficient),
     # Atmosphere
-    atmosphere_callable = atmosphere_JRA55,
-    # 8*365 - 1 year, 3H JRA55 frocing
+    atmosphere_callable = JRA55PrescribedAtmosphere,
     atmosphere_args = (
         arch = grid_args.arch,
-        backend = InMemory(),
-        grid_ref = grid_ref,
-        start = 1,
-        stop = 8 * 365,
+        latitude = (43.177, 43.214),
+        longitude = (27.640, 27.947),
     ),
     # Ocean emissivity from https://link.springer.com/article/10.1007/BF02233853
     # With suspended matter 0.96 https://www.sciencedirect.com/science/article/abs/pii/0034425787900095
     radiation = Radiation(grid_args.arch; ocean_emissivity = 0.96),
-    # Similarity theory
-    similarity_theory_callable = SimilarityTheoryTurbulentFluxes,
-    similarity_theory_args = (
-        grid_ref = grid_ref,
-        gravitational_acceleration = g_Earth,
-        turbulent_prandtl_number = 0.85,
-    ),
     # Biogeochemistry
     biogeochemistry_callable = nothing,
     biogeochemistry_args = (nothing,),
@@ -160,8 +148,6 @@ function setup_region(;
         atmosphere_callable,
         atmosphere_args,
         radiation,
-        similarity_theory_callable,
-        similarity_theory_args,
         biogeochemistry_callable,
         biogeochemistry_args,
         biogeochemistry_ref;
