@@ -28,7 +28,7 @@ coupled_simulation = coupled_hydrostatic_simulation(sim_setup)
 
 ## Set up output writers
 ocean_sim = coupled_simulation.model.ocean
-ocean_sim.callbacks[:progress] = Callback(ProgressMessengers.TimedMessenger(), IterationInterval(100));
+ocean_sim.callbacks[:progress] = Callback(ProgressMessengers.TimedMessenger(), IterationInterval(1000));
 ocean_model = ocean_sim.model
 # ke = KineticEnergy(ocean_model)
 # ε = KineticEnergyDissipationRate(ocean_model)
@@ -37,7 +37,7 @@ prefix = joinpath(sim_setup.results_dir, "snapshots")
 ocean_sim.output_writers[:all] = JLD2OutputWriter(
     ocean_model,
     merge(ocean_model.tracers, ocean_model.velocities);
-    schedule = TimeInterval(1hours),
+    schedule = TimeInterval(3hours),
     filename = "$prefix.jld2",
     overwrite_existing = true,
     array_type = Array{Float32},
