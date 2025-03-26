@@ -10,7 +10,8 @@ using FjordsSim:
     record_horizontal_tracer,
     plot_ztime,
     record_bottom_tracer,
-    record_vertical_diff
+    record_vertical_diff,
+    plot_ratio_under_thresh
 
 folder = joinpath(homedir(), "FjordsSim_results", "varna")
 filename = joinpath(folder, "snapshots")
@@ -80,11 +81,11 @@ record_horizontal_tracer(
     O₂,
     times,
     folder,
-    "O2bottom",
+    "O2surf",
     "Dissolved oxygen (μM)",
-    colorrange = (100, 350),
+    colorrange = (0, 350),
     colormap = :turbo,
-    iz = 3,
+    iz = Nz,
 )
 
 record_horizontal_tracer(
@@ -93,7 +94,7 @@ record_horizontal_tracer(
     folder,
     "NUTsurf",
     "Nutrients (μM N)",
-    colorrange = (0, 20),
+    colorrange = (0, 25),
     colormap = Reverse(:cherry),
     iz = Nz,
 )
@@ -104,8 +105,19 @@ record_horizontal_tracer(
     folder,
     "PHYsurf",
     "Phytoplankton (μM N)",
-    colorrange = (0, 2),
+    colorrange = (0, 5),
     colormap = Reverse(:cubehelix),
+    iz = Nz,
+)
+
+record_horizontal_tracer(
+    HET,
+    times,
+    folder,
+    "HETsurf",
+    "Heterotrophs (μM N)",
+    colorrange = (0, 5),
+    colormap = Reverse(:afmhot),
     iz = Nz,
 )
 
@@ -120,7 +132,18 @@ record_horizontal_tracer(
     iz = Nz,
 )
 
+record_horizontal_tracer(
+    POM,
+    times,
+    folder,
+    "POMsurf10",
+    "POM (μM N)",
+    colorrange = (0, 50),
+    colormap = Reverse(:greenbrownterrain),
+    iz = Nz,
+)
 
+############################################
 # VERTICAL
 record_vertical_tracer(
     T,
@@ -156,9 +179,22 @@ record_vertical_tracer(
     folder,
     "PHYprofile",
     "Phytoplankton (μM N)",
-    colorrange = (0, 2),
+    colorrange = (0, 5),
     colormap = Reverse(:cubehelix),
 )
+
+record_vertical_tracer(
+    HET,
+    z,
+    18,
+    times,
+    folder,
+    "HETprofile",
+    "HET (μM N)",
+    colorrange = (0, 50),
+    colormap = Reverse(:afmhot),
+)
+
 
 record_vertical_tracer(
     DOM,
@@ -168,7 +204,7 @@ record_vertical_tracer(
     folder,
     "DOMprofile",
     "DOM (μM N)",
-    colorrange = (0, 20),
+    colorrange = (0, 50),
     colormap = Reverse(:CMRmap),
 )
 
@@ -180,8 +216,8 @@ record_vertical_tracer(
     folder,
     "POMprofile",
     "POM (μM N)",
-    colorrange = (0, 100),
-    colormap = Reverse(:CMRmap),
+    colorrange = (0, 50),
+    colormap = Reverse(:greenbrownterrain),
 )
 
 record_vertical_tracer(
@@ -192,7 +228,7 @@ record_vertical_tracer(
     folder,
     "NUTprofile",
     "Nutrients (μM N)",
-    colorrange = (0, 10),
+    colorrange = (0, 25),
     colormap = Reverse(:cherry),
 )
 
@@ -204,6 +240,7 @@ record_vertical_tracer(
     folder,
     "O2profile",
     "Dissolved Oxygen (μM)",
-    colorrange = (100, 350),
+    colorrange = (0, 350),
     colormap = :turbo,
 )
+plot_ratio_under_thresh(O₂, Nz, times, folder)
