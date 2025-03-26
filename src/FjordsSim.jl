@@ -1,3 +1,5 @@
+__precompile__(false)  # Disable precompilation to allow method overwriting
+
 module FjordsSim
 
 using Oceananigans.Models: HydrostaticFreeSurfaceModel, update_model_field_time_series!
@@ -19,7 +21,7 @@ include("grids.jl")
 include("initial_conditions.jl")
 include("boundary_conditions.jl")
 include("forcing.jl")
-include("radiation.jl")
+include("atmosphere.jl")
 include("output.jl")
 include("BGCModels/BGCModels.jl")
 
@@ -174,12 +176,14 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     return coupled_simulation
 end
 
+# to allow time step adjusting in OceanSeaIceModel
 cell_advection_timescale(model::OceanSeaIceModel) = cell_advection_timescale(model.ocean.model)
 
 free_surface_default(grid_ref) = SplitExplicitFreeSurface(grid_ref[]; cfl = 0.7)
 
+# This will call a rewritten JRA55FieldTimeSeries method
 JRA55PrescribedAtmosphere(arch, lat, lon) = JRA55PrescribedAtmosphere(
-    arch; latitude = lat, longitude = lon)
+    arch; latitude = lat, longitude = lon, custom = true)
 
 biogeochemistry_LOBSTER(grid_ref) =
     LOBSTER(; 
