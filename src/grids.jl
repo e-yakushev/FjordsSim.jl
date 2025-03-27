@@ -30,8 +30,10 @@ function grid_from_nc(arch, halo, filepath)
     # but z, latitude and langitude should be for faces
     underlying_grid =
         LatitudeLongitudeGrid(arch; size = (Nx, Ny, Nz - 1), halo = halo, z = z_faces, latitude, longitude)
-    # depth should be for grid centers
-    grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(coalesce.(depth, NaN)); active_cells_map = true)
+    bathymetry = Field{Center, Center, Nothing}(underlying_grid)
+    set!(bathymetry, coalesce.(depth, 0.0))
+    fill_halo_regions!(bathymetry)
+    grid = ImmersedBoundaryGrid(underlying_grid, GridFittedBottom(bathymetry); active_cells_map = true)
     return grid
 end
 

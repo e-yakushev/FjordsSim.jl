@@ -45,7 +45,7 @@ ocean_sim.output_writers[:all] = JLD2OutputWriter(
 ocean_sim.stop_time = 10days
 coupled_simulation.stop_time = 10days
 
-conjure_time_step_wizard!(ocean_sim; cfl=0.1, max_Δt=1.5minutes, max_change=1.01)
+conjure_time_step_wizard!(coupled_simulation; cfl=0.1, max_Δt=1.5minutes, max_change=1.01)
 run!(coupled_simulation)
 
 ## Running the simulation
@@ -54,5 +54,5 @@ run!(coupled_simulation)
 ocean_sim.stop_time = 355days
 coupled_simulation.stop_time = 355days
 
-conjure_time_step_wizard!(ocean_sim; cfl=0.25, max_Δt=10minutes, max_change=1.01)
+conjure_time_step_wizard!(coupled_simulation; cfl=0.25, max_Δt=10minutes, max_change=1.01)
 run!(coupled_simulation)
