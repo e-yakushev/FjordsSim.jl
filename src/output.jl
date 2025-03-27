@@ -1,4 +1,4 @@
-using CairoMakie: Axis, Figure, Colorbar, Observable, Reverse, record, heatmap!, @lift
+using CairoMakie: Axis, Figure, Colorbar, Observable, Reverse, record, heatmap!, @lift, lines!, axislegend
 using FileIO: save
 using Oceananigans.Fields: Field, interior, compute!
 
@@ -220,7 +220,7 @@ function plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, i, j, times, z, folder)
     axis_kwargs = (
         xlabel = "Time (days)",
         ylabel = "z (m)",
-        xticks = (0:30:times[end]),
+        xticks = (0:50:times[end]),
         xtickformat = "{:.0f}", #   values -> ["$(value)kg" for value in values]     
     )
 
@@ -276,4 +276,51 @@ function plot_bottom_tracer(tracer, bottom_z, time, folder)
     Colorbar(fig[2, 2], hmOXY)
 
     save(joinpath(folder, "bottom_$(tracer).png"), fig)
+end
+
+###########################
+
+function plot_ratio_under_thresh(O₂, Nz, times, folder)
+
+    # bottom_z evaluation
+    bottom_z = ones(Int, size(O₂, 1), size(O₂, 2))
+    for i = 1:size(O₂, 1)
+        for j = 1:size(O₂, 2)
+            for k = 1:size(O₂, 3)
+                if O₂[i, j, k, 1] .!= 0
+                    bottom_z[i, j] = k
+                    if k == 20
+                        bottom_z[i, j] = 20
+                    end
+                    break
+                end
+            end
+        end
+    end
+
+    # bottom O₂ Matrix evaluation
+    O₂_bot = Array{eltype(O₂)}(undef, size(O₂, 1), size(O₂, 2), size(O₂, 4))
+    for i in 1:size(O₂, 1)
+        for j in 1:size(O₂, 2)
+            O₂_bot[i, j, :] = O₂[i, j, bottom_z[i, j], :]
+        end
+    end
+
+    land_cells = length(O₂_bot[:,:,1][O₂_bot[:,:,1] .< 10])
+    water_cells = length(bottom_z) - land_cells
+    
+    under_thresh(thresh) = [length(O₂_bot[:,:,i][O₂_bot[:,:,i] .< thresh]) - land_cells for i in 1:size(O₂_bot, 3)]
+    
+    fig = Figure(size = (1000, 400), fontsize = 20)
+    
+    axis_kwargs = (xlabel = "Time (days)", ylabel = "% of bottom grid cells", xticks = (0:30:times[end]/days), xtickformat = "{:.0f}")
+    
+    Axis(fig[1, 1]; axis_kwargs...)
+    
+    lines!(times / days, 100*under_thresh(90)/water_cells, colormap = Reverse(:RdYlBu), label="> 90 μM")
+    lines!(times / days, 100*under_thresh(15)/water_cells, colormap = Reverse(:RdYlBu), label="> 15 μM")
+    lines!(times / days, 100*under_thresh(1)/water_cells, colormap = Reverse(:RdYlBu), label="> 1 μM")
+    axislegend()
+
+    save(joinpath(folder, "ratio_uder_thresh.png"), fig)
 end

@@ -48,7 +48,7 @@ args_oxydep = (
     r_pom_nut_oxy = 0.006 / day, # 1/d
     r_pom_dom = 0.05 / day,      # 1/d
     r_dom_nut_oxy = 0.10 / day,  # 1/d
-    O2_suboxic = 30.0,    # mmol/m3
+    O2_suboxic = 15.0,    # mmol/m3
     r_pom_nut_nut = 0.010 / day, # 1/d
     r_dom_nut_nut = 0.003 / day, # 1/d
     OtoN = 8.625, # (nd)
@@ -65,7 +65,7 @@ external_values = (
     C = 0.0,  # C passive tracer, Contaminant
     NUT = 2.0,
     DOM = 1.0,
-    O₂ = 300.0,
+    O₂ = 250.0,
     P = 0.001,
     HET = 0.001,
 )
@@ -165,7 +165,7 @@ setup_region_3d_OXYDEP() = setup_region(
         NUT = 10.0,
         P = 0.05,
         HET = 0.01,
-        O₂ = 350.0,
+        O₂ = 250.0,
         DOM = 1.0,
     ),
     biogeochemistry_callable = biogeochemistry_OXYDEP,
