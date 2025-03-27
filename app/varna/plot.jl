@@ -13,8 +13,28 @@ using FjordsSim:
     record_vertical_diff,
     plot_ratio_under_thresh
 
+# garg = jldopen("$filename.jld2")["grid"]["underlying_grid"]
+# grid_from_file = LatitudeLongitudeGrid{Bounded,Bounded,Bounded}(CPU(),
+#     garg["Nx"], garg["Ny"], garg["Nz"],
+#     garg["Hx"], garg["Hy"], garg["Hz"],
+#     garg["Lx"], garg["Ly"], garg["Lz"],
+#     garg["Δλᶠᵃᵃ"], garg["Δλᶜᵃᵃ"], garg["λᶠᵃᵃ"], garg["λᶜᵃᵃ"],
+#     garg["Δφᵃᶠᵃ"], garg["Δφᵃᶜᵃ"], garg["φᵃᶠᵃ"], garg["φᵃᶜᵃ"], garg["z"],
+#     garg["Δxᶠᶜᵃ"], garg["Δxᶜᶠᵃ"], garg["Δxᶠᶠᵃ"], garg["Δxᶜᶜᵃ"],
+#     garg["Δyᶠᶜᵃ"], garg["Δyᶜᶠᵃ"],
+#     garg["Azᶠᶜᵃ"], garg["Azᶜᶠᵃ"], garg["Azᶠᶠᵃ"], garg["Azᶜᶜᵃ"], garg["radius"])
+
+include("setup.jl");
+
+sim_setup = setup_region_3d();
+grid_args = merge(sim_setup.grid_args, (arch = CPU(),))
+grid_from_setup = sim_setup.grid_callable(grid_args...).underlying_grid
+z = znodes(grid_from_setup, Center())
+Nz = grid_from_setup.Nz
+
 folder = joinpath(homedir(), "FjordsSim_results", "varna")
 filename = joinpath(folder, "snapshots")
+
 T = FieldTimeSeries("$filename.jld2", "T")
 S = FieldTimeSeries("$filename.jld2", "S")
 u = FieldTimeSeries("$filename.jld2", "u")
@@ -28,17 +48,10 @@ POM = FieldTimeSeries("$filename.jld2", "POM")
 C = FieldTimeSeries("$filename.jld2", "C")
 times = T.times
 
-grid = jldopen("$filename.jld2")["grid"]
-Nz = grid["underlying_grid"]["Nz"]
-
 record_bottom_tracer(O₂, "Oxygen", Nz, O₂.times, folder)
 
 println(keys(grid["underlying_grid"]))
 println(grid["underlying_grid"]["Δyᶠᶜᵃ"])
-
-# stupid, but I cannot find a right way with znodes
-# znodes(grid["underlying_grid"], with_halos=false)
-z = grid["underlying_grid"]["zᵃᵃᶜ"][8:Nz+7]
 
 plot_ztime(PHY, HET, POM, DOM, NUT, O₂, T, S, 84, 14, times, z, folder)
 
