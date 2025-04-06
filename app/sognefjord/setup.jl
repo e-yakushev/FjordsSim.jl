@@ -1,6 +1,6 @@
 using Oceananigans.Architectures: GPU, CPU
 using Oceananigans.Advection: WENO
-using Oceananigans.BuoyancyModels: SeawaterBuoyancy, g_Earth
+using Oceananigans.BuoyancyFormulations: SeawaterBuoyancy
 using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, BetaPlane, Ω_Earth
 using Oceananigans.TurbulenceClosures: ConvectiveAdjustmentVerticalDiffusivity, ScalarDiffusivity
 using Oceananigans.OutputReaders: InMemory
@@ -11,24 +11,20 @@ using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 using FjordsSim:
     SetupModel,
     grid_from_bathymetry_file,
-    grid_latitude_flat!,
-    grid_column!,
     grid_ref,
     forcing_from_file,
     bc_varna_bgh_oxydep,
     bgh_oxydep_boundary_conditions,
-    bc_varna,
     bc_ocean,
     PAR⁰,
     free_surface_default,
-    atmosphere_JRA55,
+    JRA55PrescribedAtmosphere,
     biogeochemistry_LOBSTER,
     biogeochemistry_OXYDEP,
-    biogeochemistry_ref,
-    SimilarityTheoryTurbulentFluxes
+    biogeochemistry_ref
 
 const bottom_drag_coefficient = 0.003
-const reference_density = 1020
+const reference_density = 1030
 
 args_oxydep = (
     initial_photosynthetic_slope = 0.1953 / day, # 1/(W/m²)/s
@@ -62,6 +58,18 @@ args_oxydep = (
     sinking_speeds = (P = 0.15 / day, HET = 4.0 / day, POM = 10.0 / day),
 )
 
+# Values on the open boundary
+external_values = (
+    T = 10.0,
+    S = 18.0,
+    C = 0.0,  # C passive tracer, Contaminant
+    NUT = 2.0,
+    DOM = 1.0,
+    O₂ = 250.0,
+    P = 0.001,
+    HET = 0.001,
+)
+
 function setup_region(;
     # Grid
     grid_callable = grid_from_bathymetry_file,
@@ -74,7 +82,6 @@ function setup_region(;
     ),
     # Buoyancy
     buoyancy = SeawaterBuoyancy(;
-        gravitational_acceleration = g_Earth,
         equation_of_state = TEOS10EquationOfState(; reference_density),
     ),
     # Closure
@@ -94,36 +101,24 @@ function setup_region(;
     coriolis = HydrostaticSphericalCoriolis(rotation_rate = Ω_Earth),
     # Forcing
     forcing_callable = forcing_from_file,
-    # forcing_callable = NamedTuple,
     forcing_args = (
         grid_ref = grid_ref,
         filepath = joinpath(homedir(), "FjordsSim_data", "sognefjord", "Sogn_bry800.nc"),
         tracers = tracers,
     ),
-    # forcing_args = (),
     # Boundary conditions
     bc_callable = bc_ocean,
     bc_args = (grid_ref, bottom_drag_coefficient),
     # Atmosphere
-    atmosphere_callable = atmosphere_JRA55,
-    # 8*365 - 1 year, 3H JRA55 frocing
+    atmosphere_callable = JRA55PrescribedAtmosphere,
     atmosphere_args = (
         arch = grid_args.arch,
-        backend = InMemory(),
-        grid_ref = grid_ref,
-        start = 1,
-        stop = 8 * 365,
+        latitude = (60.6315, 61.5),
+        longitude = (4.186, 7.72),
     ),
     # Ocean emissivity from https://link.springer.com/article/10.1007/BF02233853
     # With suspended matter 0.96 https://www.sciencedirect.com/science/article/abs/pii/0034425787900095
     radiation = Radiation(grid_args.arch; ocean_emissivity = 0.96),
-    # Similarity theory
-    similarity_theory_callable = SimilarityTheoryTurbulentFluxes,
-    similarity_theory_args = (
-        grid_ref = grid_ref,
-        gravitational_acceleration = g_Earth,
-        turbulent_prandtl_number = 0.85,
-    ),
     # Biogeochemistry
     biogeochemistry_callable = nothing,
     biogeochemistry_args = (nothing,),
@@ -151,8 +146,6 @@ function setup_region(;
         atmosphere_callable,
         atmosphere_args,
         radiation,
-        similarity_theory_callable,
-        similarity_theory_args,
         biogeochemistry_callable,
         biogeochemistry_args,
         biogeochemistry_ref;
@@ -161,6 +154,7 @@ function setup_region(;
 end
 
 setup_region_3d() = setup_region()
+
 setup_region_3d_OXYDEP() = setup_region(
     tracers = (:T, :S, :e, :C, :NUT, :P, :HET, :POM, :DOM, :O₂),
     initial_conditions = (
@@ -173,6 +167,11 @@ setup_region_3d_OXYDEP() = setup_region(
         O₂ = 350.0,
         DOM = 1.0,
     ),
+    atmosphere_callable = nothing,
+    atmosphere_args = (nothing,),
+    radiation = nothing,
+    similarity_theory_callable = nothing,
+    similarity_theory_args = (nothing,),
     biogeochemistry_callable = biogeochemistry_OXYDEP,
     biogeochemistry_args = (grid_ref, args_oxydep),
     bc_callable = bc_varna_bgh_oxydep,

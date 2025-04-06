@@ -15,7 +15,11 @@
 using Oceananigans.Units: second, seconds, minute, minutes, hour, hours, day, days
 using Oceananigans.Utils: TimeInterval, IterationInterval
 using Oceananigans.Simulations: Callback, conjure_time_step_wizard!, run!
-using Oceananigans.OutputWriters: JLD2OutputWriter
+
+# !! in version 0.96.0 names were changed to JLD2Writer, NetCDFWriter
+using Oceananigans.OutputWriters: JLD2OutputWriter, NetCDFOutputWriter  
+using Oceananigans
+using NCDatasets
 using Oceanostics
 using FjordsSim: progress, coupled_hydrostatic_simulation
 
@@ -36,6 +40,14 @@ ocean_sim.output_writers[:all] = JLD2OutputWriter(
     ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
     schedule = TimeInterval(1hours),
     filename = "$prefix.jld2",
+    overwrite_existing = true,
+    array_type=Array{Float32}
+)
+
+ocean_sim.output_writers[:nc_writer] = NetCDFOutputWriter(
+    ocean_model, merge(ocean_model.tracers, ocean_model.velocities);
+    schedule = TimeInterval(1hours),
+    filename = "$prefix.nc",
     overwrite_existing = true,
     array_type=Array{Float32}
 )
