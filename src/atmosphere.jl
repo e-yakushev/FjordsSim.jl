@@ -13,6 +13,13 @@ using ClimaOcean.DataWrangling.JRA55:
     location,
     metadata_path,
     native_times
+using ClimaOcean.OceanSeaIceModels.InterfaceComputations:
+    ComponentInterfaces,
+    default_gravitational_acceleration,
+    TemperatureDependentAirViscosity,
+    MomentumRoughnessLength,
+    ScalarRoughnessLength,
+    SimilarityScales
 
 import ClimaOcean.DataWrangling.JRA55: JRA55FieldTimeSeries
 import ClimaOcean.DataWrangling.JRA55: compute_bounding_indices
@@ -217,4 +224,18 @@ function JRA55FieldTimeSeries(
 
         return native_fts
     end
+end
+
+function regional_roughness_lengths(FT = Oceananigans.defaults.FloatType)
+    momentum = MomentumRoughnessLength(
+        FT;
+        gravitational_acceleration = default_gravitational_acceleration,
+        maximum_roughness_length = 1.0, # An estimate?
+        air_kinematic_viscosity = TemperatureDependentAirViscosity(FT),
+        gravity_wave_parameter = 0.011,
+        laminar_parameter = 0.11,
+    )
+    temperature = ScalarRoughnessLength(FT)
+    water_vapor = ScalarRoughnessLength(FT)
+    return SimilarityScales(momentum, temperature, water_vapor)
 end
