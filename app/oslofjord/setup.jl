@@ -69,7 +69,7 @@ function setup_region(;
     # Grid
     grid_callable = grid_from_nc,
     grid_args = (
-        arch = CPU(),
+        arch = GPU(),
         halo = (7, 7, 7),
         filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_105to232_bathymetry_v2.nc"),
     ),

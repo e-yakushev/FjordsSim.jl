@@ -4,6 +4,7 @@ using ClimaOcean.DataWrangling.JRA55:
     JRA55Metadata,
     JRA55_time_indices,
     JRA55_variable_names,
+    JRA55NetCDFFTS,
     TotallyInMemory,
     compute_bounding_indices,
     compute_bounding_nodes,
@@ -21,6 +22,7 @@ using ClimaOcean.OceanSeaIceModels.InterfaceComputations:
     ScalarRoughnessLength,
     SimilarityScales
 
+import ClimaOcean.DataWrangling.JRA55: set!
 import ClimaOcean.DataWrangling.JRA55: JRA55FieldTimeSeries
 import ClimaOcean.DataWrangling.JRA55: compute_bounding_indices
 
@@ -44,6 +46,57 @@ function compute_bounding_indices(longitude::Nothing, latitude::Nothing, grid, L
     j₁ = (j₂ - j₁ >= grid.Ny) ? (j₂ - grid.Ny + 1) : j₁
 
     return i₁, i₂, j₁, j₂, TX
+end
+
+# rewrite to limit the velocities
+function set!(fts::JRA55NetCDFFTS, path::String=fts.path, name::String=fts.name)
+
+    ds = Dataset(path)
+
+    # Note that each file should have the variables
+    #   - ds["time"]:     time coordinate
+    #   - ds["lon"]:      longitude at the location of the variable
+    #   - ds["lat"]:      latitude at the location of the variable
+    #   - ds["lon_bnds"]: bounding longitudes between which variables are averaged
+    #   - ds["lat_bnds"]: bounding latitudes between which variables are averaged
+    #   - ds[shortname]:  the variable data
+
+    # Nodes at the variable location
+    λc = ds["lon"][:]
+    φc = ds["lat"][:]
+    LX, LY, LZ = location(fts)
+    i₁, i₂, j₁, j₂, TX = compute_bounding_indices(nothing, nothing, fts.grid, LX, LY, λc, φc)
+
+    nn = time_indices(fts)
+    nn = collect(nn)
+
+    if issorted(nn)
+        data = ds[name][i₁:i₂, j₁:j₂, nn]
+    else
+        # The time indices may be cycling past 1; eg ti = [6, 7, 8, 1].
+        # However, DiskArrays does not seem to support loading data with unsorted
+        # indices. So to handle this, we load the data in chunks, where each chunk's
+        # indices are sorted, and then glue the data together.
+        m = findfirst(n -> n == 1, nn)
+        n1 = nn[1:m-1]
+        n2 = nn[m:end]
+
+        data1 = ds[name][i₁:i₂, j₁:j₂, n1]
+        data2 = ds[name][i₁:i₂, j₁:j₂, n2]
+        data = cat(data1, data2, dims=3)
+    end
+
+    close(ds)
+
+    if name in ("uas", "vas")
+        data .= map(x -> ismissing(x) ? missing : (x > 3f0 ? 3f0 : x), data)
+        data .= map(x -> ismissing(x) ? missing : (x < -3f0 ? -3f0 : x), data)
+    end
+
+    copyto!(interior(fts, :, :, 1, :), data)
+    fill_halo_regions!(fts)
+
+    return nothing
 end
 
 # Julia does not dispatch on keyword argument, so this overwrites the original definition
@@ -203,6 +256,11 @@ function JRA55FieldTimeSeries(
         # φc_bounded = φnodes(fts.grid, Center())
         # λc_bounded_face = λnodes(fts.grid, Face())
         # φc_bounded_face = φnodes(fts.grid, Face())
+
+        if fts.name in ("uas", "vas")
+            data .= map(x -> ismissing(x) ? missing : (x > 3f0 ? 3f0 : x), data)
+            data .= map(x -> ismissing(x) ? missing : (x < -3f0 ? -3f0 : x), data)
+        end
 
         # Fill the data in a GPU-friendly manner
         copyto!(interior(fts, :, :, 1, :), data)
