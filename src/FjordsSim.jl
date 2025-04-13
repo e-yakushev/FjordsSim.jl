@@ -11,6 +11,7 @@ using Oceananigans.OutputReaders: extract_field_time_series, update_field_time_s
 using Oceananigans.Forcings: DiscreteForcing
 using Oceananigans.Units: second, seconds
 using ClimaOcean.OceanSeaIceModels: OceanSeaIceModel
+using ClimaOcean.OceanSeaIceModels.InterfaceComputations
 using OceanBioME: LOBSTER
 
 import Oceananigans.Advection: cell_advection_timescale
@@ -18,6 +19,7 @@ import ClimaOcean.DataWrangling.JRA55: JRA55PrescribedAtmosphere
 
 include("utils.jl")
 include("grids.jl")
+include("turbulence.jl")
 include("initial_conditions.jl")
 include("boundary_conditions.jl")
 include("forcing.jl")
@@ -51,6 +53,7 @@ mutable struct SetupModel
     atmosphere_callable::Any
     atmosphere_args::Any
     radiation::Any
+    atmosphere_ocean_flux_formulation::Any
     biogeochemistry_callable::Any
     biogeochemistry_args::Any
     biogeochemistry_ref::Ref
@@ -78,6 +81,7 @@ function SetupModel(
     atmosphere_callable,
     atmosphere_args,
     radiation,
+    atmosphere_ocean_flux_formulation,
     biogeochemistry_callable,
     biogeochemistry_args,
     biogeochemistry_ref;
@@ -106,6 +110,7 @@ function SetupModel(
         atmosphere_callable,
         atmosphere_args,
         radiation,
+        atmosphere_ocean_flux_formulation,
         biogeochemistry_callable,
         biogeochemistry_args,
         biogeochemistry_ref,
@@ -134,8 +139,7 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     free_surface = sim_setup.free_surface_callable(sim_setup.free_surface_args...)
     coriolis = sim_setup.coriolis
     forcing = sim_setup.forcing_callable(sim_setup.forcing_args...)
-    biogeochemistry =
-        safe_execute(sim_setup.biogeochemistry_callable)(sim_setup.biogeochemistry_args...)
+    biogeochemistry = safe_execute(sim_setup.biogeochemistry_callable)(sim_setup.biogeochemistry_args...)
     sim_setup.biogeochemistry_ref[] = biogeochemistry
     boundary_conditions = sim_setup.bc_callable(sim_setup.bc_args...)
 
@@ -168,7 +172,15 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     ## Coupled model / simulation
     atmosphere = safe_execute(sim_setup.atmosphere_callable)(sim_setup.atmosphere_args...)
     println("Initialized atmosphere")
-    coupled_model = OceanSeaIceModel(ocean_sim; atmosphere, sim_setup.radiation)
+    sea_ice = FreezingLimitedOceanTemperature(eltype(ocean_sim.model))
+    interfaces = ComponentInterfaces(
+        atmosphere,
+        ocean_sim,
+        sea_ice;
+        sim_setup.radiation,
+        sim_setup.atmosphere_ocean_flux_formulation,
+    )
+    coupled_model = OceanSeaIceModel(ocean_sim; atmosphere, sim_setup.radiation, interfaces)
     println("Initialized coupled model")
     coupled_simulation = Simulation(coupled_model; Δt)
     println("Initialized coupled simulation")
@@ -182,18 +194,38 @@ cell_advection_timescale(model::OceanSeaIceModel) = cell_advection_timescale(mod
 free_surface_default(grid_ref) = SplitExplicitFreeSurface(grid_ref[]; cfl = 0.7)
 
 # This will call a rewritten JRA55FieldTimeSeries method
-JRA55PrescribedAtmosphere(arch, lat, lon) = JRA55PrescribedAtmosphere(
-    arch; latitude = lat, longitude = lon, custom = true)
+JRA55PrescribedAtmosphere(arch, lat, lon) =
+    JRA55PrescribedAtmosphere(arch; latitude = lat, longitude = lon, custom = true)
 
-biogeochemistry_LOBSTER(grid_ref) =
-    LOBSTER(; 
-    grid = grid_ref[], 
+ComponentInterfaces(atmosphere, ocean, sea_ice, radiation, atmosphere_ocean_flux_formulation) = ComponentInterfaces(
+    atmosphere,
+    ocean,
+    sea_ice;
+    radiation = radiation,
+    freshwater_density = 1000,
+    atmosphere_ocean_flux_formulation = atmosphere_ocean_flux_formulation,
+    atmosphere_sea_ice_flux_formulation = SimilarityTheoryFluxes(eltype(ocean.model.grid)),
+    atmosphere_ocean_interface_temperature = BulkTemperature(),
+    atmosphere_ocean_velocity_difference = RelativeVelocity(),
+    atmosphere_ocean_interface_specific_humidity = default_ao_specific_humidity(ocean),
+    atmosphere_sea_ice_interface_temperature = default_ai_temperature(sea_ice),
+    atmosphere_sea_ice_velocity_difference = RelativeVelocity(),
+    ocean_reference_density = reference_density(ocean),
+    ocean_heat_capacity = heat_capacity(ocean),
+    ocean_temperature_units = DegreesCelsius(),
+    sea_ice_temperature_units = DegreesCelsius(),
+    sea_ice_reference_density = reference_density(sea_ice),
+    sea_ice_heat_capacity = heat_capacity(sea_ice),
+)
+
+biogeochemistry_LOBSTER(grid_ref) = LOBSTER(;
+    grid = grid_ref[],
     surface_photosynthetically_active_radiation = PAR⁰,
-    carbonates = true, 
+    carbonates = true,
     variable_redfield = true,
     oxygen = true,
     scale_negatives = true,
-    )
+)
 
 biogeochemistry_OXYDEP(grid_ref, args_oxydep) = OXYDEP(;
     grid = grid_ref[],

@@ -31,11 +31,32 @@ ocean_sim = coupled_simulation.model.ocean
 ocean_sim.callbacks[:progress] = Callback(ProgressMessengers.TimedMessenger(), IterationInterval(1000));
 ocean_model = ocean_sim.model
 
-prefix = joinpath(sim_setup.results_dir, "snapshots")
-ocean_sim.output_writers[:all] = JLD2OutputWriter(
+prefix = joinpath(sim_setup.results_dir, "snapshots_ocean")
+ocean_sim.output_writers[:ocean] = JLD2OutputWriter(
     ocean_model,
-    merge(ocean_model.tracers, ocean_model.velocities);
-    schedule = TimeInterval(3hours),
+    merge(ocean_model.tracers, ocean_model.velocities, coupled_simulation.model.interfaces.atmosphere_ocean_interface.fluxes);
+    schedule = TimeInterval(1hours),
+    filename = "$prefix.jld2",
+    overwrite_existing = true,
+    array_type = Array{Float32},
+)
+
+atmosphere_fields = coupled_simulation.model.interfaces.exchanger.exchange_atmosphere_state
+atmosphere_data = NamedTuple((
+    u_atm  = atmosphere_fields.u,
+    v_atm  = atmosphere_fields.v,
+    T_atm  = atmosphere_fields.T,
+    p_atm  = atmosphere_fields.p,
+    q_atm  = atmosphere_fields.q,
+    Qs_atm = atmosphere_fields.Qs,
+    Qℓ_atm = atmosphere_fields.Qℓ,
+    Mp_atm = atmosphere_fields.Mp,
+))
+prefix = joinpath(sim_setup.results_dir, "snapshots_atmosphere")
+ocean_sim.output_writers[:atmosphere] = JLD2OutputWriter(
+    ocean_model,
+    atmosphere_data;
+    schedule = TimeInterval(1hours),
     filename = "$prefix.jld2",
     overwrite_existing = true,
     array_type = Array{Float32},
