@@ -19,6 +19,7 @@ import ClimaOcean.DataWrangling.JRA55: JRA55PrescribedAtmosphere
 
 include("utils.jl")
 include("grids.jl")
+include("turbulence.jl")
 include("initial_conditions.jl")
 include("boundary_conditions.jl")
 include("forcing.jl")

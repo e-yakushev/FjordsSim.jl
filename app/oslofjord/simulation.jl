@@ -15,9 +15,10 @@
 using Oceananigans.Units: second, seconds, minute, minutes, hour, hours, day, days
 using Oceananigans.Utils: TimeInterval, IterationInterval
 using Oceananigans.Simulations: Callback, conjure_time_step_wizard!, run!
-using Oceananigans.OutputWriters: JLD2OutputWriter
+using Oceananigans.OutputWriters: JLD2OutputWriter, NetCDFOutputWriter
 using Oceanostics
 using FjordsSim: coupled_hydrostatic_simulation
+using Printf
 
 include("setup.jl")
 
@@ -26,21 +27,54 @@ sim_setup = setup_region_3d()
 
 coupled_simulation = coupled_hydrostatic_simulation(sim_setup)
 
-## Set up output writers
+wall_time = Ref(time_ns())
+
+function progress(sim)
+    ocean = sim.model.ocean
+    u, v, w = ocean.model.velocities
+    T = ocean.model.tracers.T
+
+    Tmax = maximum(interior(T))
+    Tmin = minimum(interior(T))
+
+    umax = (maximum(abs, interior(u)),
+            maximum(abs, interior(v)),
+            maximum(abs, interior(w)))
+
+    step_time = 1e-9 * (time_ns() - wall_time[])
+
+    msg = @sprintf("Iter: %d, time: %s, Δt: %s", iteration(sim), prettytime(sim), prettytime(sim.Δt))
+    msg *= @sprintf(", max|u|: (%.2e, %.2e, %.2e) m s⁻¹, extrema(T): (%.2f, %.2f) ᵒC, wall time: %s",
+                    umax..., Tmax, Tmin, prettytime(step_time))
+
+    @info msg
+
+    wall_time[] = time_ns()
+end
+
+coupled_simulation.callbacks[:progress] = Callback(progress, TimeInterval(3hours))
+
 ocean_sim = coupled_simulation.model.ocean
-ocean_sim.callbacks[:progress] = Callback(ProgressMessengers.TimedMessenger(), IterationInterval(100));
 ocean_model = ocean_sim.model
 
+# This is center, center, face : but should be center center nothing to work with NetCDFOutputWriter
+# free_surface = NamedTuple((free_surface = ocean_model.free_surface.η,))
+net_ocean_fluxes = NamedTuple((
+    u_atm_ocean_flux = coupled_simulation.model.interfaces.net_fluxes.ocean_surface.u,
+    v_atm_ocean_flux = coupled_simulation.model.interfaces.net_fluxes.ocean_surface.v,
+))
+
 prefix = joinpath(sim_setup.results_dir, "snapshots_ocean")
-ocean_sim.output_writers[:ocean] = JLD2OutputWriter(
+ocean_sim.output_writers[:ocean] = NetCDFOutputWriter(
     ocean_model,
     merge(
         ocean_model.tracers,
         ocean_model.velocities,
         coupled_simulation.model.interfaces.atmosphere_ocean_interface.fluxes,
+        net_ocean_fluxes,
     );
     schedule = TimeInterval(1hours),
-    filename = "$prefix.jld2",
+    filename = "$prefix",
     overwrite_existing = true,
     array_type = Array{Float32},
 )
@@ -57,11 +91,11 @@ atmosphere_data = NamedTuple((
     Mp_atm = atmosphere_fields.Mp,
 ))
 prefix = joinpath(sim_setup.results_dir, "snapshots_atmosphere")
-ocean_sim.output_writers[:atmosphere] = JLD2OutputWriter(
+ocean_sim.output_writers[:atmosphere] = NetCDFOutputWriter(
     ocean_model,
     atmosphere_data;
     schedule = TimeInterval(1hours),
-    filename = "$prefix.jld2",
+    filename = "$prefix",
     overwrite_existing = true,
     array_type = Array{Float32},
 )

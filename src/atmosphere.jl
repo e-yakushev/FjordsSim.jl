@@ -88,10 +88,10 @@ function set!(fts::JRA55NetCDFFTS, path::String=fts.path, name::String=fts.name)
 
     close(ds)
 
-    if name in ("uas", "vas")
-        data .= map(x -> ismissing(x) ? missing : (x > 3f0 ? 3f0 : x), data)
-        data .= map(x -> ismissing(x) ? missing : (x < -3f0 ? -3f0 : x), data)
-    end
+    # if name in ("uas", "vas")
+    #     data .= map(x -> ismissing(x) ? missing : (x > 3f0 ? 3f0 : x), data)
+    #     data .= map(x -> ismissing(x) ? missing : (x < -3f0 ? -3f0 : x), data)
+    # end
 
     copyto!(interior(fts, :, :, 1, :), data)
     fill_halo_regions!(fts)
@@ -257,10 +257,10 @@ function JRA55FieldTimeSeries(
         # λc_bounded_face = λnodes(fts.grid, Face())
         # φc_bounded_face = φnodes(fts.grid, Face())
 
-        if fts.name in ("uas", "vas")
-            data .= map(x -> ismissing(x) ? missing : (x > 3f0 ? 3f0 : x), data)
-            data .= map(x -> ismissing(x) ? missing : (x < -3f0 ? -3f0 : x), data)
-        end
+        # if fts.name in ("uas", "vas")
+        #     data .= map(x -> ismissing(x) ? missing : (x > 3f0 ? 3f0 : x), data)
+        #     data .= map(x -> ismissing(x) ? missing : (x < -3f0 ? -3f0 : x), data)
+        # end
 
         # Fill the data in a GPU-friendly manner
         copyto!(interior(fts, :, :, 1, :), data)

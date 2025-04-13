@@ -3,7 +3,7 @@ using Oceananigans.Architectures: GPU, CPU
 using Oceananigans.Advection: WENO
 using Oceananigans.BuoyancyFormulations: SeawaterBuoyancy, g_Earth
 using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, BetaPlane, Ω_Earth
-using Oceananigans.TurbulenceClosures: ConvectiveAdjustmentVerticalDiffusivity, ScalarDiffusivity
+using Oceananigans.TurbulenceClosures: TKEDissipationVerticalDiffusivity, ConvectiveAdjustmentVerticalDiffusivity, ScalarDiffusivity
 using Oceananigans.OutputReaders: InMemory
 using Oceananigans.Units: day
 using ClimaOcean
@@ -16,6 +16,7 @@ using FjordsSim:
     grid_from_nc,
     grid_ref,
     forcing_from_file,
+    regional_ocean_closure,
     bc_varna_bgh_oxydep,
     bgh_oxydep_boundary_conditions,
     bc_ocean,
@@ -76,14 +77,19 @@ function setup_region(;
     # Buoyancy
     buoyancy = SeawaterBuoyancy(; equation_of_state = TEOS10EquationOfState(; reference_density)),
     # Closure
-    closure = ConvectiveAdjustmentVerticalDiffusivity(convective_κz = 5e-4, background_κz = 1e-5),
+    # closure = regional_ocean_closure(),
+    closure = TKEDissipationVerticalDiffusivity(),
+    # closure = ConvectiveAdjustmentVerticalDiffusivity(
+    #     convective_κz = 5e-4, background_κz = 1e-5,
+    #     convective_νz = 5e-1, background_νz = 1e-2,
+    #     ),
 
     # Tracer advection
-    tracer_advection = (T = WENO(), S = WENO(), e = nothing),
+    tracer_advection = (T = WENO(), S = WENO(), e = nothing, ϵ = nothing),
     # Momentum advection
     momentum_advection = default_momentum_advection(),
     # Tracers
-    tracers = (:T, :S, :e),
+    tracers = (:T, :S, :e, :ϵ),
     initial_conditions = (T = 5.0, S = 33.0),
     # Free surface
     free_surface_callable = free_surface_default,

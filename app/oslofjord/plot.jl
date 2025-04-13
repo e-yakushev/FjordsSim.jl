@@ -37,7 +37,7 @@ function record_variable(
         ylabel = "Grid points, northward direction",
     )
     hm = heatmap!(ax, f, colorrange = colorrange, colormap = colormap)
-    cb = Colorbar(fig[0, 1], hm, vertical = false, label = "$(var_name) (ms⁻¹)")
+    cb = Colorbar(fig[0, 1], hm, vertical = false, label = "$(var_name)")
 
     record(fig, joinpath(folder, "$(var_name).mp4"), 1:Nt, framerate = framerate) do i
         iter[] = i
@@ -114,12 +114,15 @@ datafile = jldopen("$filename.jld2")
 grid = datafile["grid"]
 Nz = grid["underlying_grid"]["Nz"]
 
-T = FieldTimeSeries("$filename.jld2", "T")
-S = FieldTimeSeries("$filename.jld2", "S")
-u = FieldTimeSeries("$filename.jld2", "u")
-x_momentum = FieldTimeSeries("$filename.jld2", "x_momentum")
-v = FieldTimeSeries("$filename.jld2", "v")
-y_momentum = FieldTimeSeries("$filename.jld2", "y_momentum")
+η = FieldTimeSeries("$filename.jld2", "free_surface", backend=OnDisk())
+T = FieldTimeSeries("$filename.jld2", "T", backend=OnDisk())
+S = FieldTimeSeries("$filename.jld2", "S", backend=OnDisk())
+u = FieldTimeSeries("$filename.jld2", "u", backend=OnDisk())
+u_ao_flux = FieldTimeSeries("$filename.jld2", "u_atm_ocean_flux", backend=OnDisk())
+x_momentum = FieldTimeSeries("$filename.jld2", "x_momentum", backend=OnDisk())
+v = FieldTimeSeries("$filename.jld2", "v", backend=OnDisk())
+v_ao_flux = FieldTimeSeries("$filename.jld2", "v_atm_ocean_flux", backend=OnDisk())
+y_momentum = FieldTimeSeries("$filename.jld2", "y_momentum", backend=OnDisk())
 O₂ = FieldTimeSeries("$filename.jld2", "O₂")
 NUT = FieldTimeSeries("$filename.jld2", "NUT")
 PHY = FieldTimeSeries("$filename.jld2", "P")
@@ -140,11 +143,14 @@ record_variable_multilayer(P, "phytoplankton", [10, 12, 14, 16, 18], P.times, fo
 
 record_bottom_tracer(O₂, "oxygen", Nz, O₂.times, folder; figsize = (300, 700))
 
+record_variable(η, "free surface", 1, η.times, folder, (300, 450); colorrange = (0., 0.1))
 record_variable(T, "temperature surface", Nz, T.times, folder, (300, 450); colorrange = (2, 6), colormap = Reverse(:RdYlBu))
 record_variable(S, "salinity surface", Nz, S.times, folder, (300, 450); colorrange = (20, 37), colormap = :viridis)
 record_variable(u, "u velocity surface", Nz, u.times, folder, (300, 450); colorrange = (-1, 1))
+record_variable(u_ao_flux, "u ao flux", 1, u_ao_flux.times, folder, (300, 450); colorrange = (-1, 1))
 record_variable(x_momentum, "x momentum", 1, x_momentum.times, folder, (300, 450); colorrange = (-1, 1))
 record_variable(v, "v velocity surface", Nz, v.times, folder, (300, 450); colorrange = (-1, 1))
+record_variable(v_ao_flux, "v ao flux", 1, v_ao_flux.times, folder, (300, 450); colorrange = (-0.1, 0.1))
 record_variable(y_momentum, "y momentum", 1, y_momentum.times, folder, (300, 450); colorrange = (-0.1, 0.1))
 record_variable(O₂, "O₂ surface", Nz, O₂.times, folder, (300, 700); colorrange = (0, 400), colormap = :turbo)
 record_variable(NUT, "NUT surface", Nz, v.times, folder, (300, 700); colorrange = (0, 5))
