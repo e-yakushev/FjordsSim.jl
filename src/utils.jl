@@ -5,6 +5,31 @@ using NCDatasets: Dataset
 using JLD2: @save
 using Printf: @sprintf
 
+wall_time = Ref(time_ns())
+
+function progress(sim)
+    ocean = sim.model.ocean
+    u, v, w = ocean.model.velocities
+    T = ocean.model.tracers.T
+
+    Tmax = maximum(interior(T))
+    Tmin = minimum(interior(T))
+
+    umax = (maximum(abs, interior(u)),
+            maximum(abs, interior(v)),
+            maximum(abs, interior(w)))
+
+    step_time = 1e-9 * (time_ns() - wall_time[])
+
+    msg = @sprintf("Iter: %d, time: %s, Δt: %s", iteration(sim), prettytime(sim), prettytime(sim.Δt))
+    msg *= @sprintf(", max|u|: (%.2e, %.2e, %.2e) m s⁻¹, extrema(T): (%.2f, %.2f) ᵒC, wall time: %s",
+                    umax..., Tmax, Tmin, prettytime(step_time))
+
+    @info msg
+
+    wall_time[] = time_ns()
+end
+
 function safe_execute(callable)
     return function (args...)
         if callable === nothing || args === nothing

@@ -1,12 +1,15 @@
+using Oceananigans
 using Oceananigans.Architectures: GPU, CPU
 using Oceananigans.Advection: WENO
-using Oceananigans.BuoyancyFormulations: SeawaterBuoyancy
+using Oceananigans.BuoyancyFormulations: SeawaterBuoyancy, g_Earth
 using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, BetaPlane, Ω_Earth
-using Oceananigans.TurbulenceClosures: ConvectiveAdjustmentVerticalDiffusivity, ScalarDiffusivity
+using Oceananigans.TurbulenceClosures: TKEDissipationVerticalDiffusivity, ConvectiveAdjustmentVerticalDiffusivity, ScalarDiffusivity
 using Oceananigans.OutputReaders: InMemory
 using Oceananigans.Units: day
+using ClimaOcean
 using ClimaOcean: Radiation
 using ClimaOcean.OceanSimulations: default_momentum_advection, default_tracer_advection
+using ClimaOcean.OceanSeaIceModels.InterfaceComputations: edson_stability_functions, LogarithmicSimilarityProfile
 using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 using FjordsSim:
     SetupModel,
@@ -17,6 +20,7 @@ using FjordsSim:
     bgh_oxydep_boundary_conditions,
     bc_ocean,
     PAR⁰,
+    regional_roughness_lengths,
     free_surface_default,
     JRA55PrescribedAtmosphere,
     biogeochemistry_LOBSTER,
@@ -25,6 +29,8 @@ using FjordsSim:
 
 const bottom_drag_coefficient = 0.003
 const reference_density = 1010  # T = 15 degC, S = 15 PSU
+
+FT = Oceananigans.defaults.FloatType
 
 args_oxydep = (
     initial_photosynthetic_slope = 0.1953 / day, # 1/(W/m²)/s
@@ -85,14 +91,15 @@ function setup_region(;
         equation_of_state = TEOS10EquationOfState(; reference_density),
     ),
     # Closure
-    closure = ConvectiveAdjustmentVerticalDiffusivity(convective_κz = 5e-4, background_κz = 1e-5),
+    # closure = ConvectiveAdjustmentVerticalDiffusivity(convective_κz = 5e-4, background_κz = 1e-5),
+    closure = TKEDissipationVerticalDiffusivity(),
 
     # Tracer advection
-    tracer_advection = (T = WENO(), S = WENO(), e = nothing),
+    tracer_advection = (T = WENO(), S = WENO(), e = nothing, ϵ = nothing),
     # Momentum advection
     momentum_advection = default_momentum_advection(),
     # Tracers
-    tracers = (:T, :S, :e),
+    tracers = (:T, :S, :e, :ϵ),
     initial_conditions = (T = 10, S = 15),
     # Free surface
     free_surface_callable = free_surface_default,
@@ -121,6 +128,19 @@ function setup_region(;
     # Ocean emissivity from https://link.springer.com/article/10.1007/BF02233853
     # With suspended matter 0.96 https://www.sciencedirect.com/science/article/abs/pii/0034425787900095
     radiation = Radiation(grid_args.arch; ocean_emissivity = 0.96),
+    atmosphere_ocean_flux_formulation = SimilarityTheoryFluxes(
+        FT;
+        gravitational_acceleration = g_Earth,
+        von_karman_constant = 0.4,
+        turbulent_prandtl_number = 1,
+        gustiness_parameter = 6.5,
+        stability_functions = edson_stability_functions(FT),
+        roughness_lengths = regional_roughness_lengths(FT),
+        similarity_form = LogarithmicSimilarityProfile(),
+        solver_stop_criteria = nothing,
+        solver_tolerance = 1e-8,
+        solver_maxiter = 100,
+    ),
     # Biogeochemistry
     biogeochemistry_callable = nothing,
     biogeochemistry_args = (nothing,),
@@ -148,6 +168,7 @@ function setup_region(;
         atmosphere_callable,
         atmosphere_args,
         radiation,
+        atmosphere_ocean_flux_formulation,
         biogeochemistry_callable,
         biogeochemistry_args,
         biogeochemistry_ref;
@@ -157,7 +178,7 @@ end
 
 setup_region_3d() = setup_region()
 setup_region_3d_OXYDEP() = setup_region(
-    tracers = (:T, :S, :e, :C, :NUT, :P, :HET, :POM, :DOM, :O₂),
+    tracers = (:T, :S, :e, :ϵ, :C, :NUT, :P, :HET, :POM, :DOM, :O₂),
     initial_conditions = (
         T = 10,
         S = 15,
@@ -177,6 +198,7 @@ setup_region_3d_OXYDEP() = setup_region(
         S = WENO(),
         C = WENO(),
         e = nothing,
+        ϵ = nothing,
         NUT = WENO(),
         P = WENO(),
         HET = WENO(),

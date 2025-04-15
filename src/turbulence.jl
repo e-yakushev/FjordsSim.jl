@@ -4,6 +4,7 @@ using Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities:
 
 import Oceananigans.BoundaryConditions: fill_halo_regions!
 
+# in Oceananigans v0.95.29 there is a typo in this function
 Adapt.adapt_structure(to, tke_dissipation_diffusivity_fields::TKEDissipationDiffusivityFields) =
     TKEDissipationDiffusivityFields(adapt(to, tke_dissipation_diffusivity_fields.κu),
                                     adapt(to, tke_dissipation_diffusivity_fields.κc),
@@ -15,6 +16,7 @@ Adapt.adapt_structure(to, tke_dissipation_diffusivity_fields::TKEDissipationDiff
                                     adapt(to, tke_dissipation_diffusivity_fields._tupled_tracer_diffusivities),
                                     adapt(to, tke_dissipation_diffusivity_fields._tupled_implicit_linear_coefficients))
 
+# in Oceananigans v0.95.29 there is a wrong positional argument
 function fill_halo_regions!(tke_dissipation_diffusivity_fields::TKEDissipationDiffusivityFields, args...; kw...)
     fields_with_halos_to_fill = (tke_dissipation_diffusivity_fields.κu,
                                  tke_dissipation_diffusivity_fields.κc,

@@ -17,7 +17,7 @@ using Oceananigans.Utils: TimeInterval, IterationInterval
 using Oceananigans.Simulations: Callback, conjure_time_step_wizard!, run!
 using Oceananigans.OutputWriters: JLD2OutputWriter, NetCDFOutputWriter
 using Oceanostics
-using FjordsSim: coupled_hydrostatic_simulation
+using FjordsSim: coupled_hydrostatic_simulation, progress
 using Printf
 
 include("setup.jl")
@@ -26,31 +26,6 @@ include("setup.jl")
 sim_setup = setup_region_3d()
 
 coupled_simulation = coupled_hydrostatic_simulation(sim_setup)
-
-wall_time = Ref(time_ns())
-
-function progress(sim)
-    ocean = sim.model.ocean
-    u, v, w = ocean.model.velocities
-    T = ocean.model.tracers.T
-
-    Tmax = maximum(interior(T))
-    Tmin = minimum(interior(T))
-
-    umax = (maximum(abs, interior(u)),
-            maximum(abs, interior(v)),
-            maximum(abs, interior(w)))
-
-    step_time = 1e-9 * (time_ns() - wall_time[])
-
-    msg = @sprintf("Iter: %d, time: %s, Δt: %s", iteration(sim), prettytime(sim), prettytime(sim.Δt))
-    msg *= @sprintf(", max|u|: (%.2e, %.2e, %.2e) m s⁻¹, extrema(T): (%.2f, %.2f) ᵒC, wall time: %s",
-                    umax..., Tmax, Tmin, prettytime(step_time))
-
-    @info msg
-
-    wall_time[] = time_ns()
-end
 
 coupled_simulation.callbacks[:progress] = Callback(progress, TimeInterval(3hours))
 

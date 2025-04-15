@@ -26,43 +26,6 @@ using FjordsSim:
 
 include("setup.jl");
 
-function record_variable(
-    variable,
-    var_name,
-    Nz,
-    times,
-    folder,
-    figsize;
-    colorrange = (0, 0.5),
-    colormap = :deep,
-    framerate = 12,
-)
-    Nt = length(times)
-    iter = Observable(Nt)
-
-    f = @lift begin
-        x = variable[$iter]
-        x = interior(x, :, :, Nz)
-        x[x.==0] .= NaN
-        x
-    end
-
-    fig = Figure(size = figsize)
-    title = @lift "$(var_name) at " * prettytime(times[$iter])
-    ax = Axis(
-        fig[1, 1];
-        title = title,
-        xlabel = "Grid points, eastward direction",
-        ylabel = "Grid points, northward direction",
-    )
-    hm = heatmap!(ax, f, colorrange = colorrange, colormap = colormap)
-    cb = Colorbar(fig[0, 1], hm, vertical = false, label = "$(var_name) (ms⁻¹)")
-
-    record(fig, joinpath(folder, "$(var_name).mp4"), 1:Nt, framerate = framerate) do i
-        iter[] = i
-    end
-end
-
 sim_setup = setup_region_3d();
 grid_args = merge(sim_setup.grid_args, (arch = CPU(),))
 grid_from_setup = sim_setup.grid_callable(grid_args...).underlying_grid
@@ -70,14 +33,12 @@ z = znodes(grid_from_setup, Center())
 Nz = grid_from_setup.Nz
 
 folder = joinpath(homedir(), "FjordsSim_results", "varna")
-filename = joinpath(folder, "snapshots")
+filename = joinpath(folder, "snapshots_ocean")
 
 T = FieldTimeSeries("$filename.jld2", "T")
 S = FieldTimeSeries("$filename.jld2", "S")
 u = FieldTimeSeries("$filename.jld2", "u")
-x_momentum = FieldTimeSeries("$filename.jld2", "x_momentum")
 v = FieldTimeSeries("$filename.jld2", "v")
-y_momentum = FieldTimeSeries("$filename.jld2", "y_momentum")
 O₂ = FieldTimeSeries("$filename.jld2", "O₂")
 NUT = FieldTimeSeries("$filename.jld2", "NUT")
 PHY = FieldTimeSeries("$filename.jld2", "P")
@@ -87,6 +48,8 @@ POM = FieldTimeSeries("$filename.jld2", "POM")
 C = FieldTimeSeries("$filename.jld2", "C")
 times = T.times
 
+record_variable(T, "temperature surface", Nz, T.times, folder, (1000, 400); colorrange = (-1, 20))
+record_variable(S, "salinity surface", Nz, S.times, folder, (1000, 400); colorrange = (0, 30))
 record_variable(u, "u velocity surface", Nz, u.times, folder, (1000, 400); colorrange = (-1, 1))
 record_variable(x_momentum, "x momentum", 1, x_momentum.times, folder, (1000, 400); colorrange = (-0.1, 0.1))
 record_variable(v, "v velocity surface", Nz, v.times, folder, (1000, 400); colorrange = (-1, 1))

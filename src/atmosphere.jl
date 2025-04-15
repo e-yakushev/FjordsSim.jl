@@ -48,7 +48,7 @@ function compute_bounding_indices(longitude::Nothing, latitude::Nothing, grid, L
     return i₁, i₂, j₁, j₂, TX
 end
 
-# rewrite to limit the velocities
+# rewrite to possibly limit the velocities
 function set!(fts::JRA55NetCDFFTS, path::String=fts.path, name::String=fts.name)
 
     ds = Dataset(path)
