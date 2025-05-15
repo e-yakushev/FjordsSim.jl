@@ -33,12 +33,21 @@ ocean_sim = coupled_simulation.model.ocean
 ocean_model = ocean_sim.model
 
 # This is center, center, face : but should be center center nothing to work with NetCDFOutputWriter
-# free_surface = NamedTuple((free_surface = ocean_model.free_surface.η,))
+free_surface = NamedTuple((free_surface = ocean_model.free_surface.η,))
+prefix = joinpath(sim_setup.results_dir, "snapshots_free_surface")
+ocean_sim.output_writers[:free_surface] = JLD2OutputWriter(
+    ocean_model,
+    free_surface;
+    schedule = TimeInterval(1hours),
+    filename = "$prefix",
+    overwrite_existing = true,
+    array_type = Array{Float32},
+)
+
 net_ocean_fluxes = NamedTuple((
     u_atm_ocean_flux = coupled_simulation.model.interfaces.net_fluxes.ocean_surface.u,
     v_atm_ocean_flux = coupled_simulation.model.interfaces.net_fluxes.ocean_surface.v,
 ))
-
 prefix = joinpath(sim_setup.results_dir, "snapshots_ocean")
 ocean_sim.output_writers[:ocean] = NetCDFOutputWriter(
     ocean_model,

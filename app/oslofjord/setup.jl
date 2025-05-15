@@ -109,8 +109,6 @@ function setup_region(;
     # Atmosphere
     atmosphere_callable = JRA55PrescribedAtmosphere,
     atmosphere_args = (arch = grid_args.arch, latitude = (58.98, 59.94), longitude = (10.18, 11.03)),
-    component_interfaces_callable = ComponentInterfaces,
-    component_interfaces_args = (),
     # Ocean emissivity from https://link.springer.com/article/10.1007/BF02233853
     # With suspended matter 0.96 https://www.sciencedirect.com/science/article/abs/pii/0034425787900095
     radiation = Radiation(grid_args.arch; ocean_emissivity = 0.96),
