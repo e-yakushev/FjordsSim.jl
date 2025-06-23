@@ -28,7 +28,7 @@
             "type": "julia",
             "request": "launch",
             "name": "Oslofjord simulation",
-            "program": "${workspaceFolder}/app/oslofjord/simulation.jl",
+            "program": "${workspaceFolder}/app/oslofjord/simulation_45to82.jl",
             "stopOnEntry": false,
             "juliaAdditionalArgs": [
                 "-O0"

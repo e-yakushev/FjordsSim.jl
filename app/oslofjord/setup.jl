@@ -3,7 +3,8 @@ using Oceananigans.Architectures: GPU, CPU
 using Oceananigans.Advection: WENO
 using Oceananigans.BuoyancyFormulations: SeawaterBuoyancy, g_Earth
 using Oceananigans.Coriolis: HydrostaticSphericalCoriolis, BetaPlane, Ω_Earth
-using Oceananigans.TurbulenceClosures: TKEDissipationVerticalDiffusivity, ConvectiveAdjustmentVerticalDiffusivity, ScalarDiffusivity
+using Oceananigans.TurbulenceClosures:
+    TKEDissipationVerticalDiffusivity, ConvectiveAdjustmentVerticalDiffusivity, ScalarDiffusivity
 using Oceananigans.OutputReaders: InMemory
 using Oceananigans.Units: day
 using ClimaOcean
@@ -78,7 +79,10 @@ function setup_region(;
     buoyancy = SeawaterBuoyancy(; equation_of_state = TEOS10EquationOfState(; reference_density)),
     # Closure
     # closure = regional_ocean_closure(),
-    closure = TKEDissipationVerticalDiffusivity(),
+    closure = (
+        # TKEDissipationVerticalDiffusivity(),
+        Oceananigans.TurbulenceClosures.HorizontalScalarDiffusivity(ν = 2000),
+        ),
     # closure = ConvectiveAdjustmentVerticalDiffusivity(
     #     convective_κz = 5e-4, background_κz = 1e-5,
     #     convective_νz = 5e-1, background_νz = 1e-2,
@@ -161,6 +165,49 @@ function setup_region(;
 end
 
 setup_region_3d() = setup_region()
+setup_region_3d_45to82() = setup_region(
+    grid_args = (
+        arch = GPU(),
+        halo = (7, 7, 7),
+        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_45to82_bathymetry.nc"),
+    ),
+    tracers = (:T, :S, :e, :ϵ),
+    forcing_args = (
+        grid_ref = grid_ref,
+        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_45to82_forcing.nc"),
+        tracers = (:T, :S, :e, :ϵ),
+    ),
+)
+setup_region_3d_OXYDEP_45to82() = setup_region(
+    grid_args = (
+        arch = GPU(),
+        halo = (7, 7, 7),
+        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_45to82_bathymetry.nc"),
+    ),
+    tracers = (:T, :S, :e, :C, :NUT, :P, :HET, :POM, :DOM, :O₂),
+    forcing_args = (
+        grid_ref = grid_ref,
+        filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_45to82_forcing.nc"),
+        tracers = tracers,
+    ),
+    initial_conditions = (T = 5.0, S = 33.0, C = 0.0, NUT = 10.0, P = 0.05, HET = 0.01, O₂ = 350.0, DOM = 1.0),
+    biogeochemistry_callable = biogeochemistry_OXYDEP,
+    biogeochemistry_args = (grid_ref, args_oxydep),
+    bc_callable = bc_varna_bgh_oxydep,
+    bc_args = (grid_ref, bottom_drag_coefficient, biogeochemistry_ref),
+    tracer_advection = (
+        T = WENO(),
+        S = WENO(),
+        C = WENO(),
+        e = nothing,
+        NUT = WENO(),
+        P = WENO(),
+        HET = WENO(),
+        POM = WENO(),
+        DOM = WENO(),
+        O₂ = WENO(),
+    ),
+)
 setup_region_3d_OXYDEP() = setup_region(
     tracers = (:T, :S, :e, :C, :NUT, :P, :HET, :POM, :DOM, :O₂),
     initial_conditions = (T = 5.0, S = 33.0, C = 0.0, NUT = 10.0, P = 0.05, HET = 0.01, O₂ = 350.0, DOM = 1.0),
