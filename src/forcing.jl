@@ -121,9 +121,21 @@ Result will be added to the tendency contributions (a kernel function).
     value = @inbounds p.fts_value[i, j, k, Time(clock.time)]
     λ = @inbounds p.fts_λ[i, j, k, Time(clock.time)]
     result = 0.0
-    result += @inbounds ifelse(λ > 1 && value > -990, forcing_term_u(λ, value, i, j, k, grid, fields[i, j, k, p.fieldname]), 0)
-    result += @inbounds ifelse(λ < -1 && value > -990, forcing_term_v(λ, value, i, j, k, grid, fields[i, j, k, p.fieldname]), 0)
-    result += @inbounds ifelse(-1 < λ < 1 && value > -990, forcing_term_relax(λ, value, i, j, k, grid, fields[i, j, k, p.fieldname]), 0)
+    result += @inbounds ifelse(
+        λ > 1 && value > -990,
+        forcing_term_u(λ, value, i, j, k, grid, fields[i, j, k, p.fieldname]),
+        0,
+    )
+    result += @inbounds ifelse(
+        λ < -1 && value > -990,
+        forcing_term_v(λ, value, i, j, k, grid, fields[i, j, k, p.fieldname]),
+        0,
+    )
+    result += @inbounds ifelse(
+        -1 < λ < 1 && value > -990,
+        forcing_term_relax(λ, value, i, j, k, grid, fields[i, j, k, p.fieldname]),
+        0,
+    )
     return result
 end
 

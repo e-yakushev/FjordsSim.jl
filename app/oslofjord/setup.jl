@@ -8,21 +8,18 @@ using Oceananigans.TurbulenceClosures:
 using Oceananigans.OutputReaders: InMemory
 using Oceananigans.Units: day
 using ClimaOcean
-using ClimaOcean: Radiation
-using ClimaOcean.OceanSimulations: default_momentum_advection, default_tracer_advection
-using ClimaOcean.OceanSeaIceModels.InterfaceComputations: edson_stability_functions, LogarithmicSimilarityProfile
 using SeawaterPolynomials.TEOS10: TEOS10EquationOfState
 using FjordsSim:
     SetupModel,
     grid_from_nc,
     grid_ref,
     forcing_from_file,
-    regional_ocean_closure,
+    # regional_ocean_closure,
     bc_varna_bgh_oxydep,
     bgh_oxydep_boundary_conditions,
     bc_ocean,
     PAR⁰,
-    regional_roughness_lengths,
+    # regional_roughness_lengths,
     free_surface_default,
     JRA55PrescribedAtmosphere,
     ComponentInterfaces,
@@ -32,8 +29,6 @@ using FjordsSim:
 
 const bottom_drag_coefficient = 0.003
 const reference_density = 1020
-
-FT = Oceananigans.defaults.FloatType
 
 args_oxydep = (
     initial_photosynthetic_slope = 0.1953 / day, # 1/(W/m²)/s
@@ -79,10 +74,11 @@ function setup_region(;
     buoyancy = SeawaterBuoyancy(; equation_of_state = TEOS10EquationOfState(; reference_density)),
     # Closure
     # closure = regional_ocean_closure(),
+    # closure = TKEDissipationVerticalDiffusivity(),
     closure = (
-        # TKEDissipationVerticalDiffusivity(),
-        Oceananigans.TurbulenceClosures.HorizontalScalarDiffusivity(ν = 2000),
-        ),
+        TKEDissipationVerticalDiffusivity(),
+        # Oceananigans.TurbulenceClosures.HorizontalScalarDiffusivity(ν = 2000),
+    ),
     # closure = ConvectiveAdjustmentVerticalDiffusivity(
     #     convective_κz = 5e-4, background_κz = 1e-5,
     #     convective_νz = 5e-1, background_νz = 1e-2,
@@ -91,7 +87,7 @@ function setup_region(;
     # Tracer advection
     tracer_advection = (T = WENO(), S = WENO(), e = nothing, ϵ = nothing),
     # Momentum advection
-    momentum_advection = default_momentum_advection(),
+    momentum_advection = WENOVectorInvariant(),
     # Tracers
     tracers = (:T, :S, :e, :ϵ),
     initial_conditions = (T = 5.0, S = 33.0),
@@ -115,20 +111,8 @@ function setup_region(;
     atmosphere_args = (arch = grid_args.arch, latitude = (58.98, 59.94), longitude = (10.18, 11.03)),
     # Ocean emissivity from https://link.springer.com/article/10.1007/BF02233853
     # With suspended matter 0.96 https://www.sciencedirect.com/science/article/abs/pii/0034425787900095
-    radiation = Radiation(grid_args.arch; ocean_emissivity = 0.96),
-    atmosphere_ocean_flux_formulation = SimilarityTheoryFluxes(
-        FT;
-        gravitational_acceleration = g_Earth,
-        von_karman_constant = 0.4,
-        turbulent_prandtl_number = 1,
-        gustiness_parameter = 6.5,
-        stability_functions = edson_stability_functions(FT),
-        roughness_lengths = regional_roughness_lengths(FT),
-        similarity_form = LogarithmicSimilarityProfile(),
-        solver_stop_criteria = nothing,
-        solver_tolerance = 1e-8,
-        solver_maxiter = 100,
-    ),
+    radiation = ClimaOcean.Radiation(grid_args.arch; ocean_emissivity = 0.96),
+    atmosphere_ocean_flux_formulation = SimilarityTheoryFluxes(),
     # Biogeochemistry
     biogeochemistry_callable = nothing,
     biogeochemistry_args = (nothing,),

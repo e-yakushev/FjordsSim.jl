@@ -15,7 +15,7 @@
 using Oceananigans.Units: second, seconds, minute, minutes, hour, hours, day, days
 using Oceananigans.Utils: TimeInterval, IterationInterval
 using Oceananigans.Simulations: Callback, conjure_time_step_wizard!, run!
-using Oceananigans.OutputWriters: JLD2OutputWriter, NetCDFOutputWriter
+using Oceananigans.OutputWriters: NetCDFWriter
 using Oceanostics
 using FjordsSim: coupled_hydrostatic_simulation, progress
 using Printf
@@ -37,7 +37,7 @@ net_ocean_fluxes = NamedTuple((
     v_atm_ocean_flux = coupled_simulation.model.interfaces.net_fluxes.ocean_surface.v,
 ))
 prefix = joinpath(sim_setup.results_dir, "snapshots_ocean")
-ocean_sim.output_writers[:ocean] = NetCDFOutputWriter(
+ocean_sim.output_writers[:ocean] = NetCDFWriter(
     ocean_model,
     merge(
         ocean_model.tracers,
@@ -45,10 +45,9 @@ ocean_sim.output_writers[:ocean] = NetCDFOutputWriter(
         coupled_simulation.model.interfaces.atmosphere_ocean_interface.fluxes,
         net_ocean_fluxes,
     );
-    schedule = TimeInterval(1hours),
     filename = "$prefix",
+    schedule = TimeInterval(1hours),
     overwrite_existing = true,
-    array_type = Array{Float32},
 )
 
 ## Spinning up the simulation

@@ -12,6 +12,7 @@ using Oceananigans.Forcings: DiscreteForcing
 using Oceananigans.Units: second, seconds
 using ClimaOcean.OceanSeaIceModels: OceanSeaIceModel
 using ClimaOcean.OceanSeaIceModels.InterfaceComputations
+using ClimaOcean.OceanSeaIceModels.InterfaceComputations: ComponentInterfaces
 using OceanBioME: LOBSTER
 
 import Oceananigans.Advection: cell_advection_timescale
@@ -177,8 +178,8 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
         atmosphere,
         ocean_sim,
         sea_ice;
-        sim_setup.radiation,
-        sim_setup.atmosphere_ocean_flux_formulation,
+        radiation = sim_setup.radiation,
+        atmosphere_ocean_fluxes = sim_setup.atmosphere_ocean_flux_formulation,
     )
     coupled_model = OceanSeaIceModel(ocean_sim; atmosphere, sim_setup.radiation, interfaces)
     println("Initialized coupled model")
@@ -195,28 +196,28 @@ free_surface_default(grid_ref) = SplitExplicitFreeSurface(grid_ref[]; cfl = 0.7)
 
 # This will call a rewritten JRA55FieldTimeSeries method
 JRA55PrescribedAtmosphere(arch, lat, lon) =
-    JRA55PrescribedAtmosphere(arch; latitude = lat, longitude = lon, custom = true)
+    JRA55PrescribedAtmosphere(arch; latitude = lat, longitude = lon)
 
-ComponentInterfaces(atmosphere, ocean, sea_ice, radiation, atmosphere_ocean_flux_formulation) = ComponentInterfaces(
-    atmosphere,
-    ocean,
-    sea_ice;
-    radiation = radiation,
-    freshwater_density = 1000,
-    atmosphere_ocean_flux_formulation = atmosphere_ocean_flux_formulation,
-    atmosphere_sea_ice_flux_formulation = SimilarityTheoryFluxes(eltype(ocean.model.grid)),
-    atmosphere_ocean_interface_temperature = BulkTemperature(),
-    atmosphere_ocean_velocity_difference = RelativeVelocity(),
-    atmosphere_ocean_interface_specific_humidity = default_ao_specific_humidity(ocean),
-    atmosphere_sea_ice_interface_temperature = default_ai_temperature(sea_ice),
-    atmosphere_sea_ice_velocity_difference = RelativeVelocity(),
-    ocean_reference_density = reference_density(ocean),
-    ocean_heat_capacity = heat_capacity(ocean),
-    ocean_temperature_units = DegreesCelsius(),
-    sea_ice_temperature_units = DegreesCelsius(),
-    sea_ice_reference_density = reference_density(sea_ice),
-    sea_ice_heat_capacity = heat_capacity(sea_ice),
-)
+# ComponentInterfaces(atmosphere, ocean, sea_ice, radiation, atmosphere_ocean_flux_formulation) = ComponentInterfaces(
+#     atmosphere,
+#     ocean,
+#     sea_ice;
+#     radiation = radiation,
+#     freshwater_density = 1000,
+#     atmosphere_ocean_fluxes = atmosphere_ocean_flux_formulation,
+#     atmosphere_sea_ice_fluxes = SimilarityTheoryFluxes(eltype(ocean.model.grid)),
+#     atmosphere_ocean_interface_temperature = BulkTemperature(),
+#     atmosphere_ocean_velocity_difference = RelativeVelocity(),
+#     atmosphere_ocean_interface_specific_humidity = default_ao_specific_humidity(ocean),
+#     atmosphere_sea_ice_interface_temperature = default_ai_temperature(sea_ice),
+#     atmosphere_sea_ice_velocity_difference = RelativeVelocity(),
+#     ocean_reference_density = reference_density(ocean),
+#     ocean_heat_capacity = heat_capacity(ocean),
+#     ocean_temperature_units = DegreesCelsius(),
+#     sea_ice_temperature_units = DegreesCelsius(),
+#     sea_ice_reference_density = reference_density(sea_ice),
+#     sea_ice_heat_capacity = heat_capacity(sea_ice),
+# )
 
 biogeochemistry_LOBSTER(grid_ref) = LOBSTER(;
     grid = grid_ref[],

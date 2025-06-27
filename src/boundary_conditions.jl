@@ -6,8 +6,7 @@ using Oceananigans.Architectures: GPU, CPU
 using Oceananigans.Grids: Center, Face
 using ClimaOcean.OceanSimulations: u_quadratic_bottom_drag, v_quadratic_bottom_drag
 using OceanBioME: CarbonDioxideGasExchangeBoundaryCondition
-
-import Oceananigans.Biogeochemistry: biogeochemical_drift_velocity
+using Oceananigans.Biogeochemistry: biogeochemical_drift_velocity
 
 # Coefficients from Garcia and Gordon (1992)
 const A1 = -173.4292
@@ -74,7 +73,7 @@ const Trel = 25000.0 #10000.0     # Relaxation time for exchange with the sedime
 const b_ox = 15.0        # difference of OXY in the sediment and water, 
 const b_NUT = 10.0       # NUT in the sediment, (mmol/m3)  
 const b_DOM_ox = 6.0     # OM in the sediment (oxic conditions), (mmol/m3) 
-const b_DOM_anox = 20.   # OM in the sediment (anoxic conditions), (mmol/m3)  
+const b_DOM_anox = 20.0   # OM in the sediment (anoxic conditions), (mmol/m3)  
 const bu = 0.8  #0.85 0.6          # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
 const windspeed = 5.0    # wind speed 10 m, (m/s)
 
