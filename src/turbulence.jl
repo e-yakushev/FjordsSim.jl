@@ -1,6 +1,5 @@
 using Oceananigans.Utils
 using Oceananigans.TimeSteppers: implicit_step!
-# using Oceananigans.TurbulenceClosures: HorizontalScalarDiffusivity
 using Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities:
     TKEDissipationDiffusivityFields,
     FlavorOfTD,
@@ -15,15 +14,18 @@ import Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities:
 @inline top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple::Tuple{<:Any}, buoyancy) =
     top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple[1], buoyancy)
 
+# is this needed?
 @inline top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple::Tuple{<:Any,<:Any}, buoyancy) =
     top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple[1], buoyancy) +
     top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple[2], buoyancy)
 
+# is this needed?
 @inline top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple::Tuple{<:Any,<:Any,<:Any}, buoyancy) =
     top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple[1], buoyancy) +
     top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple[2], buoyancy) +
     top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple[3], buoyancy)
 
+# TKE dissipation vertical diffusivity with another closure 
 @inline top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple::Tuple{<:FlavorOfTD, <:Any}, buoyancy) =
     top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple[1], buoyancy)
 

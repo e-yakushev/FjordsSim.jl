@@ -77,7 +77,7 @@ function setup_region(;
     # closure = TKEDissipationVerticalDiffusivity(),
     closure = (
         TKEDissipationVerticalDiffusivity(),
-        Oceananigans.TurbulenceClosures.HorizontalScalarDiffusivity(ν = 2000),
+        Oceananigans.TurbulenceClosures.HorizontalScalarBiharmonicDiffusivity(ν = 15, κ = 10),
     ),
     # closure = ConvectiveAdjustmentVerticalDiffusivity(
     #     convective_κz = 5e-4, background_κz = 1e-5,
