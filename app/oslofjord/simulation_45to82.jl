@@ -49,6 +49,25 @@ ocean_sim.output_writers[:ocean] = NetCDFWriter(
     schedule = TimeInterval(1hours),
     overwrite_existing = true,
 )
+atmosphere_fields = coupled_simulation.model.interfaces.exchanger.exchange_atmosphere_state
+atmosphere_data = NamedTuple((
+    u_atm  = atmosphere_fields.u,
+    v_atm  = atmosphere_fields.v,
+    T_atm  = atmosphere_fields.T,
+    p_atm  = atmosphere_fields.p,
+    q_atm  = atmosphere_fields.q,
+    Qs_atm = atmosphere_fields.Qs,
+    Qℓ_atm = atmosphere_fields.Qℓ,
+    Mp_atm = atmosphere_fields.Mp,
+))
+prefix = joinpath(sim_setup.results_dir, "snapshots_atmosphere")
+ocean_sim.output_writers[:atmosphere] = NetCDFWriter(
+    ocean_model,
+    atmosphere_data;
+    filename = "$prefix",
+    schedule = TimeInterval(1hours),
+    overwrite_existing = true,
+)
 
 ## Spinning up the simulation
 # We use an adaptive time step that maintains the [CFL condition](https://en.wikipedia.org/wiki/Courant%E2%80%93Friedrichs%E2%80%93Lewy_condition) equal to 0.1.

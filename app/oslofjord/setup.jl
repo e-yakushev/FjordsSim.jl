@@ -14,7 +14,7 @@ using FjordsSim:
     grid_from_nc,
     grid_ref,
     forcing_from_file,
-    # regional_ocean_closure,
+    regional_ocean_closure,
     bc_varna_bgh_oxydep,
     bgh_oxydep_boundary_conditions,
     bc_ocean,
@@ -73,12 +73,12 @@ function setup_region(;
     # Buoyancy
     buoyancy = SeawaterBuoyancy(; equation_of_state = TEOS10EquationOfState(; reference_density)),
     # Closure
-    # closure = regional_ocean_closure(),
+    closure = regional_ocean_closure(),
     # closure = TKEDissipationVerticalDiffusivity(),
-    closure = (
-        TKEDissipationVerticalDiffusivity(),
-        Oceananigans.TurbulenceClosures.HorizontalScalarBiharmonicDiffusivity(ν = 15, κ = 10),
-    ),
+    # closure = (
+    #     TKEDissipationVerticalDiffusivity(),
+    #     Oceananigans.TurbulenceClosures.HorizontalScalarBiharmonicDiffusivity(ν = 15, κ = 10),
+    # ),
     # closure = ConvectiveAdjustmentVerticalDiffusivity(
     #     convective_κz = 5e-4, background_κz = 1e-5,
     #     convective_νz = 5e-1, background_νz = 1e-2,

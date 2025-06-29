@@ -6,7 +6,10 @@ using Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities:
     compute_tke_dissipation_diffusivities!,
     compute_TKEDissipation_diffusivities!,
     substep_tke_dissipation!,
-    get_time_step
+    get_time_step,
+    CATKEVerticalDiffusivity,
+    CATKEMixingLength,
+    CATKEEquation
 
 import Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities:
     top_dissipation_flux, compute_diffusivities!, time_step_tke_dissipation_equations!
@@ -26,11 +29,27 @@ import Oceananigans.TurbulenceClosures.TKEBasedVerticalDiffusivities:
     top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple[3], buoyancy)
 
 # TKE dissipation vertical diffusivity with another closure 
-@inline top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple::Tuple{<:FlavorOfTD, <:Any}, buoyancy) =
-    top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple[1], buoyancy)
+@inline top_dissipation_flux(
+    i,
+    j,
+    grid,
+    clock,
+    fields,
+    parameters,
+    closure_tuple::Tuple{<:FlavorOfTD,<:Any},
+    buoyancy,
+) = top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple[1], buoyancy)
 
-@inline top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple::Tuple{<:Any, <:FlavorOfTD}, buoyancy) =
-    top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple[2], buoyancy)
+@inline top_dissipation_flux(
+    i,
+    j,
+    grid,
+    clock,
+    fields,
+    parameters,
+    closure_tuple::Tuple{<:Any,<:FlavorOfTD},
+    buoyancy,
+) = top_dissipation_flux(i, j, grid, clock, fields, parameters, closure_tuple[2], buoyancy)
 
 # overload to call the proper time_step_tke_dissipation_equations
 function compute_diffusivities!(
@@ -78,7 +97,11 @@ function compute_diffusivities!(
 end
 
 # pass proper diffusivities and closure
-function time_step_tke_dissipation_equations!(model, diffusivities::TKEDissipationDiffusivityFields, closure::FlavorOfTD)
+function time_step_tke_dissipation_equations!(
+    model,
+    diffusivities::TKEDissipationDiffusivityFields,
+    closure::FlavorOfTD,
+)
 
     e = model.tracers.e
     ϵ = model.tracers.ϵ
@@ -162,4 +185,46 @@ function time_step_tke_dissipation_equations!(model, diffusivities::TKEDissipati
     end
 
     return nothing
+end
+
+function regional_ocean_closure(FT = Oceananigans.defaults.FloatType)
+    mixing_length = CATKEMixingLength(
+        Cˢ = 1.131,  # Surface distance coefficient for shear length scale
+        Cᵇ = 0.28,   # Bottom distance coefficient for shear length scale
+        Cˢᵖ = 0.505,  # Sheared convective plume coefficient
+        CRiᵟ = 1.02,   # Stability function width
+        CRi⁰ = 0.254,  # Stability function lower Ri
+        Cʰⁱu = 0.242,  # Shear mixing length coefficient for momentum at high Ri
+        Cˡᵒu = 0.361,  # Shear mixing length coefficient for momentum at low Ri
+        Cᵘⁿu = 0.370,  # Shear mixing length coefficient for momentum at negative Ri
+        Cᶜu = 3.705,  # Convective mixing length coefficient for tracers
+        Cᵉu = 0.0,    # Convective penetration mixing length coefficient for tracers
+        Cʰⁱc = 0.098,  # Shear mixing length coefficient for tracers at high Ri
+        Cˡᵒc = 0.369,  # Shear mixing length coefficient for tracers at low Ri
+        Cᵘⁿc = 0.572,  # Shear mixing length coefficient for tracers at negative Ri
+        Cᶜc = 4.793,  # Convective mixing length coefficient for tracers
+        Cᵉc = 0.112,  # Convective penetration mixing length coefficient for tracers
+        Cʰⁱe = 0.548,  # Shear mixing length coefficient for TKE at high Ri
+        Cˡᵒe = 7.863,  # Shear mixing length coefficient for TKE at low Ri
+        Cᵘⁿe = 1.447,  # Shear mixing length coefficient for TKE at negative Ri
+        Cᶜe = 3.642,  # Convective mixing length coefficient for TKE
+        Cᵉe = 0.0,    # Convective penetration mixing length coefficient for TKE
+    )
+    turbulent_kinetic_energy_equation = CATKEEquation(
+        CʰⁱD = 0.579, # Dissipation length scale shear coefficient for high Ri
+        CˡᵒD = 1.604, # Dissipation length scale shear coefficient for low Ri
+        CᵘⁿD = 0.923, # Dissipation length scale shear coefficient for high Ri
+        CᶜD = 3.254, # Dissipation length scale convecting layer coefficient
+        CᵉD = 0.0,   # Dissipation length scale penetration layer coefficient
+        Cᵂu★ = 3.179, # Surface shear-driven TKE flux coefficient
+        CᵂwΔ = 0.383, # Surface convective TKE flux coefficient
+        Cᵂϵ = 1.0,   # Dissipative near-bottom TKE flux coefficient
+    )
+
+    return CATKEVerticalDiffusivity(
+        VerticallyImplicitTimeDiscretization(),
+        FT;
+        mixing_length,
+        turbulent_kinetic_energy_equation,
+    )
 end
