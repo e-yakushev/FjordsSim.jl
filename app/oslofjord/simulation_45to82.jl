@@ -32,6 +32,7 @@ coupled_simulation.callbacks[:progress] = Callback(progress, TimeInterval(3hours
 ocean_sim = coupled_simulation.model.ocean
 ocean_model = ocean_sim.model
 
+# ocean model output
 net_ocean_fluxes = NamedTuple((
     u_atm_ocean_flux = coupled_simulation.model.interfaces.net_fluxes.ocean_surface.u,
     v_atm_ocean_flux = coupled_simulation.model.interfaces.net_fluxes.ocean_surface.v,
@@ -49,6 +50,8 @@ ocean_sim.output_writers[:ocean] = NetCDFWriter(
     schedule = TimeInterval(1hours),
     overwrite_existing = true,
 )
+
+# prescribed interpolated atmosphere
 atmosphere_fields = coupled_simulation.model.interfaces.exchanger.exchange_atmosphere_state
 atmosphere_data = NamedTuple((
     u_atm  = atmosphere_fields.u,
@@ -64,6 +67,32 @@ prefix = joinpath(sim_setup.results_dir, "snapshots_atmosphere")
 ocean_sim.output_writers[:atmosphere] = NetCDFWriter(
     ocean_model,
     atmosphere_data;
+    filename = "$prefix",
+    schedule = TimeInterval(1hours),
+    overwrite_existing = true,
+)
+
+# interface fluxes
+interface_fluxes = coupled_simulation.model.interfaces.atmosphere_ocean_interface.fluxes
+prefix = joinpath(sim_setup.results_dir, "snapshots_interface_fluxes")
+ocean_sim.output_writers[:interface_fluxes] = NetCDFWriter(
+    ocean_model,
+    interface_fluxes;
+    filename = "$prefix",
+    schedule = TimeInterval(1hours),
+    overwrite_existing = true,
+)
+
+# net fluxes
+net_ocean_fluxes = coupled_simulation.model.interfaces.net_fluxes.ocean_surface
+net_ocean_fluxes = (u = net_ocean_fluxes.u,
+                    v = net_ocean_fluxes.v,
+                    T = net_ocean_fluxes.T,
+                    S = net_ocean_fluxes.S)
+prefix = joinpath(sim_setup.results_dir, "snapshots_net_ocean_fluxes")
+ocean_sim.output_writers[:net_fluxes] = NetCDFWriter(
+    ocean_model,
+    net_ocean_fluxes;
     filename = "$prefix",
     schedule = TimeInterval(1hours),
     overwrite_existing = true,

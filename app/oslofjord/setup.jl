@@ -39,11 +39,11 @@ function setup_region(;
     # Buoyancy
     buoyancy = SeawaterBuoyancy(FT, equation_of_state = TEOS10EquationOfState(FT, reference_density = reference_density)),
     # Closure
-    closure = regional_ocean_closure(),
-    # closure = (
-    #     TKEDissipationVerticalDiffusivity(),
-    #     Oceananigans.TurbulenceClosures.HorizontalScalarBiharmonicDiffusivity(ν = 15, κ = 10),
-    # ),
+    # closure = regional_ocean_closure(),
+    closure = (
+        TKEDissipationVerticalDiffusivity(minimum_tke = 7e-6),
+        Oceananigans.TurbulenceClosures.HorizontalScalarBiharmonicDiffusivity(ν = 15, κ = 100),
+    ),
     # Tracer advection
     tracer_advection = (T = WENO(), S = WENO(), e = nothing, ϵ = nothing),
     # Momentum advection
@@ -70,7 +70,7 @@ function setup_region(;
     atmosphere = JRA55PrescribedAtmosphere(grid_args.arch, FT, latitude = (58.98, 59.94), longitude = (10.18, 11.03)),
     # Ocean emissivity from https://link.springer.com/article/10.1007/BF02233853
     # With suspended matter 0.96 https://www.sciencedirect.com/science/article/abs/pii/0034425787900095
-    radiation = ClimaOcean.Radiation(grid_args.arch, ocean_emissivity = 0.96),
+    radiation = ClimaOcean.Radiation(grid_args.arch, ocean_emissivity = 0.96, ocean_albedo = 0.1),
     # coupled model different interfaces
     interfaces = ComponentInterfaces,
     interfaces_kwargs = (
