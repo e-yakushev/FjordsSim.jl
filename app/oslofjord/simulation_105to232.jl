@@ -15,7 +15,7 @@
 using Oceananigans.Units: second, seconds, minute, minutes, hour, hours, day, days
 using Oceananigans.Utils: TimeInterval, IterationInterval
 using Oceananigans.Simulations: Callback, conjure_time_step_wizard!, run!
-using Oceananigans.OutputWriters: JLD2OutputWriter, NetCDFOutputWriter
+using Oceananigans.OutputWriters: JLD2Writer, NetCDFWriter
 using Oceanostics
 using FjordsSim: coupled_hydrostatic_simulation, progress
 using Printf
@@ -35,13 +35,12 @@ ocean_model = ocean_sim.model
 # This is center, center, face : but should be center center nothing to work with NetCDFOutputWriter
 free_surface = NamedTuple((free_surface = ocean_model.free_surface.η,))
 prefix = joinpath(sim_setup.results_dir, "snapshots_free_surface")
-ocean_sim.output_writers[:free_surface] = JLD2OutputWriter(
+ocean_sim.output_writers[:free_surface] = JLD2Writer(
     ocean_model,
     free_surface;
-    schedule = TimeInterval(1hours),
     filename = "$prefix",
+    schedule = TimeInterval(1hours),
     overwrite_existing = true,
-    array_type = Array{Float32},
 )
 
 net_ocean_fluxes = NamedTuple((
@@ -49,7 +48,7 @@ net_ocean_fluxes = NamedTuple((
     v_atm_ocean_flux = coupled_simulation.model.interfaces.net_fluxes.ocean_surface.v,
 ))
 prefix = joinpath(sim_setup.results_dir, "snapshots_ocean")
-ocean_sim.output_writers[:ocean] = NetCDFOutputWriter(
+ocean_sim.output_writers[:ocean] = NetCDFWriter(
     ocean_model,
     merge(
         ocean_model.tracers,
@@ -57,10 +56,9 @@ ocean_sim.output_writers[:ocean] = NetCDFOutputWriter(
         coupled_simulation.model.interfaces.atmosphere_ocean_interface.fluxes,
         net_ocean_fluxes,
     );
-    schedule = TimeInterval(1hours),
     filename = "$prefix",
+    schedule = TimeInterval(1hours),
     overwrite_existing = true,
-    array_type = Array{Float32},
 )
 
 atmosphere_fields = coupled_simulation.model.interfaces.exchanger.exchange_atmosphere_state
@@ -75,13 +73,12 @@ atmosphere_data = NamedTuple((
     Mp_atm = atmosphere_fields.Mp,
 ))
 prefix = joinpath(sim_setup.results_dir, "snapshots_atmosphere")
-ocean_sim.output_writers[:atmosphere] = NetCDFOutputWriter(
+ocean_sim.output_writers[:atmosphere] = NetCDFWriter(
     ocean_model,
     atmosphere_data;
-    schedule = TimeInterval(1hours),
     filename = "$prefix",
+    schedule = TimeInterval(1hours),
     overwrite_existing = true,
-    array_type = Array{Float32},
 )
 
 ## Spinning up the simulation
