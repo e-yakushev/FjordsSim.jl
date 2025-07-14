@@ -28,6 +28,16 @@
             "type": "julia",
             "request": "launch",
             "name": "Oslofjord simulation",
+            "program": "${workspaceFolder}/app/oslofjord/simulation_105to232.jl",
+            "stopOnEntry": false,
+            "juliaAdditionalArgs": [
+                "-O0"
+            ]
+        },
+        {
+            "type": "julia",
+            "request": "launch",
+            "name": "Oslofjord simulation inner",
             "program": "${workspaceFolder}/app/oslofjord/simulation_45to82.jl",
             "stopOnEntry": false,
             "juliaAdditionalArgs": [

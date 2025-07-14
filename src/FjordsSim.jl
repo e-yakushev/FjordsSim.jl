@@ -15,6 +15,10 @@ using OceanBioME: LOBSTER
 
 import Oceananigans.Advection: cell_advection_timescale
 
+include("BGCModels/BGCModels.jl")
+
+using .BGCModels
+
 include("utils.jl")
 include("grids.jl")
 include("turbulence.jl")
@@ -23,9 +27,6 @@ include("boundary_conditions.jl")
 include("forcing.jl")
 include("atmosphere.jl")
 include("output.jl")
-include("BGCModels/BGCModels.jl")
-
-using .BGCModels: OXYDEP
 
 grid_ref = Ref{Any}(nothing)
 biogeochemistry_ref = Ref{Any}(nothing)
@@ -137,9 +138,9 @@ function coupled_hydrostatic_simulation(sim_setup::SetupModel)
     free_surface = sim_setup.free_surface_callable(sim_setup.free_surface_args...)
     coriolis = sim_setup.coriolis
     forcing = sim_setup.forcing_callable(sim_setup.forcing_args...)
-    boundary_conditions = sim_setup.bc_callable(sim_setup.bc_args...)
     biogeochemistry = safe_execute(sim_setup.biogeochemistry_callable)(sim_setup.biogeochemistry_args...)
     sim_setup.biogeochemistry_ref[] = biogeochemistry
+    boundary_conditions = sim_setup.bc_callable(sim_setup.bc_args...)
 
     println("Start compiling HydrostaticFreeSurfaceModel")
     ## Model

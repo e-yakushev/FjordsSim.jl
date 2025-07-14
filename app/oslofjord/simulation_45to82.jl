@@ -23,7 +23,7 @@ using Printf
 include("setup.jl")
 
 ## Model Setup
-sim_setup = setup_region_3d_45to82()
+sim_setup = setup_region_3d_OXYDEP_45to82()
 
 coupled_simulation = coupled_hydrostatic_simulation(sim_setup)
 

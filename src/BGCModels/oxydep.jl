@@ -209,22 +209,6 @@ required_biogeochemical_auxiliary_fields(::OXYDEP{<:Any,<:Val{(true, true)},<:An
     end
 end
 
-# function update_biogeochemical_state!(model, PAR::TwoBandPhotosyntheticallyActiveRadiation)
-#     arch = architecture(model.grid)
-#     launch!(
-#         arch,
-#         model.grid,
-#         :xy,
-#         update_TwoBandPhotosyntheticallyActiveRadiation!,
-#         PAR.field,
-#         model.grid,
-#         model.tracers.P,
-#         PAR.surface_PAR,
-#         model.clock.time,
-#         PAR,
-#     )
-# end
-
 @inline maximum_sinking_velocity(bgc::OXYDEP) = maximum(abs, bgc.sinking_velocities.POM.w)
 
 adapt_structure(to, oxydep::OXYDEP) = OXYDEP(
@@ -277,7 +261,7 @@ show(io::IO, model::OXYDEP{FT,Val{B},W}) where {FT,B,W} = print(
 )
 
 include("core.jl")
-#include("core_contaminants.jl")
+include("boundary_conditions.jl")
 
 @inline nitrogen_flux(i, j, k, grid, advection, bgc::OXYDEP, tracers) =
     sinking_flux(i, j, k, grid, advection, Val(:POM), bgc, tracers) +
