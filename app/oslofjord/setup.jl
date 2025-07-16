@@ -183,6 +183,7 @@ setup_region_3d_OXYDEP_45to82() = setup_region(
         S = WENO(),
         C = WENO(),
         e = nothing,
+        ϵ = nothing,
         NUT = WENO(),
         P = WENO(),
         HET = WENO(),
