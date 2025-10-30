@@ -31,7 +31,7 @@ function oxygen_saturation(T::Float64, S::Float64, P::Float64)::Float64
     # Oxygen saturation concentration in µmol/kg
     O2_sat = exp(ln_O2_sat) * 44.66
 
-    # Pressure correction factor (Weiss, 1970)
+    # Pressure correction factor (Weiss, 1970) for pressure in atm
     P_corr = 1.0 + P * (5.6e-6 + 2.0e-11 * P)
 
     # Adjusted oxygen saturation with pressure correction
@@ -60,8 +60,8 @@ function OxygenSeaWaterFlux(T::Float64, S::Float64, P::Float64, O₂::Float64, w
 end
 
 # OXYDEP constants
-const O2_suboxic = 15.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
-const Trel = 25000.0 #10000.0     # Relaxation time for exchange with the sediments (s/m)
+const O2_suboxic = 20.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
+const Trel = 250000.0     #25000.0 #10000.0     # Relaxation time for exchange with the sediments (s/m)
 const b_ox = 15.0        # difference of OXY in the sediment and water, 
 const b_NUT = 10.0       # NUT in the sediment, (mmol/m3)  
 const b_DOM_ox = 6.0     # OM in the sediment (oxic conditions), (mmol/m3) 
@@ -88,7 +88,7 @@ function bgh_oxydep_boundary_conditions(biogeochemistry, Nz)
 
     @inline OXY_bottom_cond(i, j, grid, clock, fields) = @inbounds -(
         F_ox(fields.O₂[i, j, 1], O2_suboxic) * b_ox +
-        F_subox(fields.O₂[i, j, 1], O2_suboxic) * (0.0 - fields.O₂[i, j, 1])
+        F_subox(fields.O₂[i, j, 1], O2_suboxic) * (fields.O₂[i, j, 1]- 0.0)
     ) / Trel
     OXY_bottom = FluxBoundaryCondition(OXY_bottom_cond, discrete_form = true)
 
