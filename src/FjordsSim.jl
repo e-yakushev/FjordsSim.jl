@@ -199,7 +199,7 @@ biogeochemistry_OXYDEP(grid_ref, args_oxydep) = OXYDEP(;
     surface_photosynthetically_active_radiation = PAR⁰,
     TS_forced = false,
     Chemicals = false,
-    scale_negatives = false,
+    scale_negatives = true, # it was false
 )
 
 end # module FjordsSim

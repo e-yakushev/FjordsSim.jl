@@ -114,7 +114,7 @@ function OXYDEP(;
     r_pom_nut_oxy::FT = 0.006 / day, # 1/d
     r_pom_dom::FT = 0.01 / day,      # 1/d
     r_dom_nut_oxy::FT = 0.050 / day,  # 1/d
-    O2_suboxic::FT = 30.0,    # mmol/m3
+    O2_suboxic::FT = 20.0,    # mmol/m3
     r_pom_nut_nut::FT = 0.010 / day, # 1/d
     r_dom_nut_nut::FT = 0.003 / day, # 1/d
     OtoN::FT = 8.625, # (nd)
