@@ -14,7 +14,7 @@ using FjordsSim:
     extract_z_faces,
     record_vertical_tracer,
     record_surface_speed,
-    plot_ztime,   
+#    plot_ztime,   
 #    record_bottom_tracer,
     BGCModel,
     oxygen_saturation  
@@ -262,9 +262,65 @@ function replace_zeros_with_NaN!(A, depth_index, day_index)
     @. slice = ifelse(slice == 0, NaN, slice)
     return slice
 end
-
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# open file and extract data to "ds"
+# vertical distribution changes at a point (i,j)
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Helper function to safely get the "interior" data
+get_interior(A, inds...) = 
+    hasmethod(interior, Tuple{typeof(A), Vararg{Any}}) ? interior(A, inds...) : A[inds...]
+# Seasonal changes at a point (i,j)
+function plot_ztime(NUT, O₂, O₂_relative, PHY, HET, T, DOM, POM, S, i, j, times, z, folder)
+    fig = Figure(size = (1500, 1000), fontsize = 20)
+
+    axis_kwargs = (
+        xlabel = "Time (days)",
+        ylabel = "z (m)",
+        xticks = (0:50:times[end]),
+        xtickformat = "{:.0f}",
+    )
+
+    axNUT = Axis(fig[1, 1]; title = "NUT, mmolN/m³", axis_kwargs...)
+    hmNUT = heatmap!(times / days, z, get_interior(NUT, i, j, :, :)', colormap = Reverse(:cherry))
+    Colorbar(fig[1, 2], hmNUT)
+    
+    axOXY = Axis(fig[1, 3]; title = "O₂, mmol/m³", axis_kwargs...)
+    hmOXY = heatmap!(times / days, z, get_interior(O₂, i, j, :, :)', colormap = :turbo)
+    Colorbar(fig[1, 4], hmOXY)
+    
+    axOXY_rel = Axis(fig[1, 5]; title = "O₂ saturation, %", axis_kwargs...)
+    hmOXY_rel = heatmap!(times / days, z, get_interior(O₂_relative, i, j, :, :)', colormap = :gist_stern)
+    Colorbar(fig[1, 6], hmOXY_rel)
+
+    axPHY = Axis(fig[2, 1]; title = "PHY, mmolN/m³", axis_kwargs...)
+    hmPHY = heatmap!(times / days, z, get_interior(PHY, i, j, :, :)', colormap = Reverse(:cubehelix))
+    Colorbar(fig[2, 2], hmPHY)
+
+    axHET = Axis(fig[2, 3]; title = "HET, mmolN/m³", axis_kwargs...)
+    hmHET = heatmap!(times / days, z, get_interior(HET, i, j, :, :)', colormap = Reverse(:afmhot))
+    Colorbar(fig[2, 4], hmHET)
+
+    axT = Axis(fig[2, 5]; title = "T, °C", axis_kwargs...)
+    hmT = heatmap!(times / days, z, get_interior(T, i, j, :, :)', colormap = Reverse(:RdYlBu))
+    Colorbar(fig[2, 6], hmT)
+
+    axDOM = Axis(fig[3, 1]; title = "DOM, mmolN/m³", axis_kwargs...)
+    hmDOM = heatmap!(times / days, z, get_interior(DOM, i, j, :, :)', colormap = Reverse(:CMRmap))
+    Colorbar(fig[3, 2], hmDOM)
+
+    axPOM = Axis(fig[3, 3]; title = "POM, mmolN/m³", axis_kwargs...)
+    hmPOM = heatmap!(times / days, z, get_interior(POM, i, j, :, :)', colormap = Reverse(:greenbrownterrain))
+    Colorbar(fig[3, 4], hmPOM)
+
+    axS = Axis(fig[3, 5]; title = "S, psu", axis_kwargs...)
+    hmS = heatmap!(times / days, z, get_interior(S, i, j, :, :)', colormap = :viridis)
+    Colorbar(fig[3, 6], hmS)
+
+    save(joinpath(folder, "ztime_$(i)_$(j).png"), fig)
+    @info "Saved ztime_$(i)_$(j) plot in $folder"
+end
+# ====================================================================
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# MAIN CODE STARTS HERE: open file and extract data to "ds"
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 folder = joinpath(homedir(), "FjordsSim_results", "oslofjord")
 filename = joinpath(folder, "snapshots_ocean")
@@ -389,11 +445,17 @@ println("O₂_sat_val stats — min: ", minimum(O₂_sat_val),  ", max: ", maxim
 println("O₂_sat % stats — min: ", minimum(O₂_sat),  ", max: ", maximum(O₂_sat))
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#  vertical distributions changes in a point
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+plot_ztime(NUT, O₂, O₂_sat, P, HET, T, DOM, POM, S, 15, 52, times, depth, folder) # Vestfjorden
+plot_ztime(NUT, O₂, O₂_sat, P, HET, T, DOM, POM, S, 35, 50, times, depth, folder) # Bunnefjorden
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # plot parameters MAPs as subplots at given days(plot_dates), depths(depth_indexes) and bottom
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 plot_dates = [36, 72, 108, 144, 180, 226, 262, 298, 334]
 bottom_layer = Nz
-depth_indexes =  [10, 12]  # surface slice index
+depth_indexes =  [12]  # surface slice index
 fig_width =  1200         # figure width
 fig_height = 1200         # figure height
 
