@@ -8,7 +8,7 @@ using Oceananigans.Utils: prettytimeunits, maybe_int
 using CairoMakie: 
       Auto, Axis, Figure, GridLayout, Colorbar, 
       rowgap!, colgap!,GridLayout, Relative,
-      Observable, Reverse, record, heatmap!, @lift
+      Observable, Reverse, record, heatmap!, contour!, @lift
 using FjordsSim:
     plot_1d_phys,
     extract_z_faces,
@@ -21,58 +21,17 @@ using FjordsSim:
 include("/home/eya/src/FjordsSim.jl/src/BGCModels/BGCModels.jl")
 using .BGCModels
 include("/home/eya/src/FjordsSim.jl/src/BGCModels/boundary_conditions.jl")
+ 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 map_axis_kwargs = (xlabel = "Grid points, East", ylabel = "Grid points, North")
 transect_axis_kwargs = (xlabel = "Grid points, East", ylabel = "z (m)")
 framerate = 12
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Make animated gif of changes at selected depth
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-function record_variable(
-    variable,
-    var_name,
-    Nz,
-    times,
-    folder,
-    figsize;
-    colorrange = (0, 0.5),
-    colormap = :deep,
-    framerate = 12,
-)
-    Nt = length(times)
-    iter = Observable(Nt)
-
-    f = @lift begin
-        x = variable[$iter]
-        x = interior(x, :, :, Nz)
-        x[x.==0] .= NaN
-        x
-    end
-
-    fig = Figure(size = figsize)
-    title = @lift "$(var_name) at " * prettytime(times[$iter])
-    ax = Axis(
-        fig[1, 1];
-        title = title,
-        xlabel = "Grid points, eastward direction",
-        ylabel = "Grid points, northward direction",
-    )
-    hm = heatmap!(ax, f, colorrange = colorrange, colormap = colormap)
-    cb = Colorbar(fig[0, 1], hm, vertical = false, label = "$(var_name)")
-
-    record(fig, joinpath(folder, "$(var_name).mp4"), 1:Nt, framerate = framerate) do i
-        iter[] = i
-    end
-end
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Make animated gif of changes at the bottom
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 function record_bottom_tracer(variable, var_name, Nz, times, folder;
     colorrange = (-1, 350), colormap = :turbo, figsize = (1000, 400),)
-
     # bottom_z evaluation
     bottom_z = ones(Int, size(variable, 1), size(variable, 2))
     for i = 1:size(variable, 1)
@@ -88,7 +47,6 @@ function record_bottom_tracer(variable, var_name, Nz, times, folder;
             end
         end
     end
-
     iter = Observable(1)
     f = @lift begin
         x = [variable[i, j, bottom_z[i, j], $iter] for i = 1:size(variable, 1), j = 1:size(variable, 2)]
@@ -100,7 +58,6 @@ function record_bottom_tracer(variable, var_name, Nz, times, folder;
     ax = Axis(fig[1, 1]; title = title, map_axis_kwargs...)
     hm = heatmap!(ax, f, colorrange = colorrange, colormap = colormap)
     cb = Colorbar(fig[0, 1], hm, vertical = false, label = "$(var_name), mmol/m³")
-
     Nt = length(times)
     record(fig, joinpath(folder, "movie_$(var_name).gif"), 1:Nt, framerate = framerate) do i
         iter[] = i
@@ -112,7 +69,6 @@ end
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 function record_horizontal_tracer(tracer, times, folder, name, label;
                                   colorrange = (-1, 30), colormap = :magma, iz = 10)
-
     Nt = length(times)
     iter = Observable(1)
     Ti = @lift begin
@@ -126,120 +82,15 @@ function record_horizontal_tracer(tracer, times, folder, name, label;
         Ti[Ti .== 0] .= NaN
         Ti
     end
-
     title = @lift "$label at $(prettytime(times[$iter]))"
     fig = Figure(size = (400, 550), fontsize = 20)
     ax = Axis(fig[1, 1]; title = title, map_axis_kwargs...)
     hm = heatmap!(ax, Ti, colorrange = colorrange, colormap = colormap, nan_color = :silver)
     cb = Colorbar(fig[0, 1], hm, vertical = false)
-
     record(fig, joinpath(folder, "movie_$(name)_iz_$iz.gif"), 1:Nt, framerate = framerate) do i
         iter[] = i
     end
-
     @info "movie_$(name)_iz_$iz record made"
-end
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Do something with time (Shamil' function  )
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-function prettiertime(t, longform=true)
-    s = longform ? "seconds" : "s" 
-    iszero(t) && return "0 $s"
-    t < 1e-9 && return @sprintf("%.3e %s", t, s) # yah that's small
-
-    t = maybe_int(t)
-    value, units = prettytimeunits(t, longform)
-    return @sprintf("%d %s", Int(trunc(Int, value)), units)
-end
-
-function record_variable_multilayer(
-    variable,
-    var_name,
-    Nz_layers,
-    times,
-    folder;
-    colorrange = (0, 0.5),
-    colormap = :deep,
-    framerate = 30,
-)
-    Nt = length(times)
-    iter = Observable(Nt)
-    num_layers = length(Nz_layers)
-    figsize = (200 * num_layers, 400)  # Adaptive figure size based on number of layers
-
-    figs = []
-    titles = []
-    heatmaps = []
-    axes = []
-
-    fig = Figure(size = figsize)
-    grid = GridLayout(fig[1, 1])  # Stack vertically
-    
-    for (i, Nz) in enumerate(Nz_layers)
-        f = @lift begin
-            x = variable[$iter]
-            x = interior(x, :, :, Nz)
-            x[x .== 0] .= NaN
-            x
-        end
-
-        title = @lift "Layer $Nz - " * prettiertime(times[$iter])
-        push!(titles, title)
-
-        ax = Axis(
-            grid[1, i];
-            title = title,
-            titlealign = :left,
-            width = Auto(),  # Adaptive width
-            height = Auto()  # Adaptive height
-        )
-        push!(axes, ax)
-
-        hm = heatmap!(ax, f, colorrange = colorrange, colormap = colormap)
-        push!(heatmaps, hm)
-    end
-
-    cb = Colorbar(fig[1, 2], heatmaps[1], vertical = true, label = "$(var_name)")
-
-    record(fig, joinpath(folder, "$(var_name)_multi.mp4"), 1:Nt, framerate = framerate) do i
-        iter[] = i
-    end
-end
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Plot tracer distribution at given day (plot_day) at given depth (iz)
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-function plot_surface_tracer(tracer, name, iz, times, plot_day, folder; 
-                             colorrange = (0, 0.5), colormap = :turbo, )
-# calculate the index in the time array corresponding to the plot_day                             
-   nday = plot_day*round(Int, (length(times)/365))
-# extract tracer data at iz at given day   
-   z_tracer = [tracer[i, j, iz, nday] == 0 ? NaN : tracer[i, j, iz, nday] for i in 1:size(tracer, 1), j in 1:size(tracer, 2)]
-# create the plot
-   fig = Figure(size = (400, 550), fontsize = 20)
-    axis_kwargs = (xlabel = "Grid points, East ", ylabel = "Grid points, North")
-    axTRAC = Axis(fig[1, 1]; title = "$(name), μM, day $(plot_day) ", axis_kwargs...)
-    hmTRAS = heatmap!([i for i = 1:size(tracer, 1)], [j for j = 1:size(tracer, 2)], z_tracer, colorrange = colorrange, colormap = colormap, nan_color = :grey) #:gray)
-    Colorbar(fig[1, 2], hmTRAS)
-    save(joinpath(folder, "surface_$(name)_day_$(plot_day)_iz_$(iz).png"), fig)
-    @info "surface_$(name)_day_$(plot_day) plot made"    
-end
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Plot tracer distribution at given day (plot_day) at the bottom  (bottom_z)
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-function plot_bottom_tracer!(tracer, name, bottom_z, times, plot_day, folder; colorrange = (0, 0.5), colormap = :turbo)
-# calculate the index in the time array corresponding to the plot_day      
-    nday = plot_day*round(Int, (length(times)/365))
-# extract tracer data at iz at given day  
-    z_tracer = [tracer[i, j, bottom_z[i, j], nday] == 0 ? NaN : tracer[i, j, bottom_z[i, j], nday] for i in 1:size(tracer, 1), j in 1:size(tracer, 2)]
-# create the plot
-    fig = Figure(size = (400, 550), fontsize = 20)
-    axis_kwargs = (xlabel = "Grid points, East ", ylabel = "Grid points, North")
-    axTRAC = Axis(fig[1, 1]; title = "$(name), μM, day $(plot_day) ", axis_kwargs...) 
-    hmTRAS = heatmap!([i for i = 1:size(tracer, 1)], [j for j = 1:size(tracer, 2)], z_tracer, colorrange = colorrange, colormap = colormap, nan_color = :silver)
-    Colorbar(fig[1, 2], hmTRAS)
-    save(joinpath(folder, "$(name)_bottom_day_$(plot_day).png"), fig)  
-    @info "$(name)_bottom_day_$(plot_day) plot made"    
 end
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -248,12 +99,13 @@ end
 function plot_tracer_subplot!(fig, pos, 
                         data, title_str; colorrange=(0,1), colormap=:viridis)
     ax = Axis(fig[pos...]; title=title_str, 
-            width = 200, #Auto(),  # Adaptive width
-            height = 200, #Auto()  # Adaptive height
+            width  = 200, #Auto(),  # Adaptive width
+            height = 300, #Auto()  # Adaptive height
             xlabel="", ylabel="")
     hm = heatmap!(ax, data; colorrange=colorrange, colormap=colormap, nan_color=:silver)
     Colorbar(fig[pos[1], pos[2]+1], hm, vertical=true)
 end
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # replace zeros with NaN in 4D array slice
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -268,8 +120,9 @@ end
 # Helper function to safely get the "interior" data
 get_interior(A, inds...) = 
     hasmethod(interior, Tuple{typeof(A), Vararg{Any}}) ? interior(A, inds...) : A[inds...]
-# Seasonal changes at a point (i,j)
-function plot_ztime(NUT, O₂, O₂_relative, PHY, HET, T, DOM, POM, S, i, j, times, z, folder)
+# ~~~~~~~~~~~~~~~~  Seasonal changes at a point (i,j) ~~~~~~~~~~~~~~~~
+function plot_ztime(NUT, O₂, O₂_sat, PHY, HET, T, DOM, POM, S, i, j, times, z, folder)
+#using CairoMakie  # ensures Makie symbols are available here
     fig = Figure(size = (1500, 1000), fontsize = 20)
 
     axis_kwargs = (
@@ -284,11 +137,23 @@ function plot_ztime(NUT, O₂, O₂_relative, PHY, HET, T, DOM, POM, S, i, j, ti
     Colorbar(fig[1, 2], hmNUT)
     
     axOXY = Axis(fig[1, 3]; title = "O₂, mmol/m³", axis_kwargs...)
-    hmOXY = heatmap!(times / days, z, get_interior(O₂, i, j, :, :)', colormap = :turbo)
+#    hmOXY = heatmap!(times / days, z, get_interior(O₂, i, j, :, :)', colormap = :turbo)
+#    Colorbar(fig[1, 4], hmOXY)
+    O₂_slice = get_interior(O₂, i, j, :, :)'   # transpose so z is vertical
+    hmOXY = heatmap!(times / days, z, O₂_slice, colormap = :turbo)
+# --- Add isoline O₂ = 90 ---
+    contour!(times / days, z, O₂_slice; levels=[90], color=:white, linewidth=2, linestyle = :dash)
+# --- Add manual label ---
+#    text!(times[end] / (2 * days), 20;  # (x, z) position of the label
+#      text = "90", color = :white, align = (:center, :center), fontsize = 18, font = "sans")
     Colorbar(fig[1, 4], hmOXY)
-    
+
     axOXY_rel = Axis(fig[1, 5]; title = "O₂ saturation, %", axis_kwargs...)
-    hmOXY_rel = heatmap!(times / days, z, get_interior(O₂_relative, i, j, :, :)', colormap = :gist_stern)
+
+    O₂_sat_slice = get_interior(O₂_sat, i, j, :, :)'   # transpose so z is vertical
+    hmOXY_rel = heatmap!(times / days, z, O₂_sat_slice, colormap = :gist_stern) 
+    # --- Add isoline O₂_sat = 100 ---
+    contour!(times / days, z, O₂_sat_slice; levels=[100], color=:white, linewidth=2, linestyle = :dash)
     Colorbar(fig[1, 6], hmOXY_rel)
 
     axPHY = Axis(fig[2, 1]; title = "PHY, mmolN/m³", axis_kwargs...)
@@ -318,6 +183,7 @@ function plot_ztime(NUT, O₂, O₂_relative, PHY, HET, T, DOM, POM, S, i, j, ti
     save(joinpath(folder, "ztime_$(i)_$(j).png"), fig)
     @info "Saved ztime_$(i)_$(j) plot in $folder"
 end
+
 # ====================================================================
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # MAIN CODE STARTS HERE: open file and extract data to "ds"
@@ -456,8 +322,8 @@ plot_ztime(NUT, O₂, O₂_sat, P, HET, T, DOM, POM, S, 35, 50, times, depth, fo
 plot_dates = [36, 72, 108, 144, 180, 226, 262, 298, 334]
 bottom_layer = Nz
 depth_indexes =  [12]  # surface slice index
-fig_width =  1200         # figure width
-fig_height = 1200         # figure height
+fig_width =  1000         # figure width
+fig_height = 1000         # figure height
 
 for plot_day in plot_dates
     day_index = plot_day * round(Int, length(times)/365)  
@@ -474,7 +340,7 @@ for plot_day in plot_dates
         DOM_slice = replace_zeros_with_NaN!(DOM, depth_index, day_index)
         POM_slice  = replace_zeros_with_NaN!(POM, depth_index, day_index)
         O₂_sat_slice = replace_zeros_with_NaN!(O₂_sat, depth_index, day_index)
-println("Creating figure for day $plot_day at depth index $depth_index ...")
+        println("Creating figure for day $plot_day at depth index $depth_index ...")
 
         # Create 3×3 subplot figure
         fig = Figure(size=(fig_width, fig_height))
