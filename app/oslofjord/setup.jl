@@ -173,7 +173,7 @@ setup_region_3d_OXYDEP_45to82() = setup_region(
         filepath = joinpath(homedir(), "FjordsSim_data", "oslofjord", "OF_inner_45to82_forcing.nc"),
         tracers = (:T, :S, :e, :ϵ, :C, :NUT, :P, :HET, :POM, :DOM, :O₂),
     ),
-    initial_conditions = (T = 5.0, S = 33.0, C = 0.0, NUT = 10.0, P = 0.05, HET = 0.01, O₂ = 350.0, DOM = 1.0),
+    initial_conditions = (T = 5.0, S = 33.0, C = 0.0, NUT = 10.0, P = 0.05, HET = 0.01, O₂ = 200.0, DOM = 1.0),
     biogeochemistry_callable = biogeochemistry_OXYDEP,
     biogeochemistry_args = (grid_ref, args_oxydep),
     bc_callable = bc_varna_bgh_oxydep,
