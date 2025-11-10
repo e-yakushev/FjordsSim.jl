@@ -7,7 +7,7 @@ using Oceananigans.Units
 using Oceananigans.Utils: prettytimeunits, maybe_int
 using CairoMakie: 
       Auto, Axis, Figure, GridLayout, Colorbar, 
-      rowgap!, colgap!,GridLayout, Relative,
+      rowgap!, colgap!,GridLayout, Relative, scatter!, lines!,  
       Observable, Reverse, record, heatmap!, contour!, @lift
 using FjordsSim:
     plot_1d_phys,
@@ -96,13 +96,16 @@ end
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # subplot function for tracer plots
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-function plot_tracer_subplot!(fig, pos, 
-                        data, title_str; colorrange=(0,1), colormap=:viridis)
+function plot_tracer_subplot!(fig, pos, data, title_str; 
+    colorrange=(0,1), colormap=:viridis, whiteline=1.0)
     ax = Axis(fig[pos...]; title=title_str, 
             width  = 200, #Auto(),  # Adaptive width
             height = 300, #Auto()  # Adaptive height
             xlabel="", ylabel="")
     hm = heatmap!(ax, data; colorrange=colorrange, colormap=colormap, nan_color=:silver)
+    if whiteline != 0.0
+        contour!(ax, data; levels=[whiteline], color=:white, linewidth=2, linestyle = :dash)
+    end
     Colorbar(fig[pos[1], pos[2]+1], hm, vertical=true)
 end
 
@@ -142,7 +145,7 @@ function plot_ztime(NUT, O₂, O₂_sat, PHY, HET, T, DOM, POM, S, i, j, times, 
     O₂_slice = get_interior(O₂, i, j, :, :)'   # transpose so z is vertical
     hmOXY = heatmap!(times / days, z, O₂_slice, colormap = :turbo)
 # --- Add isoline O₂ = 90 ---
-    contour!(times / days, z, O₂_slice; levels=[90], color=:white, linewidth=2, linestyle = :dash)
+    contour!(times / days, z, O₂_slice; levels=[90], color=:white, linewidth=3, linestyle = :dash)
 # --- Add manual label ---
 #    text!(times[end] / (2 * days), 20;  # (x, z) position of the label
 #      text = "90", color = :white, align = (:center, :center), fontsize = 18, font = "sans")
@@ -153,7 +156,7 @@ function plot_ztime(NUT, O₂, O₂_sat, PHY, HET, T, DOM, POM, S, i, j, times, 
     O₂_sat_slice = get_interior(O₂_sat, i, j, :, :)'   # transpose so z is vertical
     hmOXY_rel = heatmap!(times / days, z, O₂_sat_slice, colormap = :gist_stern) 
     # --- Add isoline O₂_sat = 100 ---
-    contour!(times / days, z, O₂_sat_slice; levels=[100], color=:white, linewidth=2, linestyle = :dash)
+    contour!(times / days, z, O₂_sat_slice; levels=[100], color=:white, linewidth=3, linestyle = :dash)
     Colorbar(fig[1, 6], hmOXY_rel)
 
     axPHY = Axis(fig[2, 1]; title = "PHY, mmolN/m³", axis_kwargs...)
@@ -183,7 +186,25 @@ function plot_ztime(NUT, O₂, O₂_sat, PHY, HET, T, DOM, POM, S, i, j, times, 
     save(joinpath(folder, "ztime_$(i)_$(j).png"), fig)
     @info "Saved ztime_$(i)_$(j) plot in $folder"
 end
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Plot a map of bottom depth indices or physical depth (m)
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+function plot_bottom_depth_map!(fig, pos, bottom_z::AbstractMatrix{<:Integer}, z_vals::AbstractVector;
+                                title_str="Bottom depth (m)", use_abs=true, colormap=:viridis, whiteline=0.0)
+    # build 2D array of physical depths from index map (preserves shape)
+    depth_map = [ z_vals[ bottom_z[i,j] ] for i in 1:size(bottom_z,1), j in 1:size(bottom_z,2) ]
+    # convert to absolute positive depth if requested (z often negative)
+    if use_abs
+        depth_map = abs.(depth_map)
+    end
+    # mark invalid/zero indices as NaN
+    @. depth_map = ifelse(bottom_z == 0, NaN, depth_map)
+    # determine sensible colorrange from finite values
+    finite_vals = depth_map[isfinite.(depth_map)]
+    colorrange = isempty(finite_vals) ? (0.0, 1.0) : (minimum(finite_vals), maximum(finite_vals))
+    plot_tracer_subplot!(fig, pos, depth_map, title_str; colorrange=colorrange, colormap=colormap, whiteline=whiteline)
+end
 # ====================================================================
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # MAIN CODE STARTS HERE: open file and extract data to "ds"
@@ -262,18 +283,22 @@ println("O₂ stats — min: ", minimum(O₂),  ", max: ", maximum(O₂))
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Calculate additional fields
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Pressure = similar(T[:,:,:,1])  
+# - - - - 
 # Pressure is needed in atm; we calculate  ro*g*z  in Pa and convert to atm using 1 atm = 101325 Pa
+# - - - - 
+Pressure = similar(T[:,:,:,1])  
 for k in 1:Nz
     Pressure[:,:,k] .= 1. + 0.0992*(-depth[k])
 end
-
+# - - - - 
 # oxygen saturation related
+# - - - - 
 O₂_sat_val = similar(T)  # Oxygen saturation concentrtaion
 O₂_sat = similar(T)       # Oxygen %
 ϵ = eps(Float32)            # small positive number needed in division to zero
-
+# - - - - 
 # bottom depths index for the bottom maps
+# - - - - 
 bottom_z = ones(Int, size(O₂, 1), size(O₂, 2))
 for i = 1:size(O₂, 1)
     for j = 1:size(O₂, 2)
@@ -291,7 +316,88 @@ for i = 1:size(O₂, 1)
         end
     end
 end
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Compute trans array (list of i, j, max_depth_index)
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+function compute_trans(bottom_z)
+    trans = Vector{Tuple{Int, Int, Int, Int}}()  # (num, i, j, max_depth_index)
+    num = 1
+
+    # First part: λ_caa < 27 → φ_aca increases
+    for j in 1:71
+        max_depth_index = 12
+        for i in 27:-1:14
+            if max_depth_index < bottom_z[i-1, j]
+                push!(trans, (num, i, j, max_depth_index))
+                num += 1
+                break
+            end
+            max_depth_index = bottom_z[i-1, j]
+        end
+    end
+    # Second part: λ_caa ≥ 27 → φ_aca decreases
+    for j in 71:-1:34
+        max_depth_index = 12
+        for i in 27:44
+            if max_depth_index < bottom_z[i+1, j]
+                push!(trans, (num, i, j, max_depth_index))
+                num += 1
+                break
+            end
+            max_depth_index = bottom_z[i+1, j]
+        end
+    end
+
+    println("✅ Total trans points found: ", length(trans))
+    return trans
+end
+
+# Compute trans trajectory
+trans = compute_trans(bottom_z)
+
+# Extract (i, j) positions for plotting
+i_vals = [t[2] for t in trans]
+j_vals = [t[3] for t in trans]
+# ──────────────────────────────────────────────
+# Plot a map of bottom depth indices (physical depth in meters)
+fig_depth_map0 = Figure(size=(600, 500))
+plot_bottom_depth_map!(fig_depth_map0, (1, 1), bottom_z, depth; 
+    title_str="Bottom depth (m)", use_abs=true, colormap=Reverse(:oslo25), whiteline=0.0)
+save(joinpath(folder, "depth_map0.png"), fig_depth_map0)
+println("Saved: depth_map0.png")
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Plot bottom depth map and overlay trans line
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+using CairoMakie
+# Create figure and axis
+fig_depth_map = Figure(size = (600, 500))
+
+# Plot bottom map and capture both the axis and heatmap
+ax_depth = Axis(fig_depth_map[1, 1], title = "Bottom depth (m)")
+#hm = heatmap!(ax_depth, bottom_z'; colormap = Reverse(:oslo25))
+hm = heatmap!(ax_depth, bottom_z; colormap = Reverse(:oslo25))
+cb = Colorbar(fig_depth_map[1, 2], hm, label = "Depth (m)")
+
+# Overlay trajectory line on the *axis*
+CairoMakie.lines!(ax_depth, i_vals, j_vals;
+    color = :white,
+    linewidth = 2.5,
+    linestyle = :solid)
+
+# Save
+save(joinpath(folder, "depth_trans_map.png"), fig_depth_map)
+println("💾 Saved: depth_trans_map.png ✅")
+
+println("⏸ Press Enter to continue...")
+readline()
+
+# - - - - 
 # Fill oxygen saturation and percentage arrays
+# - - - - 
 for i = 1:size(O₂, 1)
     for j = 1:size(O₂, 2)
         for k = 1:size(O₂, 3)
@@ -322,8 +428,8 @@ plot_ztime(NUT, O₂, O₂_sat, P, HET, T, DOM, POM, S, 35, 50, times, depth, fo
 plot_dates = [36, 72, 108, 144, 180, 226, 262, 298, 334]
 bottom_layer = Nz
 depth_indexes =  [12]  # surface slice index
-fig_width =  1000         # figure width
-fig_height = 1000         # figure height
+fig_width =  950         # figure width
+fig_height = 1150         # figure height
 
 for plot_day in plot_dates
     day_index = plot_day * round(Int, length(times)/365)  
@@ -345,17 +451,17 @@ for plot_day in plot_dates
         # Create 3×3 subplot figure
         fig = Figure(size=(fig_width, fig_height))
 
-        plot_tracer_subplot!(fig, (1, 1), T_slice, "T [°C]";  colorrange=(0, 20), colormap=:turbo)
-        plot_tracer_subplot!(fig, (1, 3), S_slice, "S [PSU]"; colorrange=(15, 35))
-        plot_tracer_subplot!(fig, (1, 5), O₂_slice,"O₂ [μM]"; colorrange=(0, 350), colormap=:turbo)
+        plot_tracer_subplot!(fig, (1, 1), T_slice, "T [°C]";  colorrange=(0, 20), colormap=Reverse(:RdYlBu), whiteline=0.0)
+        plot_tracer_subplot!(fig, (1, 3), S_slice, "S [PSU]"; colorrange=(15, 35), colormap=:viridis, whiteline=0.0)
+        plot_tracer_subplot!(fig, (1, 5), O₂_slice,"O₂ [μM]"; colorrange=(0, 350), colormap=:turbo, whiteline=90.0)
 
-        plot_tracer_subplot!(fig, (2, 1), P_slice,     "PHY";   colorrange=(0, 5), colormap=Reverse(:cubehelix))
-        plot_tracer_subplot!(fig, (2, 3), HET_slice,   "HET";   colorrange=(0, 5), colormap=Reverse(:afmhot))
-        plot_tracer_subplot!(fig, (2, 5), O₂_sat_slice,"O₂ [%]";colorrange=(0, 150), colormap=:gist_stern)
+        plot_tracer_subplot!(fig, (2, 1), P_slice,     "PHY";   colorrange=(0, 5), colormap=Reverse(:cubehelix), whiteline=0.0)
+        plot_tracer_subplot!(fig, (2, 3), HET_slice,   "HET";   colorrange=(0, 5), colormap=Reverse(:afmhot), whiteline=0.0)
+        plot_tracer_subplot!(fig, (2, 5), O₂_sat_slice,"O₂ [%]";colorrange=(0, 150), colormap=:gist_stern, whiteline=100.0)
 
-        plot_tracer_subplot!(fig, (3, 1), DOM_slice,   "DOM"; colorrange=(0, 15), colormap=Reverse(:CMRmap))
-        plot_tracer_subplot!(fig, (3, 3), POM_slice,   "POM"; colorrange=(0, 5), colormap=Reverse(:greenbrownterrain))
-        plot_tracer_subplot!(fig, (3, 5), NUT_slice,   "NUT"; colorrange=(0, 40), colormap=Reverse(:cherry))
+        plot_tracer_subplot!(fig, (3, 1), DOM_slice,   "DOM"; colorrange=(0, 15), colormap=Reverse(:CMRmap), whiteline=0.0)
+        plot_tracer_subplot!(fig, (3, 3), POM_slice,   "POM"; colorrange=(0, 5), colormap=Reverse(:greenbrownterrain), whiteline=0.0)
+        plot_tracer_subplot!(fig, (3, 5), NUT_slice,   "NUT"; colorrange=(0, 40), colormap=Reverse(:cherry), whiteline=0.0)
 
         save(joinpath(folder, "map_iz_$(depth_index)_day_$(plot_day).png"), fig)
         @info "Saved: map_iz_$(depth_index)_day_$(plot_day).png"
@@ -408,17 +514,17 @@ for plot_day in plot_dates
     @. NUT_slice_bot = ifelse(NUT_slice_bot == 0, NaN, NUT_slice_bot)
 
     # Plot bottom maps
-    plot_tracer_subplot!(fig_b, (1, 1), T_slice_bot, "T [°C]";  colorrange=(0, 20), colormap=:turbo)
-    plot_tracer_subplot!(fig_b, (1, 3), S_slice_bot, "S [PSU]"; colorrange=(15, 35))
-    plot_tracer_subplot!(fig_b, (1, 5), O₂_slice_bot, "O₂ [μM]"; colorrange=(0, 350), colormap=:turbo)
+    plot_tracer_subplot!(fig_b, (1, 1), T_slice_bot,  "T [°C]"; colorrange=(0, 20), colormap=Reverse(:RdYlBu), whiteline=0.0)
+    plot_tracer_subplot!(fig_b, (1, 3), S_slice_bot, "S [PSU]"; colorrange=(15, 35), colormap=:viridis, whiteline=0.0)
+    plot_tracer_subplot!(fig_b, (1, 5), O₂_slice_bot,"O₂ [μM]"; colorrange=(0, 350), colormap=:turbo, whiteline=90.0)
 
-    plot_tracer_subplot!(fig_b, (2, 1), P_slice_bot,     "PHY";   colorrange=(0, 5), colormap=Reverse(:cubehelix))
-    plot_tracer_subplot!(fig_b, (2, 3), HET_slice_bot,   "HET";   colorrange=(0, 5), colormap=Reverse(:afmhot))
-    plot_tracer_subplot!(fig_b, (2, 5), O₂_sat_slice_bot,"O₂ [%]";colorrange=(0, 150), colormap=:gist_stern)
+    plot_tracer_subplot!(fig_b, (2, 1), P_slice_bot,     "PHY";   colorrange=(0, 5), colormap=Reverse(:cubehelix), whiteline=0.0)
+    plot_tracer_subplot!(fig_b, (2, 3), HET_slice_bot,   "HET";   colorrange=(0, 5), colormap=Reverse(:afmhot), whiteline=0.0)
+    plot_tracer_subplot!(fig_b, (2, 5), O₂_sat_slice_bot,"O₂ [%]";colorrange=(0, 150), colormap=:gist_stern, whiteline=100.0)
 
-    plot_tracer_subplot!(fig_b, (3, 1), DOM_slice_bot,   "DOM"; colorrange=(0, 15), colormap=Reverse(:CMRmap))
-    plot_tracer_subplot!(fig_b, (3, 3), POM_slice_bot,   "POM"; colorrange=(0, 5), colormap=Reverse(:greenbrownterrain))
-    plot_tracer_subplot!(fig_b, (3, 5), NUT_slice_bot,   "NUT"; colorrange=(0, 40), colormap=Reverse(:cherry))
+    plot_tracer_subplot!(fig_b, (3, 1), DOM_slice_bot,   "DOM"; colorrange=(0, 15), colormap=Reverse(:CMRmap), whiteline=0.0)
+    plot_tracer_subplot!(fig_b, (3, 3), POM_slice_bot,   "POM"; colorrange=(0, 5), colormap=Reverse(:greenbrownterrain), whiteline=0.0)
+    plot_tracer_subplot!(fig_b, (3, 5), NUT_slice_bot,   "NUT"; colorrange=(0, 40), colormap=Reverse(:cherry), whiteline=0.0)
     # Save figure with bottom maps
             save(joinpath(folder, "map_bottom_day_$(plot_day).png"), fig_b)
             @info "Saved: map_bottom_day_$(plot_day).png"        
