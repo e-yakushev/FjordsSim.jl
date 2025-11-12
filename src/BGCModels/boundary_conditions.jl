@@ -60,12 +60,12 @@ function OxygenSeaWaterFlux(T::Float64, S::Float64, P::Float64, O₂::Float64, w
 end
 
 # OXYDEP constants
-const O2_suboxic = 20.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
-const Trel = 250000.0     #25000.0 #10000.0     # Relaxation time for exchange with the sediments (s/m)
+const O2_suboxic = 10.0  # OXY threshold for oxic/suboxic switch (mmol/m3)
+const Trel = 5000000.0 # 250000.0 OK    #25000.0 #10000.0     # Relaxation time for exchange with the sediments (s/m)
 const b_ox = 15.0        # difference of OXY in the sediment and water, 
 const b_NUT = 10.0       # NUT in the sediment, (mmol/m3)  
 const b_DOM_ox = 6.0     # OM in the sediment (oxic conditions), (mmol/m3) 
-const b_DOM_anox = 20.0   # OM in the sediment (anoxic conditions), (mmol/m3)  
+const b_DOM_anox = 10.0   # OM in the sediment (anoxic conditions), (mmol/m3)  
 const bu = 0.8  #0.85 0.6          # Burial coeficient for lower boundary (0<Bu<1), 1 - for no burying, (nd)
 const windspeed = 5.0    # wind speed 10 m, (m/s)
 
