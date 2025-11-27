@@ -109,6 +109,7 @@ function plot_tracer_subplot!(fig, pos, data, title_str;
     Colorbar(fig[pos[1], pos[2]+1], hm, vertical=true)
 end
 
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # replace zeros with NaN in 4D array slice
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -117,6 +118,7 @@ function replace_zeros_with_NaN!(A, depth_index, day_index)
     @. slice = ifelse(slice == 0, NaN, slice)
     return slice
 end
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # vertical distribution changes at a point (i,j)
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -145,7 +147,7 @@ function plot_ztime(NUT, O₂, O₂_sat, PHY, HET, T, DOM, POM, S, i, j, times, 
     O₂_slice = get_interior(O₂, i, j, :, :)'   # transpose so z is vertical
     hmOXY = heatmap!(times / days, z, O₂_slice, colormap = :turbo)
 # --- Add isoline O₂ = 90 ---
-    contour!(times / days, z, O₂_slice; levels=[90], color=:white, linewidth=3, linestyle = :dash)
+    contour!(times / days, z, O₂_slice; levels=[90], color=:red, linewidth=2, linestyle = :dash)
 # --- Add manual label ---
 #    text!(times[end] / (2 * days), 20;  # (x, z) position of the label
 #      text = "90", color = :white, align = (:center, :center), fontsize = 18, font = "sans")
@@ -156,7 +158,8 @@ function plot_ztime(NUT, O₂, O₂_sat, PHY, HET, T, DOM, POM, S, i, j, times, 
     O₂_sat_slice = get_interior(O₂_sat, i, j, :, :)'   # transpose so z is vertical
     hmOXY_rel = heatmap!(times / days, z, O₂_sat_slice, colormap = :gist_stern) 
     # --- Add isoline O₂_sat = 100 ---
-    contour!(times / days, z, O₂_sat_slice; levels=[100], color=:white, linewidth=3, linestyle = :dash)
+    contour!(times / days, z, O₂_sat_slice; levels=[100], color=:white, 
+                                            linewidth=2, linestyle = :dash)
     Colorbar(fig[1, 6], hmOXY_rel)
 
     axPHY = Axis(fig[2, 1]; title = "PHY, mmolN/m³", axis_kwargs...)
@@ -186,10 +189,48 @@ function plot_ztime(NUT, O₂, O₂_sat, PHY, HET, T, DOM, POM, S, i, j, times, 
     save(joinpath(folder, "ztime_$(i)_$(j).png"), fig)
     @info "Saved ztime_$(i)_$(j) plot in $folder"
 end
+
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Plot a transect along the deeppest line of the fjord
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+function plot_param_transect(Par_transect_slice, title_str, depth, transect, folder;  colormap=:turbo, day_index=1)
+    # --- Ensure depth is a 1-D vector ---
+    depth = vec(depth)
+    nmax = length(transect)
+    Nz   = length(depth)
+    # --- Compute cumulative distance along transect ---
+    dist = zeros(Float64, nmax)
+    for n in 2:nmax
+        (_, i1, j1, _) = transect[n-1]
+        (_, i2, j2, _) = transect[n]
+        dist[n] = dist[n-1] + hypot(i2 - i1, j2 - j1) * 0.2
+    end
+#Distance along transect is multipied to grid spacing. i.e. 0.2 km
+    # --- Create figure ---
+    fig = Figure(size = (900, 450), fontsize = 18)
+    ax = Axis(fig[1, 1];
+        xlabel = "Distance along transect (km)",
+        ylabel = "Depth (m)",
+        title  = "$title_str transect for day: $day_index",
+        yreversed = false,
+    )
+    hm = heatmap!(ax, dist, depth, Par_transect_slice;
+        colormap = colormap,
+        colorrange = extrema(Par_transect_slice),
+        nan_color = :silver,
+        interpolate = false,
+    )
+    Colorbar(fig[1, 2], hm, label = "O₂ (mmol/m³)")
+    title_short = title_str[1:2]
+    save(joinpath(folder, "transect_$(title_short)_day_$(day_index).png"), fig)
+    @info "Saved $(title_short) transect plot for plot_day $day_index"
+    return fig
+end
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Plot a map of bottom depth indices or physical depth (m)
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 function plot_bottom_depth_map!(fig, pos, bottom_z::AbstractMatrix{<:Integer}, z_vals::AbstractVector;
                                 title_str="Bottom depth (m)", use_abs=true, colormap=:viridis, whiteline=0.0)
     # build 2D array of physical depths from index map (preserves shape)
@@ -291,13 +332,13 @@ for k in 1:Nz
     Pressure[:,:,k] .= 1. + 0.0992*(-depth[k])
 end
 # - - - - 
-# oxygen saturation related
+# Oxygen saturation related
 # - - - - 
 O₂_sat_val = similar(T)  # Oxygen saturation concentrtaion
 O₂_sat = similar(T)       # Oxygen %
 ϵ = eps(Float32)            # small positive number needed in division to zero
 # - - - - 
-# bottom depths index for the bottom maps
+# Bottom depths index for the bottom maps
 # - - - - 
 bottom_z = ones(Int, size(O₂, 1), size(O₂, 2))
 for i = 1:size(O₂, 1)
@@ -317,12 +358,11 @@ for i = 1:size(O₂, 1)
     end
 end
 
-
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Compute trans array (list of i, j, max_depth_index)
+# Compute transect array (list of i, j, max_depth_index)
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-function compute_trans(bottom_z)
-    trans = Vector{Tuple{Int, Int, Int, Int}}()  # (num, i, j, max_depth_index)
+function compute_transect(bottom_z)
+    transect = Vector{Tuple{Int, Int, Int, Int}}()  # (num, i, j, max_depth_index)
     num = 1
 
     # First part: λ_caa < 27 → φ_aca increases
@@ -330,7 +370,7 @@ function compute_trans(bottom_z)
         max_depth_index = 12
         for i in 27:-1:14
             if max_depth_index < bottom_z[i-1, j]
-                push!(trans, (num, i, j, max_depth_index))
+                push!(transect, (num, i, j, max_depth_index))
                 num += 1
                 break
             end
@@ -342,7 +382,7 @@ function compute_trans(bottom_z)
         max_depth_index = 12
         for i in 27:44
             if max_depth_index < bottom_z[i+1, j]
-                push!(trans, (num, i, j, max_depth_index))
+                push!(transect, (num, i, j, max_depth_index))
                 num += 1
                 break
             end
@@ -350,31 +390,44 @@ function compute_trans(bottom_z)
         end
     end
 
-    println("✅ Total trans points found: ", length(trans))
-    return trans
+    println("✅ Total transect points found: ", length(transect))
+    return transect
 end
 
-# Compute trans trajectory
-trans = compute_trans(bottom_z)
+# Compute transect trajectory
+transect = compute_transect(bottom_z)
 
 # Extract (i, j) positions for plotting
-i_vals = [t[2] for t in trans]
-j_vals = [t[3] for t in trans]
+i_vals = [t[2] for t in transect]
+j_vals = [t[3] for t in transect]
 # ──────────────────────────────────────────────
 # Plot a map of bottom depth indices (physical depth in meters)
-fig_depth_map0 = Figure(size=(600, 500))
+fig_depth_map0 = Figure(size=(1200, 1000))
 plot_bottom_depth_map!(fig_depth_map0, (1, 1), bottom_z, depth; 
     title_str="Bottom depth (m)", use_abs=true, colormap=Reverse(:oslo25), whiteline=0.0)
-save(joinpath(folder, "depth_map0.png"), fig_depth_map0)
-println("Saved: depth_map0.png")
+save(joinpath(folder, "Bottom_depth_map.png"), fig_depth_map0)
+println("Saved: Bottom_depth_map.png")
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Plot bottom depth map and overlay trans line
+# Compute slice for vertical transect of Parameter
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+function vert_transect_slice(Param, transect, t, Nz)
+    nmax = length(transect)
+    Param_slice = Array{Float64}(undef, nmax, Nz)
 
+    for (n, (_, i, j, _)) in enumerate(transect)
+        @inbounds Param_slice[n, :] = Param[i, j, 1:Nz, t]
+    end
+
+    return Param_slice
+end
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Plot bottom depth map and overlay transect line
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 using CairoMakie
 # Create figure and axis
-fig_depth_map = Figure(size = (600, 500))
+fig_depth_map = Figure(size = (1200, 1000))
 
 # Plot bottom map and capture both the axis and heatmap
 ax_depth = Axis(fig_depth_map[1, 1], title = "Bottom depth (m)")
@@ -389,11 +442,8 @@ CairoMakie.lines!(ax_depth, i_vals, j_vals;
     linestyle = :solid)
 
 # Save
-save(joinpath(folder, "depth_trans_map.png"), fig_depth_map)
-println("💾 Saved: depth_trans_map.png ✅")
-
-println("⏸ Press Enter to continue...")
-readline()
+save(joinpath(folder, "Bottom_depth_and_transect_map.png"), fig_depth_map)
+println("💾 Saved: Bottom_depth_and_transect_map.png ✅")
 
 # - - - - 
 # Fill oxygen saturation and percentage arrays
@@ -433,6 +483,15 @@ fig_height = 1150         # figure height
 
 for plot_day in plot_dates
     day_index = plot_day * round(Int, length(times)/365)  
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Plot vertical slices at prescribed transect for the day_index
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+O2_slice = vert_transect_slice(O₂, transect, day_index, Nz)
+fig1 = plot_param_transect(O2_slice, "O₂, mmol/m³", depth, transect, folder; colormap=:turbo, day_index=plot_day)
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Plot maps of horizontal slices at given depth_index and day_index
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     for depth_index in depth_indexes
         println("Plotting full map figure for day $plot_day ...")
 
@@ -467,7 +526,7 @@ for plot_day in plot_dates
         @info "Saved: map_iz_$(depth_index)_day_$(plot_day).png"
     end
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Now plot bottom maps
+# Plot bottom maps
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # Create 3×3 subplot figure
     fig_b = Figure(size=(fig_width, fig_height))
