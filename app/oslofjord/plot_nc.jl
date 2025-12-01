@@ -4,11 +4,11 @@ using NCDatasets
 using NetCDF
 using Printf
 using Oceananigans.Units
-using Oceananigans.Utils: prettytimeunits, maybe_int
-using CairoMakie: 
-      Auto, Axis, Figure, GridLayout, Colorbar, 
-      rowgap!, colgap!,GridLayout, Relative, scatter!, lines!,  
-      Observable, Reverse, record, heatmap!, contour!, @lift
+using Oceananigans.Utils: maybe_int
+using CairoMakie #: 
+      #Auto, Axis, Figure, GridLayout, Colorbar, 
+      #rowgap!, colgap!,GridLayout, Relative, scatter!, lines!,  
+      #Observable, Reverse, record, heatmap!, contour!, @lift
 using FjordsSim:
     plot_1d_phys,
     extract_z_faces,
@@ -18,97 +18,18 @@ using FjordsSim:
 #    record_bottom_tracer,
     BGCModel,
     oxygen_saturation  
-include("/home/eya/src/FjordsSim.jl/src/BGCModels/BGCModels.jl")
+include("/home/ocean12400/src/FjordsSim.jl/src/BGCModels/BGCModels.jl")
 using .BGCModels
-include("/home/eya/src/FjordsSim.jl/src/BGCModels/boundary_conditions.jl")
+include("/home/ocean12400/src/FjordsSim.jl/src/BGCModels/boundary_conditions.jl")
  
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-map_axis_kwargs = (xlabel = "Grid points, East", ylabel = "Grid points, North")
-transect_axis_kwargs = (xlabel = "Grid points, East", ylabel = "z (m)")
-framerate = 12
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Make animated gif of changes at the bottom
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-function record_bottom_tracer(variable, var_name, Nz, times, folder;
-    colorrange = (-1, 350), colormap = :turbo, figsize = (1000, 400),)
-    # bottom_z evaluation
-    bottom_z = ones(Int, size(variable, 1), size(variable, 2))
-    for i = 1:size(variable, 1)
-        for j = 1:size(variable, 2)
-            for k = size(variable, 3):-1:1  # Loop backwards to find the latest non-zero
-                if variable[i, j, k, 1] == 0
-                    bottom_z[i, j] = k
-                    if k != Nz
-                        bottom_z[i, j] = k + 1
-                    end
-                    break
-                end
-            end
-        end
-    end
-    iter = Observable(1)
-    f = @lift begin
-        x = [variable[i, j, bottom_z[i, j], $iter] for i = 1:size(variable, 1), j = 1:size(variable, 2)]
-        x[x.==0] .= NaN
-        x
-    end
-    title = @lift "bottom $(var_name), mmol/m³ at " * prettytime(times[$iter])
-    fig = Figure(size = figsize)
-    ax = Axis(fig[1, 1]; title = title, map_axis_kwargs...)
-    hm = heatmap!(ax, f, colorrange = colorrange, colormap = colormap)
-    cb = Colorbar(fig[0, 1], hm, vertical = false, label = "$(var_name), mmol/m³")
-    Nt = length(times)
-    record(fig, joinpath(folder, "movie_$(var_name).gif"), 1:Nt, framerate = framerate) do i
-        iter[] = i
-    end
+function prettydays(time_seconds)
+    days = round(Int, time_seconds / (24 * 3600))
+    return "day $days"
 end
-
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Make animated gif of changes at selected depth
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-function record_horizontal_tracer(tracer, times, folder, name, label;
-                                  colorrange = (-1, 30), colormap = :magma, iz = 10)
-    Nt = length(times)
-    iter = Observable(1)
-    Ti = @lift begin
-        if tracer isa AbstractArray
-            Ti = tracer[:, :, iz, $iter]
-        elseif tracer isa FieldTimeSeries
-            Ti = interior(tracer[$iter], :, :, iz)
-        else
-            error("Unsupported tracer type: $(typeof(tracer))")
-        end
-        Ti[Ti .== 0] .= NaN
-        Ti
-    end
-    title = @lift "$label at $(prettytime(times[$iter]))"
-    fig = Figure(size = (400, 550), fontsize = 20)
-    ax = Axis(fig[1, 1]; title = title, map_axis_kwargs...)
-    hm = heatmap!(ax, Ti, colorrange = colorrange, colormap = colormap, nan_color = :silver)
-    cb = Colorbar(fig[0, 1], hm, vertical = false)
-    record(fig, joinpath(folder, "movie_$(name)_iz_$iz.gif"), 1:Nt, framerate = framerate) do i
-        iter[] = i
-    end
-    @info "movie_$(name)_iz_$iz record made"
-end
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# subplot function for tracer plots
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-function plot_tracer_subplot!(fig, pos, data, title_str; 
-    colorrange=(0,1), colormap=:viridis, whiteline=1.0)
-    ax = Axis(fig[pos...]; title=title_str, 
-            width  = 200, #Auto(),  # Adaptive width
-            height = 300, #Auto()  # Adaptive height
-            xlabel="", ylabel="")
-    hm = heatmap!(ax, data; colorrange=colorrange, colormap=colormap, nan_color=:silver)
-    if whiteline != 0.0
-        contour!(ax, data; levels=[whiteline], color=:white, linewidth=2, linestyle = :dash)
-    end
-    Colorbar(fig[pos[1], pos[2]+1], hm, vertical=true)
-end
-
+#map_axis_kwargs = (xlabel = "Grid points, East", ylabel = "Grid points, North")
+#transect_axis_kwargs = (xlabel = "Grid points, East", ylabel = "z (m)")
+#framerate = 12
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # replace zeros with NaN in 4D array slice
@@ -137,11 +58,11 @@ function plot_ztime(NUT, O₂, O₂_sat, PHY, HET, T, DOM, POM, S, i, j, times, 
         xtickformat = "{:.0f}",
     )
 
-    axNUT = Axis(fig[1, 1]; title = "NUT, mmolN/m³", axis_kwargs...)
+    axNUT = Axis(fig[1, 1]; title = "NUT [μM N]", axis_kwargs...)
     hmNUT = heatmap!(times / days, z, get_interior(NUT, i, j, :, :)', colormap = Reverse(:cherry))
     Colorbar(fig[1, 2], hmNUT)
     
-    axOXY = Axis(fig[1, 3]; title = "O₂, mmol/m³", axis_kwargs...)
+    axOXY = Axis(fig[1, 3]; title = "O₂ [μM]", axis_kwargs...)
 #    hmOXY = heatmap!(times / days, z, get_interior(O₂, i, j, :, :)', colormap = :turbo)
 #    Colorbar(fig[1, 4], hmOXY)
     O₂_slice = get_interior(O₂, i, j, :, :)'   # transpose so z is vertical
@@ -153,7 +74,7 @@ function plot_ztime(NUT, O₂, O₂_sat, PHY, HET, T, DOM, POM, S, i, j, times, 
 #      text = "90", color = :white, align = (:center, :center), fontsize = 18, font = "sans")
     Colorbar(fig[1, 4], hmOXY)
 
-    axOXY_rel = Axis(fig[1, 5]; title = "O₂ saturation, %", axis_kwargs...)
+    axOXY_rel = Axis(fig[1, 5]; title = "O₂ saturation [%]", axis_kwargs...)
 
     O₂_sat_slice = get_interior(O₂_sat, i, j, :, :)'   # transpose so z is vertical
     hmOXY_rel = heatmap!(times / days, z, O₂_sat_slice, colormap = :gist_stern) 
@@ -162,34 +83,33 @@ function plot_ztime(NUT, O₂, O₂_sat, PHY, HET, T, DOM, POM, S, i, j, times, 
                                             linewidth=2, linestyle = :dash)
     Colorbar(fig[1, 6], hmOXY_rel)
 
-    axPHY = Axis(fig[2, 1]; title = "PHY, mmolN/m³", axis_kwargs...)
+    axPHY = Axis(fig[2, 1]; title = "PHY [μM N]", axis_kwargs...)
     hmPHY = heatmap!(times / days, z, get_interior(PHY, i, j, :, :)', colormap = Reverse(:cubehelix))
     Colorbar(fig[2, 2], hmPHY)
 
-    axHET = Axis(fig[2, 3]; title = "HET, mmolN/m³", axis_kwargs...)
+    axHET = Axis(fig[2, 3]; title = "HET [μM N]", axis_kwargs...)
     hmHET = heatmap!(times / days, z, get_interior(HET, i, j, :, :)', colormap = Reverse(:afmhot))
     Colorbar(fig[2, 4], hmHET)
 
-    axT = Axis(fig[2, 5]; title = "T, °C", axis_kwargs...)
+    axT = Axis(fig[2, 5]; title = "T [°C]", axis_kwargs...)
     hmT = heatmap!(times / days, z, get_interior(T, i, j, :, :)', colormap = Reverse(:RdYlBu))
     Colorbar(fig[2, 6], hmT)
 
-    axDOM = Axis(fig[3, 1]; title = "DOM, mmolN/m³", axis_kwargs...)
+    axDOM = Axis(fig[3, 1]; title = "DOM [μM N]", axis_kwargs...)
     hmDOM = heatmap!(times / days, z, get_interior(DOM, i, j, :, :)', colormap = Reverse(:CMRmap))
     Colorbar(fig[3, 2], hmDOM)
 
-    axPOM = Axis(fig[3, 3]; title = "POM, mmolN/m³", axis_kwargs...)
+    axPOM = Axis(fig[3, 3]; title = "POM [μM N]", axis_kwargs...)
     hmPOM = heatmap!(times / days, z, get_interior(POM, i, j, :, :)', colormap = Reverse(:greenbrownterrain))
     Colorbar(fig[3, 4], hmPOM)
 
-    axS = Axis(fig[3, 5]; title = "S, psu", axis_kwargs...)
+    axS = Axis(fig[3, 5]; title = "S [psu]", axis_kwargs...)
     hmS = heatmap!(times / days, z, get_interior(S, i, j, :, :)', colormap = :viridis)
     Colorbar(fig[3, 6], hmS)
 
     save(joinpath(folder, "ztime_$(i)_$(j).png"), fig)
     @info "Saved ztime_$(i)_$(j) plot in $folder"
 end
-
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Plot a transect along the deeppest line of the fjord
@@ -208,7 +128,7 @@ function plot_param_transect(Par_transect_slice, title_str, depth, transect, fol
     end
 #Distance along transect is multipied to grid spacing. i.e. 0.2 km
     # --- Create figure ---
-    fig = Figure(size = (900, 450), fontsize = 18)
+    fig = Figure(size = (900, 450), fontsize = 24)
     ax = Axis(fig[1, 1];
         xlabel = "Distance along transect (km)",
         ylabel = "Depth (m)",
@@ -221,7 +141,7 @@ function plot_param_transect(Par_transect_slice, title_str, depth, transect, fol
         nan_color = :silver,
         interpolate = false,
     )
-    Colorbar(fig[1, 2], hm, label = "O₂ (mmol/m³)")
+    Colorbar(fig[1, 2], hm, label = "O₂ [μM]")
     title_short = title_str[1:2]
     save(joinpath(folder, "transect_$(title_short)_day_$(day_index).png"), fig)
     @info "Saved $(title_short) transect plot for plot_day $day_index"
@@ -232,7 +152,7 @@ end
 # Plot a map of bottom depth indices or physical depth (m)
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 function plot_bottom_depth_map!(fig, pos, bottom_z::AbstractMatrix{<:Integer}, z_vals::AbstractVector;
-                                title_str="Bottom depth (m)", use_abs=true, colormap=:viridis, whiteline=0.0)
+                                title_str="Bottom depth [m]", use_abs=true, colormap=:viridis, whiteline=0.0)
     # build 2D array of physical depths from index map (preserves shape)
     depth_map = [ z_vals[ bottom_z[i,j] ] for i in 1:size(bottom_z,1), j in 1:size(bottom_z,2) ]
     # convert to absolute positive depth if requested (z often negative)
@@ -282,11 +202,18 @@ println("4D Variables in $filename.nc:")
         
 # Get grid dimensions and properties
 grid_group = ds.group["grid_reconstruction"]
-Nx = grid_group.attrib["Nx"]
-Ny = grid_group.attrib["Ny"]
-Nz = grid_group.attrib["Nz"]
+Nx = Int(grid_group.attrib["Nx"])
+Ny = Int(grid_group.attrib["Ny"])
+Nz = Int(grid_group.attrib["Nz"])
 
-println("Grid dimensions: Nx=$Nx,", typeof(Nx),", Ny=$Ny,", typeof(Ny),", Nz=$Nz,", typeof(Nz))
+println("Grid dimensions: Nx=$Nx, Ny=$Ny, Nz=$Nz")
+
+#grid_group = ds.group["grid_reconstruction"]
+#Nx = grid_group.attrib["Nx"]
+#$Ny = grid_group.attrib["Ny"]
+#Nz = grid_group.attrib["Nz"]
+
+#println("Grid dimensions: Nx=$Nx,", typeof(Nx),", Ny=$Ny,", typeof(Ny),", Nz=$Nz,", typeof(Nz))
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Extract from NetCDF dataset 
@@ -320,6 +247,40 @@ O₂ = ds["O₂"][:,:,:,:]
 println("O₂ stats — min: ", minimum(O₂),  ", max: ", maximum(O₂))
 
 @info "BGH arrays loaded"
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# subplot function for tracer plots
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Example for the Oslofjord (approximate boundaries)
+oslo_fjord_lon_min = 10.45   # East longitude
+oslo_fjord_lon_max = 10.8
+oslo_fjord_lat_min = 59.6  # Northern latitude
+oslo_fjord_lat_max = 59.95
+
+# Create realistic coordinates
+real_lon = range(oslo_fjord_lon_min, oslo_fjord_lon_max, length=Nx)
+real_lat = range(oslo_fjord_lat_min, oslo_fjord_lat_max, length=Ny)
+
+# Using real coordinates in the plotting function
+function plot_tracer_subplot!(fig, pos, data, title_str; 
+    longitudes=real_lon, latitudes=real_lat,
+    colorrange=(0,1), colormap=:viridis, whiteline=1.0)
+
+    ax = Axis(fig[pos...]; title=title_str, 
+            width = 180,
+            height = 300,
+            xlabel="Longitude (°E)", ylabel="Latitude (°N)")
+    
+    hm = heatmap!(ax, longitudes, latitudes, data; 
+                  colorrange=colorrange, colormap=colormap, nan_color=:silver)
+    
+    if whiteline != 0.0
+        contour!(ax, longitudes, latitudes, data; 
+                 levels=[whiteline], color=:white, linewidth=2, linestyle=:dash)
+    end
+    Colorbar(fig[pos[1], pos[2]+1], hm, vertical=true)
+end
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Calculate additional fields
@@ -430,13 +391,24 @@ using CairoMakie
 fig_depth_map = Figure(size = (1200, 1000))
 
 # Plot bottom map and capture both the axis and heatmap
-ax_depth = Axis(fig_depth_map[1, 1], title = "Bottom depth (m)")
-#hm = heatmap!(ax_depth, bottom_z'; colormap = Reverse(:oslo25))
-hm = heatmap!(ax_depth, bottom_z; colormap = Reverse(:oslo25))
+ax_depth = Axis(fig_depth_map[1, 1], title = "Bottom depth (m)",
+    xlabel = "Longitude (°E)",  
+    ylabel = "Latitude (°N)")   
+
+# Convert indices into coordinates for the trajectory
+lon_vals = real_lon[i_vals]
+lat_vals = real_lat[j_vals]
+
+# Create a depth map in coordinates
+depth_map = [ depth[bottom_z[i,j]] for i in 1:size(bottom_z,1), j in 1:size(bottom_z,2) ]
+depth_map = abs.(depth_map)  # absolute depth values
+@. depth_map = ifelse(bottom_z == 0, NaN, depth_map)
+
+hm = heatmap!(ax_depth, real_lon, real_lat, depth_map; colormap = Reverse(:oslo25))
 cb = Colorbar(fig_depth_map[1, 2], hm, label = "Depth (m)")
 
-# Overlay trajectory line on the *axis*
-CairoMakie.lines!(ax_depth, i_vals, j_vals;
+# Overlay trajectory line on the *axis* using coordinates
+CairoMakie.lines!(ax_depth, lon_vals, lat_vals;
     color = :white,
     linewidth = 2.5,
     linestyle = :solid)
@@ -482,19 +454,19 @@ fig_width =  950         # figure width
 fig_height = 1150         # figure height
 
 for plot_day in plot_dates
-    day_index = plot_day * round(Int, length(times)/365)  
+    day_index = plot_day * round(Int, length(times)/365) 
+    for depth_index in depth_indexes
+        println("Plotting full map figure for day $plot_day ...") 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Plot vertical slices at prescribed transect for the day_index
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 O2_slice = vert_transect_slice(O₂, transect, day_index, Nz)
-fig1 = plot_param_transect(O2_slice, "O₂, mmol/m³", depth, transect, folder; colormap=:turbo, day_index=plot_day)
+fig1 = plot_param_transect(O2_slice, "O₂ [μM]", depth, transect, folder; colormap=:turbo, day_index=plot_day)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Plot maps of horizontal slices at given depth_index and day_index
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    for depth_index in depth_indexes
-        println("Plotting full map figure for day $plot_day ...")
-
+    
         # Extract horizontal slices
         T_slice = replace_zeros_with_NaN!(T, depth_index, day_index)
         S_slice = replace_zeros_with_NaN!(S, depth_index, day_index)
@@ -511,16 +483,16 @@ fig1 = plot_param_transect(O2_slice, "O₂, mmol/m³", depth, transect, folder; 
         fig = Figure(size=(fig_width, fig_height))
 
         plot_tracer_subplot!(fig, (1, 1), T_slice, "T [°C]";  colorrange=(0, 20), colormap=Reverse(:RdYlBu), whiteline=0.0)
-        plot_tracer_subplot!(fig, (1, 3), S_slice, "S [PSU]"; colorrange=(15, 35), colormap=:viridis, whiteline=0.0)
+        plot_tracer_subplot!(fig, (1, 3), S_slice, "S [psu]"; colorrange=(15, 35), colormap=:viridis, whiteline=0.0)
         plot_tracer_subplot!(fig, (1, 5), O₂_slice,"O₂ [μM]"; colorrange=(0, 350), colormap=:turbo, whiteline=90.0)
 
-        plot_tracer_subplot!(fig, (2, 1), P_slice,     "PHY";   colorrange=(0, 5), colormap=Reverse(:cubehelix), whiteline=0.0)
-        plot_tracer_subplot!(fig, (2, 3), HET_slice,   "HET";   colorrange=(0, 5), colormap=Reverse(:afmhot), whiteline=0.0)
+        plot_tracer_subplot!(fig, (2, 1), P_slice,     "PHY [μM N]";   colorrange=(0, 5), colormap=Reverse(:cubehelix), whiteline=0.0)
+        plot_tracer_subplot!(fig, (2, 3), HET_slice,   "HET [μM N]";   colorrange=(0, 5), colormap=Reverse(:afmhot), whiteline=0.0)
         plot_tracer_subplot!(fig, (2, 5), O₂_sat_slice,"O₂ [%]";colorrange=(0, 150), colormap=:gist_stern, whiteline=100.0)
 
-        plot_tracer_subplot!(fig, (3, 1), DOM_slice,   "DOM"; colorrange=(0, 15), colormap=Reverse(:CMRmap), whiteline=0.0)
-        plot_tracer_subplot!(fig, (3, 3), POM_slice,   "POM"; colorrange=(0, 5), colormap=Reverse(:greenbrownterrain), whiteline=0.0)
-        plot_tracer_subplot!(fig, (3, 5), NUT_slice,   "NUT"; colorrange=(0, 40), colormap=Reverse(:cherry), whiteline=0.0)
+        plot_tracer_subplot!(fig, (3, 1), DOM_slice,   "DOM [μM N]"; colorrange=(0, 15), colormap=Reverse(:CMRmap), whiteline=0.0)
+        plot_tracer_subplot!(fig, (3, 3), POM_slice,   "POM [μM N]"; colorrange=(0, 5), colormap=Reverse(:greenbrownterrain), whiteline=0.0)
+        plot_tracer_subplot!(fig, (3, 5), NUT_slice,   "NUT [μM N]"; colorrange=(0, 40), colormap=Reverse(:cherry), whiteline=0.0)
 
         save(joinpath(folder, "map_iz_$(depth_index)_day_$(plot_day).png"), fig)
         @info "Saved: map_iz_$(depth_index)_day_$(plot_day).png"
@@ -574,47 +546,318 @@ fig1 = plot_param_transect(O2_slice, "O₂, mmol/m³", depth, transect, folder; 
 
     # Plot bottom maps
     plot_tracer_subplot!(fig_b, (1, 1), T_slice_bot,  "T [°C]"; colorrange=(0, 20), colormap=Reverse(:RdYlBu), whiteline=0.0)
-    plot_tracer_subplot!(fig_b, (1, 3), S_slice_bot, "S [PSU]"; colorrange=(15, 35), colormap=:viridis, whiteline=0.0)
+    plot_tracer_subplot!(fig_b, (1, 3), S_slice_bot, "S [psu]"; colorrange=(15, 35), colormap=:viridis, whiteline=0.0)
     plot_tracer_subplot!(fig_b, (1, 5), O₂_slice_bot,"O₂ [μM]"; colorrange=(0, 350), colormap=:turbo, whiteline=90.0)
 
-    plot_tracer_subplot!(fig_b, (2, 1), P_slice_bot,     "PHY";   colorrange=(0, 5), colormap=Reverse(:cubehelix), whiteline=0.0)
-    plot_tracer_subplot!(fig_b, (2, 3), HET_slice_bot,   "HET";   colorrange=(0, 5), colormap=Reverse(:afmhot), whiteline=0.0)
+    plot_tracer_subplot!(fig_b, (2, 1), P_slice_bot,     "PHY [μM N]";   colorrange=(0, 5), colormap=Reverse(:cubehelix), whiteline=0.0)
+    plot_tracer_subplot!(fig_b, (2, 3), HET_slice_bot,   "HET [μM N]";   colorrange=(0, 5), colormap=Reverse(:afmhot), whiteline=0.0)
     plot_tracer_subplot!(fig_b, (2, 5), O₂_sat_slice_bot,"O₂ [%]";colorrange=(0, 150), colormap=:gist_stern, whiteline=100.0)
 
-    plot_tracer_subplot!(fig_b, (3, 1), DOM_slice_bot,   "DOM"; colorrange=(0, 15), colormap=Reverse(:CMRmap), whiteline=0.0)
-    plot_tracer_subplot!(fig_b, (3, 3), POM_slice_bot,   "POM"; colorrange=(0, 5), colormap=Reverse(:greenbrownterrain), whiteline=0.0)
-    plot_tracer_subplot!(fig_b, (3, 5), NUT_slice_bot,   "NUT"; colorrange=(0, 40), colormap=Reverse(:cherry), whiteline=0.0)
+    plot_tracer_subplot!(fig_b, (3, 1), DOM_slice_bot,   "DOM [μM N]"; colorrange=(0, 15), colormap=Reverse(:CMRmap), whiteline=0.0)
+    plot_tracer_subplot!(fig_b, (3, 3), POM_slice_bot,   "POM [μM N]"; colorrange=(0, 5), colormap=Reverse(:greenbrownterrain), whiteline=0.0)
+    plot_tracer_subplot!(fig_b, (3, 5), NUT_slice_bot,   "NUT [μM N]"; colorrange=(0, 40), colormap=Reverse(:cherry), whiteline=0.0)
     # Save figure with bottom maps
             save(joinpath(folder, "map_bottom_day_$(plot_day).png"), fig_b)
             @info "Saved: map_bottom_day_$(plot_day).png"        
 end 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# subplot function for tracer plots
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+function plot_tracer_subplot!(fig, pos, data, title_str; 
+    colorrange=(0,1), colormap=:viridis, whiteline=1.0)
+    ax = Axis(fig[pos...]; title=title_str, 
+            width  = 200, #Auto(),  # Adaptive width
+            height = 300, #Auto()  # Adaptive height
+            xlabel="", ylabel="")
+    hm = heatmap!(ax, data; colorrange=colorrange, colormap=colormap, nan_color=:silver)
+    if whiteline != 0.0
+        contour!(ax, data; levels=[whiteline], color=:white, linewidth=2, linestyle = :dash)
+    end
+    Colorbar(fig[pos[1], pos[2]+1], hm, vertical=true)
+end
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Make animated gif of changes at selected depth
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#function record_horizontal_tracer(tracer, times, folder, name, label;
+#                                longitudes=real_lon, latitudes=real_lat,
+#                                colorrange = (-1, 30), colormap = :magma, iz = 10, framerate = 12)
+#    Nt = length(times)
+#    iter = Observable(1)
+#   Ti = @lift begin
+#        if tracer isa AbstractArray
+#            Ti = tracer[:, :, iz, $iter]
+#        elseif tracer isa FieldTimeSeries
+#            Ti = interior(tracer[$iter], :, :, iz)
+#        else
+#            error("Unsupported tracer type: $(typeof(tracer))")
+#        end
+#        Ti[Ti .== 0] .= NaN
+#        Ti
+#    end
+#    title = @lift "$label at $(prettydays(times[$iter]))"
+#    fig = Figure(size = (400, 550), fontsize = 20)
+#    ax = Axis(fig[1, 1]; title = title, xlabel="Longitude (°E)", ylabel="Latitude (°N)")
+#    hm = heatmap!(ax, longitudes, latitudes, Ti, colorrange = colorrange, colormap = colormap, nan_color = :silver)
+#    cb = Colorbar(fig[0, 1], hm, vertical = false)
+#    record(fig, joinpath(folder, "movie_$(name)_iz_$iz.gif"), 1:Nt, framerate = framerate) do i
+#        iter[] = i
+#    end
+#    @info "movie_$(name)_iz_$iz record made"
+#end
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Make animated gif of changes at the bottom
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#function record_bottom_tracer(variable, var_name, Nz, times, folder;
+#    longitudes=real_lon, latitudes=real_lat,
+#    colorrange = (-1, 350), colormap = :turbo, figsize = (1000, 400), framerate = 12)
+    # bottom_z evaluation
+#    bottom_z = ones(Int, size(variable, 1), size(variable, 2))
+#    for i = 1:size(variable, 1)
+#        for j = 1:size(variable, 2)
+#            for k = size(variable, 3):-1:1  # Loop backwards to find the latest non-zero
+#                if variable[i, j, k, 1] == 0
+#                    bottom_z[i, j] = k
+#                    if k != Nz
+#                        bottom_z[i, j] = k + 1
+#                    end
+#                    break
+#                end
+#            end
+#        end
+#    end
+#    iter = Observable(1)
+#    f = @lift begin
+#        x = [variable[i, j, bottom_z[i, j], $iter] for i = 1:size(variable, 1), j = 1:size(variable, 2)]
+#        x[x.==0] .= NaN
+#        x
+#    end
+#    title = @lift "bottom $(var_name), μM at " * prettydays(times[$iter])
+#    fig = Figure(size = figsize)
+#    ax = Axis(fig[1, 1]; title = title, xlabel="Longitude (°E)", ylabel="Latitude (°N)")
+#    hm = heatmap!(ax, longitudes, latitudes, f, colorrange = colorrange, colormap = colormap)
+#    cb = Colorbar(fig[0, 1], hm, vertical = false, label = "$(var_name), μM")
+#    Nt = length(times)
+#    record(fig, joinpath(folder, "movie_$(var_name).gif"), 1:Nt, framerate = framerate) do i
+#        iter[] = i
+#    end
+#end
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Make movies at the bottom        
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-record_bottom_tracer(O₂, "O2_bottom", Nz, times, folder;
-    colorrange = (-1, 350), colormap = :turbo, figsize = (400, 550),)
+#record_bottom_tracer(O₂, "O2_bottom", Nz, times, folder;
+#    colorrange = (-1, 350), colormap = :turbo, figsize = (400, 550),)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Make movies at the surface (iz = Nz) 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~   
- record_horizontal_tracer(NUT, times, folder, "NUTsurf", "Nutrients (μM N)",
-                          colorrange = (0, 40),colormap = Reverse(:cherry),iz = Nz, )
+# record_horizontal_tracer(NUT, times, folder, "NUTsurf", "NUT [μM N]",
+#                          colorrange = (0, 40),colormap = Reverse(:cherry),iz = Nz, )
  # ~~~~~~~~~~~~~~~~~~~~~~~~~
- record_horizontal_tracer(O₂, times, folder, "O2surf", "Dissolved oxygen (μM)",
-     colorrange = (0, 350), colormap = :turbo, iz = Nz, )
+ #record_horizontal_tracer(O₂, times, folder, "O2surf", "O₂ [μM]",
+#     colorrange = (0, 350), colormap = :turbo, iz = Nz, )
  # ~~~~~~~~~~~~~~~~~~~~~~~~~
- record_horizontal_tracer(P, times, folder, "PHYsurf", "PHY (μM)",
-     colorrange = (0, 5), colormap = Reverse(:cubehelix), iz = Nz, )     
+# record_horizontal_tracer(P, times, folder, "PHYsurf", "PHY [μM N]",
+ #    colorrange = (0, 5), colormap = Reverse(:cubehelix), iz = Nz, )     
 # ~~~~~~~~~~~~~~~~~~~~~~~~~
- record_horizontal_tracer(HET, times, folder, "HETsurf", "HET (μM)",
-     colorrange = (0, 5), colormap = Reverse(:afmhot), iz = Nz, )
+# record_horizontal_tracer(HET, times, folder, "HETsurf", "HET [μM N]",
+#     colorrange = (0, 5), colormap = Reverse(:afmhot), iz = Nz, )
 # ~~~~~~~~~~~~~~~~~~~~~~~~~
- record_horizontal_tracer(POM, times, folder, "POMsurf", "POM (μM)",
-     colorrange = (0, 5), colormap = Reverse(:greenbrownterrain), iz = Nz, )    
+# record_horizontal_tracer(POM, times, folder, "POMsurf", "POM [μM N]",
+#     colorrange = (0, 5), colormap = Reverse(:greenbrownterrain), iz = Nz, )    
 # ~~~~~~~~~~~~~~~~~~~~~~~~~
-    record_horizontal_tracer(DOM, times, folder, "DOMsurf", "DOM (μM)",
-     colorrange = (0, 20), colormap = Reverse(:CMRmap), iz = Nz, )
+#   record_horizontal_tracer(DOM, times, folder, "DOMsurf", "DOM [μM N]",
+#     colorrange = (0, 20), colormap = Reverse(:CMRmap), iz = Nz, )
 #println("⏸ Press Enter to continue...")
 #readline()
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Function to convert seconds to days and find indices for 365 days
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+function get_365_days_indices(times_seconds, total_days=365)
+    # Converting seconds to days
+    times_days = times_seconds ./ (24 * 3600)
+    
+    # Find the maximum time in days
+    max_days = maximum(times_days)
+    
+    if max_days < total_days
+        @warn "Available data only for $max_days days, but requested $total_days days"
+        total_days = Int(floor(max_days))
+    end
+    
+    # Find indexes for 365 days
+    target_times = range(0, total_days, length=total_days)
+    indices = Int[]
+    
+    for target_day in target_times
+        # Find the nearest available time step
+        idx = argmin(abs.(times_days .- target_day))
+        push!(indices, idx)
+    end
+    
+    # Remove duplicates
+    unique_indices = unique(indices)
+    
+    @info "Selected $(length(unique_indices)) frames for $total_days days"
+    @info "Time range: day 0 to day $total_days"
+    
+    return unique_indices
+end
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Function to plot six animations on one sheet for 365 days
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+function plot_six_animations_365_days(tracers, times_seconds, folder, labels, longitudes, latitudes;
+                                      colorranges, colormaps, iz=Nz, framerate=1, 
+                                      figsize=(1800, 1200), fontsize=24)
+    
+    # Receive indexes for 365 days
+    day_indices = get_365_days_indices(times_seconds, 365)
+    Nt = length(day_indices)
+    
+    # Create an Observable for the current day
+    day_iter = Observable(1)
+    current_frame = Observable(1)
+    
+    # Convert time to days for display
+    times_days = times_seconds ./ (24 * 3600)
+    
+    # Create the figure
+    fig = Figure(size=figsize, fontsize=fontsize)
+    
+    # Create arrays to store axes and heatmaps
+    axes_vec = []
+    heatmaps_vec = []
+    
+    # Create 6 subplots in 2x3 grid
+    for i in 1:6
+        row = ((i-1) ÷ 3) + 1
+        col = ((i-1) % 3) + 1
+        
+        # Create main plot axis
+        ax = Axis(fig[row, col*2-1], 
+                  xlabel=(row == 2 ? "Longitude (°E)" : ""),
+                  ylabel=(col == 1 ? "Latitude (°N)" : ""),
+                  title=labels[i])
+        
+        # Create observable for current tracer и текущего дня
+        Ti = @lift begin
+            tracer_data = tracers[i]
+            frame_idx = day_indices[$day_iter]
+            # Check the dimensions of the data
+            if ndims(tracer_data) == 4
+                Ti_val = tracer_data[:, :, iz, frame_idx]
+            else
+                error("Expected 4D array, got $(ndims(tracer_data))D")
+            end
+            # Convert to Float64 and replace zeros with NaN
+            Ti_val = Float64.(Ti_val)
+            Ti_val[Ti_val .== 0] .= NaN
+            Ti_val
+        end
+        
+        # Create heatmap
+        hm = heatmap!(ax, longitudes, latitudes, Ti, 
+                     colorrange=colorranges[i], 
+                     colormap=colormaps[i], 
+                     nan_color=:lightgray)
+        
+        # Create colorbar next to the plot
+        Colorbar(fig[row, col*2], hm, width=20, label="")
+        
+        push!(axes_vec, ax)
+        push!(heatmaps_vec, hm)
+    end
+    
+    # Add super title with time in days
+    super_title = @lift begin
+        day_idx = day_indices[$day_iter]
+        current_day = round(Int, times_days[day_idx])
+        "Day $current_day/365 - Surface"
+    end
+    Label(fig[0, :], super_title, fontsize=24, font=:bold)
+    
+    # Add progress information
+    #progress_info = @lift "Frame $($day_iter)/$Nt"
+    #Label(fig[3, :], progress_info, fontsize=22, color=:gray)
+    
+    # Adjust layout
+    rowgap!(fig.layout, 15)
+    colgap!(fig.layout, 10)
+    
+    output_file = joinpath(folder, "six_animations_365days_iz_$iz.gif")
+    
+    @info "Starting 365-day animation recording with $Nt frames..."
+    @info "Output file: $output_file"
+    @info "Frame rate: $framerate fps"
+    
+    # Record animation for selected days
+    record(fig, output_file, 1:Nt, framerate=framerate) do i
+        day_iter[] = i
+        current_frame[] = day_indices[i]
+        
+        if i % 30 == 0 || i <= 5 || i >= Nt-5
+            day_idx = day_indices[i]
+            current_day = round(Int, times_days[day_idx])
+            @info "Processing: frame $i/$Nt (day $current_day)"
+        end
+    end
+    
+    @info "365-day animation completed: $output_file"
+    
+    return fig
+end
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Prepare and call the function
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Prepare data for the six animations
+tracers = [NUT, O₂, P, HET, POM, DOM]
+
+labels = ["NUT [μM N]", "O₂ [μM N]", "PHY [μM N]", "HET [μM N]", "POM [μM N]", "DOM [μM N]"]
+
+colorranges = [
+    (0.0, 40.0),    # NUT
+    (0.0, 350.0),   # O₂
+    (0.0, 5.0),     # PHY
+    (0.0, 5.0),     # HET  
+    (0.0, 5.0),     # POM
+    (0.0, 20.0)     # DOM
+]
+
+colormaps = [
+    :viridis,        # NUT
+    :turbo,          # O₂
+    :plasma,         # PHY
+    :hot,            # HET
+    :rainbow,        # POM
+    :jet             # DOM
+]
+
+# Check the available data
+times_days = times ./ (24 * 3600)
+max_days = maximum(times_days)
+@info "Available data: $(length(times)) time steps, up to day $(round(max_days, digits=1))"
+
+# Select the appropriate function depending on the data
+if max_days >= 365
+    @info "Enough data for 365-day animation"
+    fig = plot_six_animations_365_days(tracers, times, folder, labels, real_lon, real_lat,
+                                      colorranges=colorranges, colormaps=colormaps, 
+                                      iz=Nz, framerate=1)
+else
+    @info "Using all available data ($(round(max_days, digits=1)) days)"
+    fig = plot_six_animations_daily(tracers, times, folder, labels, real_lon, real_lat,
+                                   colorranges=colorranges, colormaps=colormaps, 
+                                   iz=Nz, framerate=1)
+end
+
+# Close the dataset
+close(ds)
+
+@info "Script completed!"
