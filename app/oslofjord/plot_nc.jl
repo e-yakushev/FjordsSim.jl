@@ -18,9 +18,9 @@ using FjordsSim:
 #    record_bottom_tracer,
     BGCModel,
     oxygen_saturation  
-include("/home/ocean12400/src/FjordsSim.jl/src/BGCModels/BGCModels.jl")
+include("/home/eya/src/FjordsSim.jl/src/BGCModels/BGCModels.jl")
 using .BGCModels
-include("/home/ocean12400/src/FjordsSim.jl/src/BGCModels/boundary_conditions.jl")
+include("/home/eya/src/FjordsSim.jl/src/BGCModels/boundary_conditions.jl")
  
 function prettydays(time_seconds)
     days = round(Int, time_seconds / (24 * 3600))
@@ -67,11 +67,11 @@ function plot_ztime(NUT, O₂, O₂_sat, PHY, HET, T, DOM, POM, S, i, j, times, 
 #    Colorbar(fig[1, 4], hmOXY)
     O₂_slice = get_interior(O₂, i, j, :, :)'   # transpose so z is vertical
     hmOXY = heatmap!(times / days, z, O₂_slice, colormap = :turbo)
-# --- Add isoline O₂ = 90 ---
-    contour!(times / days, z, O₂_slice; levels=[90], color=:red, linewidth=2, linestyle = :dash)
+# --- Add isoline O₂ = 67 uM (i.e. 1.5 ml/l as hypoxia threshold) ---
+    contour!(times / days, z, O₂_slice; levels=[67], color=:red, linewidth=2, linestyle = :dot)
 # --- Add manual label ---
 #    text!(times[end] / (2 * days), 20;  # (x, z) position of the label
-#      text = "90", color = :white, align = (:center, :center), fontsize = 18, font = "sans")
+#      text = "67", color = :white, align = (:center, :center), fontsize = 18, font = "sans")
     Colorbar(fig[1, 4], hmOXY)
 
     axOXY_rel = Axis(fig[1, 5]; title = "O₂ saturation [%]", axis_kwargs...)
@@ -80,7 +80,7 @@ function plot_ztime(NUT, O₂, O₂_sat, PHY, HET, T, DOM, POM, S, i, j, times, 
     hmOXY_rel = heatmap!(times / days, z, O₂_sat_slice, colormap = :gist_stern) 
     # --- Add isoline O₂_sat = 100 ---
     contour!(times / days, z, O₂_sat_slice; levels=[100], color=:white, 
-                                            linewidth=2, linestyle = :dash)
+                                            linewidth=2, linestyle = :dot)
     Colorbar(fig[1, 6], hmOXY_rel)
 
     axPHY = Axis(fig[2, 1]; title = "PHY [μM N]", axis_kwargs...)
@@ -114,7 +114,8 @@ end
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Plot a transect along the deeppest line of the fjord
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-function plot_param_transect(Par_transect_slice, title_str, depth, transect, folder;  colormap=:turbo, day_index=1)
+function plot_param_transect(Par_transect_slice, title_str, depth, transect, folder; 
+                             colormap=:turbo, day_index=1, whiteline=1.0)
     # --- Ensure depth is a 1-D vector ---
     depth = vec(depth)
     nmax = length(transect)
@@ -136,11 +137,15 @@ function plot_param_transect(Par_transect_slice, title_str, depth, transect, fol
         yreversed = false,
     )
     hm = heatmap!(ax, dist, depth, Par_transect_slice;
-        colormap = colormap,
         colorrange = extrema(Par_transect_slice),
+        colormap = colormap,
         nan_color = :silver,
         interpolate = false,
     )
+    if whiteline != 0.0
+        contour!(ax, dist, depth, Par_transect_slice; 
+                 levels=[whiteline], color=:white, linewidth=2, linestyle=:dot)
+    end
     Colorbar(fig[1, 2], hm, label = "O₂ [μM]")
     title_short = title_str[1:2]
     save(joinpath(folder, "transect_$(title_short)_day_$(day_index).png"), fig)
@@ -277,7 +282,7 @@ function plot_tracer_subplot!(fig, pos, data, title_str;
     
     if whiteline != 0.0
         contour!(ax, longitudes, latitudes, data; 
-                 levels=[whiteline], color=:white, linewidth=2, linestyle=:dash)
+                 levels=[whiteline], color=:white, linewidth=2, linestyle=:dot)
     end
     Colorbar(fig[pos[1], pos[2]+1], hm, vertical=true)
 end
@@ -461,7 +466,8 @@ for plot_day in plot_dates
 # Plot vertical slices at prescribed transect for the day_index
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 O2_slice = vert_transect_slice(O₂, transect, day_index, Nz)
-fig1 = plot_param_transect(O2_slice, "O₂ [μM]", depth, transect, folder; colormap=:turbo, day_index=plot_day)
+fig1 = plot_param_transect(O2_slice, "O₂ [μM]", depth, transect, folder; 
+        colormap=:turbo, day_index=plot_day, whiteline=67.0)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Plot maps of horizontal slices at given depth_index and day_index
@@ -484,7 +490,7 @@ fig1 = plot_param_transect(O2_slice, "O₂ [μM]", depth, transect, folder; colo
 
         plot_tracer_subplot!(fig, (1, 1), T_slice, "T [°C]";  colorrange=(0, 20), colormap=Reverse(:RdYlBu), whiteline=0.0)
         plot_tracer_subplot!(fig, (1, 3), S_slice, "S [psu]"; colorrange=(15, 35), colormap=:viridis, whiteline=0.0)
-        plot_tracer_subplot!(fig, (1, 5), O₂_slice,"O₂ [μM]"; colorrange=(0, 350), colormap=:turbo, whiteline=90.0)
+        plot_tracer_subplot!(fig, (1, 5), O₂_slice,"O₂ [μM]"; colorrange=(0, 350), colormap=:turbo, whiteline=67.0)
 
         plot_tracer_subplot!(fig, (2, 1), P_slice,     "PHY [μM N]";   colorrange=(0, 5), colormap=Reverse(:cubehelix), whiteline=0.0)
         plot_tracer_subplot!(fig, (2, 3), HET_slice,   "HET [μM N]";   colorrange=(0, 5), colormap=Reverse(:afmhot), whiteline=0.0)
@@ -547,7 +553,7 @@ fig1 = plot_param_transect(O2_slice, "O₂ [μM]", depth, transect, folder; colo
     # Plot bottom maps
     plot_tracer_subplot!(fig_b, (1, 1), T_slice_bot,  "T [°C]"; colorrange=(0, 20), colormap=Reverse(:RdYlBu), whiteline=0.0)
     plot_tracer_subplot!(fig_b, (1, 3), S_slice_bot, "S [psu]"; colorrange=(15, 35), colormap=:viridis, whiteline=0.0)
-    plot_tracer_subplot!(fig_b, (1, 5), O₂_slice_bot,"O₂ [μM]"; colorrange=(0, 350), colormap=:turbo, whiteline=90.0)
+    plot_tracer_subplot!(fig_b, (1, 5), O₂_slice_bot,"O₂ [μM]"; colorrange=(0, 350), colormap=:turbo, whiteline=67.0)
 
     plot_tracer_subplot!(fig_b, (2, 1), P_slice_bot,     "PHY [μM N]";   colorrange=(0, 5), colormap=Reverse(:cubehelix), whiteline=0.0)
     plot_tracer_subplot!(fig_b, (2, 3), HET_slice_bot,   "HET [μM N]";   colorrange=(0, 5), colormap=Reverse(:afmhot), whiteline=0.0)
@@ -572,7 +578,7 @@ function plot_tracer_subplot!(fig, pos, data, title_str;
             xlabel="", ylabel="")
     hm = heatmap!(ax, data; colorrange=colorrange, colormap=colormap, nan_color=:silver)
     if whiteline != 0.0
-        contour!(ax, data; levels=[whiteline], color=:white, linewidth=2, linestyle = :dash)
+        contour!(ax, data; levels=[whiteline], color=:white, linewidth=2, linestyle = :dot)
     end
     Colorbar(fig[pos[1], pos[2]+1], hm, vertical=true)
 end
@@ -764,7 +770,7 @@ function plot_six_animations_365_days(tracers, times_seconds, folder, labels, lo
         hm = heatmap!(ax, longitudes, latitudes, Ti, 
                      colorrange=colorranges[i], 
                      colormap=colormaps[i], 
-                     nan_color=:lightgray)
+                     nan_color=:silver)
         
         # Create colorbar next to the plot
         Colorbar(fig[row, col*2], hm, width=20, label="")
