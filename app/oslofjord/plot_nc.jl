@@ -18,9 +18,10 @@ using FjordsSim:
 #    record_bottom_tracer,
     BGCModel,
     oxygen_saturation  
-include("/home/eya/src/FjordsSim.jl/src/BGCModels/BGCModels.jl")
+include("/home/ocean12400/src/FjordsSim.jl/src/BGCModels/BGCModels.jl")
 using .BGCModels
-include("/home/eya/src/FjordsSim.jl/src/BGCModels/boundary_conditions.jl")
+using Colors
+include("/home/ocean12400/src/FjordsSim.jl/src/BGCModels/boundary_conditions.jl")
  
 function prettydays(time_seconds)
     days = round(Int, time_seconds / (24 * 3600))
@@ -68,7 +69,7 @@ function plot_ztime(NUT, O₂, O₂_sat, PHY, HET, T, DOM, POM, S, i, j, times, 
     O₂_slice = get_interior(O₂, i, j, :, :)'   # transpose so z is vertical
     hmOXY = heatmap!(times / days, z, O₂_slice, colormap = :turbo)
 # --- Add isoline O₂ = 67 uM (i.e. 1.5 ml/l as hypoxia threshold) ---
-    contour!(times / days, z, O₂_slice; levels=[67], color=:red, linewidth=2, linestyle = :dot)
+    contour!(times / days, z, O₂_slice; levels=[67], color=:white, linewidth=4, linestyle = :dot)
 # --- Add manual label ---
 #    text!(times[end] / (2 * days), 20;  # (x, z) position of the label
 #      text = "67", color = :white, align = (:center, :center), fontsize = 18, font = "sans")
@@ -80,7 +81,7 @@ function plot_ztime(NUT, O₂, O₂_sat, PHY, HET, T, DOM, POM, S, i, j, times, 
     hmOXY_rel = heatmap!(times / days, z, O₂_sat_slice, colormap = :gist_stern) 
     # --- Add isoline O₂_sat = 100 ---
     contour!(times / days, z, O₂_sat_slice; levels=[100], color=:white, 
-                                            linewidth=2, linestyle = :dot)
+                                            linewidth=4, linestyle = :dot)
     Colorbar(fig[1, 6], hmOXY_rel)
 
     axPHY = Axis(fig[2, 1]; title = "PHY [μM N]", axis_kwargs...)
@@ -116,10 +117,11 @@ end
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 function plot_param_transect(Par_transect_slice, title_str, depth, transect, folder; 
                              colormap=:turbo, day_index=1, whiteline=1.0)
+    
     # --- Ensure depth is a 1-D vector ---
     depth = vec(depth)
     nmax = length(transect)
-    Nz   = length(depth)
+    
     # --- Compute cumulative distance along transect ---
     dist = zeros(Float64, nmax)
     for n in 2:nmax
@@ -127,7 +129,7 @@ function plot_param_transect(Par_transect_slice, title_str, depth, transect, fol
         (_, i2, j2, _) = transect[n]
         dist[n] = dist[n-1] + hypot(i2 - i1, j2 - j1) * 0.2
     end
-#Distance along transect is multipied to grid spacing. i.e. 0.2 km
+
     # --- Create figure ---
     fig = Figure(size = (900, 450), fontsize = 24)
     ax = Axis(fig[1, 1];
@@ -136,20 +138,72 @@ function plot_param_transect(Par_transect_slice, title_str, depth, transect, fol
         title  = "$title_str transect for day: $day_index",
         yreversed = false,
     )
-    hm = heatmap!(ax, dist, depth, Par_transect_slice;
-        colorrange = extrema(Par_transect_slice),
-        colormap = colormap,
-        nan_color = :silver,
-        interpolate = false,
-    )
-    if whiteline != 0.0
-        contour!(ax, dist, depth, Par_transect_slice; 
-                 levels=[whiteline], color=:white, linewidth=2, linestyle=:dot)
+    # ============================================
+    # BASIC METHOD: First draw the gray background, then the data
+    # ============================================
+    
+    # Create a copy of the data with NaN replacement
+    data_plot = copy(Par_transect_slice)
+    nan_mask = isnan.(data_plot)
+    
+    # Find the min/max of valid values
+    if any(.!nan_mask)
+        valid_data = data_plot[.!nan_mask]
+        vmin, vmax = extrema(valid_data)
+        
+        # Replace NaN with a value BELOW the minimum
+        offset = 0.1 * abs(vmax - vmin)
+        data_plot[nan_mask] .= vmin - offset
+        
+        # Create a custom color map with gray at the beginning
+        base_colors = to_colormap(colormap)
+        gray_color = RGB(0.75, 0.75, 0.75)  # Grey
+        custom_colors = [gray_color, base_colors...]
+        
+        # Drawing a heatmap
+        hm = heatmap!(ax, dist, depth, data_plot;
+            colorrange = (vmin, vmax),
+            colormap = custom_colors,  # CairoMakieustom map
+            lowclip = custom_colors[1],  # Gray for values ​​below vmin
+            highclip = custom_colors[end],  # Last color for values ​​above vmax
+            interpolate = false,
+            nan_color = gray_color,  
+        )
+    else
+        # All NaN values ​​- just draw gray
+        data_plot .= 0.0
+        hm = heatmap!(ax, dist, depth, data_plot;
+            colorrange = (0.0, 1.0),
+            colormap = [:silver],
+            interpolate = false,
+        )
     end
-    Colorbar(fig[1, 2], hm, label = "O₂ [μM]")
-    title_short = title_str[1:2]
-    save(joinpath(folder, "transect_$(title_short)_day_$(day_index).png"), fig)
-    @info "Saved $(title_short) transect plot for plot_day $day_index"
+    
+    # --- Contour line ---
+    if whiteline != 0.0
+        contour_data = copy(Par_transect_slice)
+        if any(nan_mask)
+            # Replace NaN with a large value
+            contour_data[nan_mask] .= whiteline + 1000.0
+        end
+        
+        contour!(ax, dist, depth, contour_data; 
+                 levels=[whiteline], color=:white, linewidth=4, linestyle=:dot)
+    end
+    
+    # --- Colorbar ---
+    if any(.!nan_mask)
+        Colorbar(fig[1, 2], hm, label="O₂ [μM]", width=25)
+    end
+    
+    # --- Save ---
+    title_short = title_str[1:min(2, length(title_str))]
+    filename = joinpath(folder, "transect_$(title_short)_day_$(day_index).png")
+    save(filename, fig, px_per_unit=2)
+    
+    @info "Saved plot to $filename"
+    println("NaN пикселей: $(sum(nan_mask)) из $(length(nan_mask))")
+    
     return fig
 end
 
@@ -282,7 +336,7 @@ function plot_tracer_subplot!(fig, pos, data, title_str;
     
     if whiteline != 0.0
         contour!(ax, longitudes, latitudes, data; 
-                 levels=[whiteline], color=:white, linewidth=2, linestyle=:dot)
+                 levels=[whiteline], color=:white, linewidth=4, linestyle=:dot)
     end
     Colorbar(fig[pos[1], pos[2]+1], hm, vertical=true)
 end
@@ -578,7 +632,7 @@ function plot_tracer_subplot!(fig, pos, data, title_str;
             xlabel="", ylabel="")
     hm = heatmap!(ax, data; colorrange=colorrange, colormap=colormap, nan_color=:silver)
     if whiteline != 0.0
-        contour!(ax, data; levels=[whiteline], color=:white, linewidth=2, linestyle = :dot)
+        contour!(ax, data; levels=[whiteline], color=:white, linewidth=4, linestyle = :dot)
     end
     Colorbar(fig[pos[1], pos[2]+1], hm, vertical=true)
 end
@@ -770,7 +824,7 @@ function plot_six_animations_365_days(tracers, times_seconds, folder, labels, lo
         hm = heatmap!(ax, longitudes, latitudes, Ti, 
                      colorrange=colorranges[i], 
                      colormap=colormaps[i], 
-                     nan_color=:silver)
+                     nan_color=:white)
         
         # Create colorbar next to the plot
         Colorbar(fig[row, col*2], hm, width=20, label="")
@@ -783,7 +837,7 @@ function plot_six_animations_365_days(tracers, times_seconds, folder, labels, lo
     super_title = @lift begin
         day_idx = day_indices[$day_iter]
         current_day = round(Int, times_days[day_idx])
-        "Day $current_day/365 - Surface"
+        "Day $current_day - Surface"
     end
     Label(fig[0, :], super_title, fontsize=24, font=:bold)
     
